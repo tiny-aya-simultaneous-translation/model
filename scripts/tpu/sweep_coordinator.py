@@ -138,6 +138,22 @@ def _publish_trial(control_prefix: str, payload: dict) -> None:
     _gsutil("cp", local, control_prefix.rstrip("/") + "/current_trial.json")
 
 
+def _clear_done_markers(control_prefix: str, index: int) -> None:
+    """Delete any done-markers already sitting under ``done/trial_<index>_*``.
+
+    Trial indices are reused across coordinator restarts (grid re-enumeration is
+    deterministic), but done-markers persist in GCS forever once written. If a
+    trial previously ran at this index and left markers behind (e.g. it CRASHED
+    before the done-marker-on-crash fix, or genuinely completed but its
+    checkpoint was later invalidated), a fresh (re-)publish of the same index
+    would have ``_wait_for_hosts`` see the OLD markers and report instant fake
+    completion without any host actually running the new trial. Clear first so
+    only markers written during THIS session count.
+    """
+    glob = control_prefix.rstrip("/") + f"/done/trial_{index}_host_*"
+    _gsutil("-m", "rm", glob, check=False, capture=True)
+
+
 def _wait_for_hosts(control_prefix: str, index: int, num_hosts: int,
                     poll_s: int = 20, timeout_s: int = 6 * 3600) -> bool:
     """Block until every host has written its done-marker for ``index``."""
@@ -302,6 +318,7 @@ def run(args) -> int:
             leaderboard.append((metric, index, run_id, params))
             continue
 
+        _clear_done_markers(args.control_prefix, index)
         _publish_trial(args.control_prefix, payload)
         ok = _wait_for_hosts(args.control_prefix, index, args.num_hosts,
                              timeout_s=args.host_timeout_s)

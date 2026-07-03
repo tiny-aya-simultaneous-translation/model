@@ -81,6 +81,19 @@ ssh_all "set -e; gcloud storage cp '$GCS_TARBALL' /tmp/sweep-code.tar.gz && \
     sudo tar -xzf /tmp/sweep-code.tar.gz -C '$REPO_DIR' && rm -f /tmp/sweep-code.tar.gz && \
     echo \"[\$(hostname)] code refreshed\""
 
+# ----- 2.5 clear stale control state so host loops can't race the coordinator -----
+# sweep_host_loop.sh handles a MISSING current_trial.json by waiting (poll again),
+# but a LEFTOVER one from a finished/previous sweep session (e.g. {"stop": true}
+# or a stale trial index) makes a host loop that starts before the coordinator
+# publishes its first trial read that stale state and exit immediately -- this
+# happened live: host loops raced the coordinator's startup (uv install + yaml
+# load takes several seconds) and all 4 read a leftover stop:true and exited
+# before the coordinator got a chance to publish trial 1. Deleting it here is
+# safe either way: no current_trial.json is exactly the "wait for the first
+# publish" state the host loop already handles.
+echo "==> [2.5/4] clearing stale current_trial.json (host loops must not race a stop signal from the last session)"
+gsutil rm "$CONTROL_PREFIX/current_trial.json" 2>/dev/null || true
+
 # ----- 3. start the per-host loop on ALL hosts (detached tmux, as ROOT) -----
 # Kill BOTH the old sweephost tmux AND any surviving train_hierarchical child
 # first: `tmux kill-session` only SIGHUPs the session, leaving a train process
