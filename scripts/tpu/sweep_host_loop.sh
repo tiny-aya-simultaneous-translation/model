@@ -87,9 +87,21 @@ while true; do
     trial_rc=${PIPESTATUS[0]}
     echo "[$(date -Is)] trial $index exited rc=$trial_rc host=$HOST_ID" | tee -a "$LOG"
 
-    # done-marker (unique per host via hostname); coordinator waits for all hosts.
-    : > /tmp/done_marker
-    gsutil cp /tmp/done_marker "$CONTROL_PREFIX/done/trial_${index}_host_${HOST_ID}" 2>/dev/null || true
+    # done-marker (unique per host via hostname); coordinator waits for all hosts,
+    # THEN reads the metric and marks the trial completed. Only write it on a
+    # CLEAN exit (rc=0): a crashed trial that still gets a done-marker looks
+    # "complete" to the coordinator, which advances to the next trial and reads
+    # whatever best_by_val happened to upload before the crash -- a STALE metric
+    # (this exact bug let a crashed trial 1 masquerade as done with a worse
+    # recorded score than it had actually reached in-process). On a crash, skip
+    # the marker so _wait_for_hosts times out and the supervisor's recovery path
+    # (checkpoint-truth _trial_completed) retries this trial for real.
+    if [ "$trial_rc" -eq 0 ]; then
+        : > /tmp/done_marker
+        gsutil cp /tmp/done_marker "$CONTROL_PREFIX/done/trial_${index}_host_${HOST_ID}" 2>/dev/null || true
+    else
+        echo "[$(date -Is)] trial $index CRASHED (rc=$trial_rc) -- withholding done-marker so it gets retried" | tee -a "$LOG"
+    fi
     last_index="$index"
 done
 echo "[$(date -Is)] host_loop complete host=$HOST_ID" | tee -a "$LOG"
