@@ -23,6 +23,11 @@ REPO_DIR="${REPO_DIR:-/opt/tinyaya}"
 CONFIG_FILE="${CONFIG_FILE:-configs/tpu/stage2_tpu_v6e16_scale_proxy.yaml}"
 TPU_STRATEGY="${TPU_STRATEGY:-fsdpv2_lora}"
 SECRET_HF="${SECRET_HF:-hf-token}"
+# The GCS rendezvous file (keyed by the config's wandb_run_name) that host-0's
+# train publishes its run id to and the workers read to attach. Cleared per trial
+# so a worker can NEVER read a STALE previous-trial (or Stage-1) run id -- it must
+# wait for THIS trial's host-0 run.
+RENDEZVOUS_URI="${RENDEZVOUS_URI:-gs://tinyaya-stage2-tpu/wandb-rendezvous/scale-sweep.id}"
 LOG=/tmp/train.log
 
 # Stage-1 WINNER (+MLP) structure + fixed rsLoRA knobs -- NOT swept. Injected here
@@ -43,6 +48,9 @@ SUGGESTED=("$@")                                   # e.g. --lr_lora=2e-4 --lora_
 ALL_ARGS=("${SUGGESTED[@]}" "${FIXED_ARGS[@]}")
 
 # ---- 1. broadcast to the worker hosts (monotonic index -> new trial) ----
+# Invalidate the rendezvous FIRST so workers block until host-0 republishes THIS
+# trial's run id (rather than attaching to the last trial's stale id).
+gsutil rm "$RENDEZVOUS_URI" 2>/dev/null || true
 idx_uri="$CONTROL_PREFIX/agent_index"
 cur="$(gsutil cat "$idx_uri" 2>/dev/null || echo 0)"
 [ -z "$cur" ] && cur=0

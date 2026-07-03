@@ -58,7 +58,9 @@ ssh_all "set -e; gcloud storage cp '$GCS_TARBALL' /tmp/bayes-code.tar.gz && \
     sudo tar -xzf /tmp/bayes-code.tar.gz -C '$REPO_DIR' && rm -f /tmp/bayes-code.tar.gz && \
     echo \"[\$(hostname)] code refreshed\""
 
-# ----- 3. create the W&B sweep (Python API; the `wandb sweep` CLI is broken here) -----
+# ----- 3. create the W&B sweep (programmatically via wandb.sweep()) -----
+# We create the sweep from Python (not the `wandb sweep` CLI, which also works)
+# so the script captures the sweep id directly without parsing CLI output.
 # Reuse a pre-created sweep if SWEEP_ID is passed (avoids orphan sweeps on relaunch).
 WANDB_API_KEY="$(gcloud secrets versions access latest --secret="$SECRET_WANDB" --project="$PROJECT_ID" 2>/dev/null)"
 export WANDB_API_KEY
@@ -84,6 +86,9 @@ echo "    sweep: https://wandb.ai/$WANDB_ENTITY/$WANDB_PROJECT/sweeps/$SWEEP_ID"
 echo "==> [4/5] clearing stale control state + starting worker loops (hosts 1..$((NUM_HOSTS-1)))"
 gsutil rm "$CONTROL_PREFIX/current_trial.json" 2>/dev/null || true
 gsutil -m rm "$CONTROL_PREFIX/agent_index" "$CONTROL_PREFIX/done/**" 2>/dev/null || true
+# also invalidate any stale rendezvous run-id (e.g. from Stage 1) so workers can't
+# attach to a dead run before host-0's first trial republishes it.
+gsutil rm "gs://$BUCKET/wandb-rendezvous/scale-sweep.id" 2>/dev/null || true
 for w in $(seq 1 $((NUM_HOSTS - 1))); do
     ssh_w "$w" "sudo -H tmux kill-session -t sweephost 2>/dev/null || true; \
         sudo pkill -9 -f '[s]cripts/train_hierarchical.py' 2>/dev/null || true; sleep 2; \

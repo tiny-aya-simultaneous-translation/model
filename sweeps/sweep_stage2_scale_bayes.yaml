@@ -16,9 +16,10 @@
 # wrapper (a JSON list can't ride wandb's ${args}); only lr x rank is swept here.
 # STAGE-1 WINNER: q,k,v,o + gate,up,down + embed_tokens (val/composite 5.1326).
 #
-# NOTE: `wandb sweep` (creation CLI) is broken in this wandb build; the launcher
-# creates the sweep via the Python API (wandb.sweep()). The `wandb agent` CLI is
-# fine.
+# NOTE: keep this YAML block-style (as below). `${env}` / `${args}` contain a
+# brace, so a flow-style `command: [${env}, ...]` makes YAML mis-parse the file
+# and wandb then errors; the launcher creates the sweep via wandb.sweep() but the
+# `wandb sweep` CLI works fine on this block-style form too.
 
 entity: cataluna84
 project: tinyaya-stage2-tpu

@@ -74,11 +74,14 @@ while true; do
     echo "[trial $index] args: ${TRIAL_ARGS[*]}" | tee -a "$LOG"
 
     ulimit -n 1048576
-    # WANDB_RUN_ID: the coordinator's pre-generated id (train honors it -> its run
-    # id + checkpoint dir + the metric the coordinator reads all match). Only set
-    # WANDB_SWEEP_ID when NON-empty -- wandb rejects an empty-string sweep id
-    # ("Sweep ID cannot be empty"), which is the grid case (no server-side sweep).
-    export WANDB_RUN_ID="$run_id"
+    # WANDB_RUN_ID / WANDB_SWEEP_ID: ONLY export when NON-empty. wandb's Settings
+    # validation rejects an empty-string value for either ("Run ID cannot be
+    # empty" / "Sweep ID cannot be empty") and CRASHES wandb.init even before the
+    # rank-0-vs-worker branch runs. Grid sets a deterministic run_id (workers get
+    # it but attach via the rendezvous anyway); the Stage-2 bayes flow leaves
+    # run_id EMPTY for workers -- they must attach to host-0's agent-created run
+    # via the rendezvous, so WANDB_RUN_ID must be UNSET, not "".
+    if [ -n "$run_id" ]; then export WANDB_RUN_ID="$run_id"; else unset WANDB_RUN_ID; fi
     if [ -n "$sweep_id" ]; then export WANDB_SWEEP_ID="$sweep_id"; else unset WANDB_SWEEP_ID; fi
     DEVICE_BACKEND=tpu PJRT_DEVICE=TPU \
     XLA_USE_BF16=0 XLA_DOWNCAST_BF16=0 XLA_DISABLE_FUNCTIONALIZATION=0 XLA_NO_SPECIAL_SCALARS=1 \
