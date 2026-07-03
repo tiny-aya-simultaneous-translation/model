@@ -28,6 +28,12 @@ HOST_ID="$(hostname)"
 
 export HOME="${HOME:-/root}"
 export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
+# Group every trial of this sweep under one W&B group (the control-prefix name,
+# e.g. "scale-grid") -- wandb.init reads WANDB_RUN_GROUP automatically, so a grid
+# sweep's per-trial runs cluster in the UI for easy cross-trial comparison. (For
+# the Stage-2 bayes sweep the workers instead ATTACH to host-0's sweep run via the
+# rendezvous, so this is a harmless no-op there.)
+export WANDB_RUN_GROUP="$(basename "$CONTROL_PREFIX")"
 cd "$REPO_DIR"
 
 # torch_xla's _XLAC.so needs libpython3.12.so.1.0, which uv hides in its managed
