@@ -1368,11 +1368,16 @@ def main():
                 optimizer.load_state_dict(full_osd)
             if is_main:
                 print(f"Restored optimizer state from {resume_dir}")
-        sch_p = os.path.join(resume_dir, "scheduler.pt")
-        if os.path.exists(sch_p):
-            scheduler.load_state_dict(torch.load(sch_p, map_location="cpu", weights_only=True))
-            if is_main:
-                print(f"Restored scheduler state from {resume_dir}")
+        # NOTE: scheduler state is intentionally NOT restored from the
+        # checkpoint. WarmupCosineScheduler is a pure function of
+        # (warmup_steps, total_steps, min_lr_ratio, base_lrs) -- it has no
+        # other organic state -- and it was already freshly constructed
+        # above from the CURRENT config. Restoring scheduler.pt would
+        # silently clobber a deliberately-changed max_steps (e.g. extending
+        # a run's horizon) back to the checkpoint's stale total_steps,
+        # parking the LR at min_lr_ratio instead of actually training the
+        # extended steps. The fresh construction is identical to the old
+        # restored behavior on a same-config resume anyway.
         if is_main:
             print(f"Resuming training from step {start_step}")
 
@@ -1540,9 +1545,15 @@ def main():
             wandb.define_metric("train/*", step_metric="global_step")
             wandb.define_metric("perf/*", step_metric="global_step")
             wandb.define_metric("val/*", step_metric="global_step")
-            # Phase E sweep: optimise on the BEST (min) composite, not the last
-            # value, so early-stopped trials are compared at their best point.
-            wandb.define_metric("val/composite", summary="min", step_metric="global_step")
+            # NOTE: previously summary="min" here, so sweep trials could be
+            # compared at their best point. Dropped: it makes W&B store the
+            # run summary as {"min": x} instead of a flat scalar, which
+            # breaks parallel-coordinates/line-chart panels (they read a
+            # plain number). The actual best-value read for sweep ranking
+            # goes through best_by_val/metadata.json (sweep_coordinator.py's
+            # _read_metric_from_checkpoint), which never depended on this
+            # summary aggregation, so dropping it is UI-only and safe.
+            wandb.define_metric("val/composite", step_metric="global_step")
             wandb.define_metric("audio/*", step_metric="global_step")
             wandb.define_metric("mem/*", step_metric="global_step")
             if is_tpu:
