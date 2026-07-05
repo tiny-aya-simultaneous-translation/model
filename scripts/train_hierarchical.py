@@ -813,15 +813,26 @@ def run_validation(
         # cb0 teacher-forced acc on target positions (shifted next-token).
         # Static-shape masked reduction -- NO boolean indexing (which
         # would produce a dynamic-length tensor and recompile on XLA).
+        # TARGET = audio_targets (the DELAYED model_audio_codes the model
+        # predicts and the loss trains against), NOT all_codes (batch
+        # "audio_codes", which is UNDELAYED). Using all_codes was a real bug:
+        # CB0 has codebook-delay 0 so all_codes[0] == audio_targets[0] and its
+        # accuracy was correct, but CB1-7 are delayed by 1..7 frames, so the
+        # metric compared the model's (correctly-delayed) predictions against
+        # the undelayed target -> off-by-k misalignment -> CB1-7 accuracy
+        # pinned at ~random even when fully learned (verified on the overfit
+        # run: CB1-7 loss -> ~0.05 while this metric read ~0%). audio_targets
+        # is defined above (= full_model_codes, delayed) so loss and accuracy
+        # now use the SAME target.
         pred = audio_logits[:, 0, :-1].argmax(dim=-1)  # [B, T-1]
-        target = all_codes[:, 0, 1:]
+        target = audio_targets[:, 0, 1:]
         m = (loss_mask[:, 1:].bool() & mask[:, 1:].bool()).to(acc_loss.dtype)
         cb0_correct = cb0_correct + ((pred == target).to(m.dtype) * m).sum()
         cb0_total = cb0_total + m.sum()
         # All-codebook top-1 acc (same target positions; static-shape, no
         # boolean indexing). [B,CB,T-1] preds vs targets, masked, summed -> [CB].
         preds_cb = audio_logits[:, :, :-1].argmax(dim=-1)  # [B, CB, T-1]
-        tgts_cb = all_codes[:, :num_codebooks, 1:]
+        tgts_cb = audio_targets[:, :num_codebooks, 1:]
         cb_correct = cb_correct + (
             (preds_cb == tgts_cb).to(m.dtype) * m.unsqueeze(1)
         ).sum(dim=(0, 2))
