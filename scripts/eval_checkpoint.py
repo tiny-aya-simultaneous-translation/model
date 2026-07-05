@@ -39,7 +39,7 @@ def generate_teacher_forced(model, sample, device, num_codebooks=8):
     mask = torch.ones(1, T, dtype=torch.long, device=device)
     full_model = sample["model_audio_codes"].unsqueeze(0).to(device)
 
-    with torch.no_grad(), torch.amp.autocast("cuda", dtype=torch.bfloat16):
+    with torch.no_grad(), torch.amp.autocast(device.split(":")[0], dtype=torch.bfloat16):
         output = model(
             text_ids=text, audio_codes=user_cb0, model_audio_codes=model_cb0,
             attention_mask=mask, full_audio_codes=full_model[:, :num_codebooks, :],
@@ -65,7 +65,7 @@ def generate_autoregressive(model, sample, device, temp=0.8, top_p=0.9):
     for t in range(src_len, T):
         ar_mask = torch.ones(1, t + 1, dtype=torch.long, device=device)
 
-        with torch.no_grad(), torch.amp.autocast("cuda", dtype=torch.bfloat16):
+        with torch.no_grad(), torch.amp.autocast(device.split(":")[0], dtype=torch.bfloat16):
             bb_out = model.backbone(
                 text_ids=ar_text[:, :t + 1],
                 audio_codes=user_stream[:, :t + 1],
@@ -102,6 +102,10 @@ def generate_autoregressive(model, sample, device, temp=0.8, top_p=0.9):
 
 
 def _sample_top_p(logits, temp, top_p):
+    # temp<=0 -> greedy (argmax). For a memorization-reproduction check we want
+    # deterministic decoding so a perfectly-learned model reproduces the target.
+    if temp <= 0:
+        return logits.argmax(dim=-1)
     probs = torch.softmax(logits.float() / temp, dim=-1)
     sorted_p, sorted_i = torch.sort(probs, descending=True)
     cum = torch.cumsum(sorted_p, dim=-1)
@@ -146,15 +150,20 @@ def main():
     parser.add_argument("--output_dir", default="eval_results")
     parser.add_argument("--whisper_model", default="large-v3")
     parser.add_argument("--skip_ar", action="store_true", help="Skip slow autoregressive generation")
+    parser.add_argument("--skip_asr", action="store_true", help="Skip Whisper ASR/BLEU (audio-only sanity)")
+    parser.add_argument("--device", default="cuda", help="cuda | cpu (xla not supported for the AR loop)")
+    parser.add_argument("--lora_r", type=int, default=16, help="LoRA rank of the checkpoint (must match)")
+    parser.add_argument("--ar_temp", type=float, default=0.0, help="AR sampling temp; 0 = greedy (reproduction check)")
+    parser.add_argument("--ar_top_p", type=float, default=0.9)
     args = parser.parse_args()
 
     os.makedirs(args.output_dir, exist_ok=True)
-    device = "cuda"
+    device = args.device
 
     # Load model
     print("Loading model...", flush=True)
     model = TinyAyaMoshiComposite(num_codebooks=8)
-    model.backbone = apply_lora(model.backbone, r=16, num_full_ft_layers=0)
+    model.backbone = apply_lora(model.backbone, r=args.lora_r, num_full_ft_layers=0)
     load_checkpoint(model, None, None, args.checkpoint)
     model = model.to(device).to(torch.bfloat16).eval()
 
@@ -196,7 +205,12 @@ def main():
         # Teacher-forced generation
         t0 = time.time()
         tf_codes = generate_teacher_forced(model, sample, device)
-        tf_codes_clean = tf_codes.clamp(max=2047)
+        # tf_codes are in the DELAYED codebook space (the model predicts the
+        # delayed model_audio_codes). Undo the per-codebook delay before Mimi
+        # decode so every codebook is temporally realigned -- decoding delayed
+        # codes directly garbles the audio. (undo_codebook_delay was imported
+        # but never applied.) clamp SILENCE(2048)->2047 AFTER undo.
+        tf_codes_clean = undo_codebook_delay(tf_codes).clamp(max=2047)
         tf_wav = mimi.decode(tf_codes_clean.to(device)).numpy()
         sf.write(os.path.join(sample_dir, "teacher_forced.wav"), tf_wav, 24000)
         tf_time = time.time() - t0
@@ -213,21 +227,25 @@ def main():
         ar_time = 0
         if not args.skip_ar:
             t0 = time.time()
-            ar_codes = generate_autoregressive(model, sample, device)
-            ar_codes_clean = ar_codes.clamp(max=2047)
+            ar_codes = generate_autoregressive(model, sample, device, temp=args.ar_temp, top_p=args.ar_top_p)
+            # AR output is likewise in DELAYED space -- undo before decode.
+            ar_codes_clean = undo_codebook_delay(ar_codes).clamp(max=2047)
             ar_wav = mimi.decode(ar_codes_clean.to(device)).numpy()
             sf.write(os.path.join(sample_dir, "autoregressive.wav"), ar_wav, 24000)
             ar_time = time.time() - t0
 
-        # ASR on generated audio
-        print(f"  Running ASR...", flush=True)
-        gt_transcript = run_asr(os.path.join(sample_dir, "target_gt.wav"), args.whisper_model, language=tgt_lang)
-        tf_transcript = run_asr(os.path.join(sample_dir, "teacher_forced.wav"), args.whisper_model, language=tgt_lang)
-        ar_transcript = run_asr(os.path.join(sample_dir, "autoregressive.wav"), args.whisper_model, language=tgt_lang) if ar_wav is not None else ""
-
-        # BLEU scores
-        tf_bleu = compute_bleu(tf_transcript, gt_transcript)
-        ar_bleu = compute_bleu(ar_transcript, gt_transcript) if ar_transcript else 0.0
+        # ASR on generated audio (skippable -- Whisper is CUDA-oriented + slow;
+        # for an audio-only reproduction sanity check the per-codebook accuracy
+        # and the decoded waveforms are enough).
+        gt_transcript = tf_transcript = ar_transcript = ""
+        tf_bleu = ar_bleu = 0.0
+        if not args.skip_asr:
+            print(f"  Running ASR...", flush=True)
+            gt_transcript = run_asr(os.path.join(sample_dir, "target_gt.wav"), args.whisper_model, language=tgt_lang)
+            tf_transcript = run_asr(os.path.join(sample_dir, "teacher_forced.wav"), args.whisper_model, language=tgt_lang)
+            ar_transcript = run_asr(os.path.join(sample_dir, "autoregressive.wav"), args.whisper_model, language=tgt_lang) if ar_wav is not None else ""
+            tf_bleu = compute_bleu(tf_transcript, gt_transcript)
+            ar_bleu = compute_bleu(ar_transcript, gt_transcript) if ar_transcript else 0.0
 
         result = {
             "sample_idx": i,
