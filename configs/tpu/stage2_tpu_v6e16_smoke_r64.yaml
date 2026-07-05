@@ -1,0 +1,91 @@
+# TPU v6e-16 SMOKE test, ARM C (Stage-2 rank-diversity check): r=64, lr=4.412e-5.
+#
+# See stage2_tpu_v6e16_smoke_r32.yaml for the full rationale. This arm is
+# the Stage-2 sweep's 3rd-place candidate (val/composite=5.2261) -- included
+# to confirm the highest tested rank doesn't diverge/OOM on real full-corpus
+# data diversity (untested combination so far). Runs in PARALLEL with the
+# r=32 and r=8 arms on a NEW v6e-16 slice in us-east1-d (2nd TRC zone,
+# spreads spot-availability risk).
+
+backend: tpu
+
+data:
+  encoded_dir: /mnt/data/encoded
+  train_split: /mnt/data/splits/train.jsonl
+  val_split: /mnt/data/splits/val.jsonl
+  max_frames: 300
+  audio_frame_rate: 12.5
+  num_workers: 32
+  pin_memory: false
+
+train:
+  weight_decay: 0.01
+  num_codebooks: 8
+  batch_size: 4
+  grad_accum: 4
+  max_steps: 5000
+  warmup_steps: 50
+  min_lr_ratio: 0.0
+  early_stop_patience: 6
+  compile_warmup_steps: 1
+  enable_clip_grad_norm: true
+  clip_grad_norm: 1.0
+  log_grad_norm: true
+  fsdp_barrier_hook: false
+  depth_chunk_size: 16
+  precision: bfloat16
+  use_scan_layers: false
+  xla_grad_checkpoint: true
+  final_canonical_save: false
+
+loss:
+  text_weight: 0.0
+  audio_weight: 1.0
+  text_weight_curriculum_frac: 0.0
+  composite_text_w: 0.0
+  composite_audio_w: 1.0
+  text_padding_weight: 0.01
+  zero_padding_weight: 0.0
+  label_smoothing: 0.1
+  per_codebook_multipliers: [1.0, 1.0, 1.5, 1.5, 2.0, 2.0, 2.0, 2.0]
+  progressive_unmask_fraction: 0.10
+  unmask_k0: 1
+
+lora:
+  r: 64                             # Stage-2 rank-diversity check (3rd place)
+  alpha: 128                        # 2 x r
+  dropout: 0.05
+  use_rslora: true
+  target_modules: [q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, down_proj, embed_tokens]
+  lora_exclude_top: 2
+  num_full_ft_layers: 0
+  depth_unfreeze_blocks: 0
+
+optim:
+  lr_lora: 4.412e-5                 # Stage-2 sweep run w4wz4g4j
+  lr_full_ft: 5.0e-5
+  lr_projection: 5.0e-4
+  lr_depth: 1.0e-4
+  lr_depth_blocks: 1.0e-5
+  lr_audio_embed: 5.0e-4
+  lr_text_embed: 5.0e-4
+
+logging:
+  log_every: 25
+  save_every: 500
+  audio_every: 1000000
+  val_every: 250
+  val_max_batches: 25
+  val_on_tpu: true
+  diag_metrics: false
+  save_dir: gs://tinyaya-stage2-tpu/checkpoints/stage2-tpu-v6e16-smoke-r64
+  keep_last_n: 0
+  keep_local_checkpoints: false
+  use_wandb: true
+  wandb_project: tinyaya-stage2-tpu
+  wandb_run_name: v0.3-smoke-r64
+
+perf:
+  enabled: true
+  warmup_skip_steps: 25
+  xprof_trace_labels: false
