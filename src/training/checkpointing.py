@@ -28,6 +28,7 @@ weights back to the target device.
 
 import json
 import os
+import re
 from pathlib import Path
 
 import torch
@@ -415,6 +416,38 @@ def save_checkpoint_canonical_final(
         shutil.rmtree(write_dir, ignore_errors=True)
 
 
+# Backbone decoder blocks are wrapped by the TPU grad-checkpoint / scan proxy
+# (``_ScannedLayerStack`` in src/model/scan_utils.py) whenever ``xla_grad_checkpoint``
+# or ``use_scan_layers`` is on, which renames every block param from
+# ``...model.layers.<i>.<rest>`` to ``...model.layers.layers_list.<i>.layer.<rest>``.
+# A checkpoint SAVED under that proxy therefore carries the ``layers_list.<i>.layer``
+# namespace, but a model BUILT without the proxy (CPU/GPU eval, the HF/PEFT export a
+# release consumer loads, or a resume with grad-ckpt off) uses the plain ``layers.<i>``
+# namespace. ``set_peft_model_state_dict`` matches on exact key names, so the mismatch
+# silently loads 0 of the adapter tensors -- the model runs base-only and reads near
+# random. This canonicalises the saved keys to whichever namespace the LIVE model uses,
+# so the adapter loads on any structure (proven bug: 1/239 lora_B tensors loaded on a
+# vanilla eval model before this; after the fix, 239/239).
+_SCAN_WRAP_RE = re.compile(r"\.layers\.layers_list\.(\d+)\.layer\.")
+_SCAN_PLAIN_RE = re.compile(r"\.layers\.(\d+)\.")
+
+
+def _match_scan_namespace(sd: dict, model_keys) -> dict:
+    """Remap a saved state_dict's decoder-block keys to the live model's namespace.
+
+    Bidirectional: strips the ``layers_list.<i>.layer`` wrapper when the live model
+    is plain (eval/export), or inserts it when the live model is scan-wrapped (TPU
+    resume) but the checkpoint is plain. A no-op when the two already agree.
+    """
+    model_wrapped = any(".layers.layers_list." in k for k in model_keys)
+    saved_wrapped = any(".layers.layers_list." in k for k in sd)
+    if saved_wrapped and not model_wrapped:
+        return {_SCAN_WRAP_RE.sub(r".layers.\1.", k): v for k, v in sd.items()}
+    if model_wrapped and not saved_wrapped:
+        return {_SCAN_PLAIN_RE.sub(r".layers.layers_list.\1.layer.", k): v for k, v in sd.items()}
+    return sd
+
+
 def load_checkpoint(model, optimizer, scheduler, load_dir: str) -> int:
     """Load checkpoint into an UNWRAPPED model (before FSDP/DDP wrapping).
 
@@ -490,7 +523,22 @@ def load_checkpoint(model, optimizer, scheduler, load_dir: str) -> int:
     peft_dir = os.path.join(load_dir, "peft_adapter")
     if os.path.isdir(peft_dir):
         sd = load_peft_weights(peft_dir)
-        set_peft_model_state_dict(model.backbone.model, sd)
+        # Canonicalise the scan/grad-ckpt block namespace to the LIVE model's before
+        # matching (see _match_scan_namespace) -- otherwise a TPU-saved adapter loads
+        # 0 tensors onto a plain eval/export model and the backbone runs un-adapted.
+        sd = _match_scan_namespace(sd, model.backbone.model.state_dict().keys())
+        res = set_peft_model_state_dict(model.backbone.model, sd)
+        # Fidelity guard: a still-mismatched namespace (or a rank/target mismatch)
+        # would silently no-op. Fail loud rather than ship a base-only model.
+        missing = getattr(res, "missing_keys", []) or []
+        adapter_missing = [k for k in missing if "lora_" in k]
+        if adapter_missing:
+            raise RuntimeError(
+                f"[ckpt] adapter load MISMATCH: {len(adapter_missing)} lora_* keys "
+                f"unfilled (e.g. {adapter_missing[:2]}). The checkpoint's LoRA "
+                f"structure/namespace does not match the live model -- the backbone "
+                f"would run un-adapted. Check r/target_modules and scan-wrapper state."
+            )
 
     modules_to_load = [
         ("projection.pt", model.projection),
@@ -504,7 +552,11 @@ def load_checkpoint(model, optimizer, scheduler, load_dir: str) -> int:
     for fname, mod in modules_to_load:
         p = os.path.join(load_dir, fname)
         if os.path.exists(p):
-            mod.load_state_dict(torch.load(p, map_location="cpu", weights_only=True), strict=False)
+            msd = torch.load(p, map_location="cpu", weights_only=True)
+            # depth_decoder blocks are scan-wrapped on TPU too; realign the namespace
+            # to the live module so trained keys are not silently dropped by strict=False.
+            msd = _match_scan_namespace(msd, mod.state_dict().keys())
+            mod.load_state_dict(msd, strict=False)
 
     opt_p = os.path.join(load_dir, "optimizer.pt")
     if optimizer is not None and os.path.exists(opt_p):

@@ -123,6 +123,56 @@ def test_read_checkpoint_metadata_missing_returns_empty(tmp_path):
     assert ckpt.read_checkpoint_metadata(str(d)) == {}
 
 
+# ---------------------------------------------------------------------------
+# _match_scan_namespace: the TPU grad-ckpt/scan proxy renames backbone blocks to
+# ``layers.layers_list.<i>.layer.<rest>``. A checkpoint saved under it must still
+# load onto a plain (eval/export) OR a scan-wrapped (resume) model. Before this
+# fix a TPU-saved adapter loaded 1/239 lora tensors onto a vanilla eval model
+# (backbone ran un-adapted -> teacher-forced acc read ~19% vs training's ~97%).
+# ---------------------------------------------------------------------------
+
+
+def test_match_scan_namespace_strips_wrapper_for_plain_model(tmp_path):
+    saved = {  # keys as written by save_pretrained under the scan proxy (no .default)
+        "base_model.model.model.layers.layers_list.0.layer.self_attn.q_proj.lora_A.weight": 1,
+        "base_model.model.model.layers.layers_list.33.layer.mlp.down_proj.lora_B.weight": 2,
+        "base_model.model.model.embed_tokens.lora_embedding_A": 3,  # no layers segment
+    }
+    plain_model_keys = [
+        "base_model.model.model.layers.0.self_attn.q_proj.lora_A.default.weight",
+        "base_model.model.model.layers.33.mlp.down_proj.lora_B.default.weight",
+    ]
+    out = ckpt._match_scan_namespace(saved, plain_model_keys)
+    assert "base_model.model.model.layers.0.self_attn.q_proj.lora_A.weight" in out
+    assert "base_model.model.model.layers.33.mlp.down_proj.lora_B.weight" in out
+    assert "base_model.model.model.embed_tokens.lora_embedding_A" in out  # untouched
+    assert not any("layers_list" in k for k in out)
+
+
+def test_match_scan_namespace_inserts_wrapper_for_scan_model(tmp_path):
+    saved = {  # a canonical/vanilla-saved adapter being loaded onto a scan-wrapped model
+        "base_model.model.model.layers.5.self_attn.v_proj.lora_A.weight": 9,
+        "base_model.model.model.embed_tokens.lora_embedding_A": 3,
+    }
+    scan_model_keys = [
+        "base_model.model.model.layers.layers_list.5.layer.self_attn.v_proj.lora_A.default.weight",
+    ]
+    out = ckpt._match_scan_namespace(saved, scan_model_keys)
+    assert (
+        "base_model.model.model.layers.layers_list.5.layer.self_attn.v_proj.lora_A.weight"
+        in out
+    )
+    assert "base_model.model.model.embed_tokens.lora_embedding_A" in out  # untouched
+
+
+def test_match_scan_namespace_noop_when_namespaces_agree(tmp_path):
+    saved = {"base_model.model.model.layers.layers_list.0.layer.x": 1}
+    model_keys = ["base_model.model.model.layers.layers_list.0.layer.x.default"]
+    assert ckpt._match_scan_namespace(saved, model_keys) is saved
+    plain = {"base_model.model.model.layers.0.x": 1}
+    assert ckpt._match_scan_namespace(plain, ["base_model.model.model.layers.0.x.default"]) is plain
+
+
 if __name__ == "__main__":
     import sys
     import tempfile
