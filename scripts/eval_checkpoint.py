@@ -160,10 +160,31 @@ def main():
     os.makedirs(args.output_dir, exist_ok=True)
     device = args.device
 
-    # Load model
+    # Load model. Build the LoRA structure from the checkpoint's OWN
+    # adapter_config.json (target_modules / r / alpha / rslora) rather than
+    # hardcoding it -- otherwise the adapter's weights for any module the eval
+    # didn't wrap (e.g. the +MLP k/o/gate/up/down at r=32) silently fail to load
+    # and the model runs mostly-untrained. Self-configuring for any checkpoint.
     print("Loading model...", flush=True)
+    _acfg_uri = os.path.join(args.checkpoint, "peft_adapter", "adapter_config.json")
+    if args.checkpoint.startswith("gs://"):
+        import subprocess as _sp
+        _acfg = json.loads(_sp.run(["gsutil", "cat", _acfg_uri], capture_output=True, text=True).stdout)
+    else:
+        with open(_acfg_uri) as _f:
+            _acfg = json.load(_f)
+    _r = _acfg.get("r", args.lora_r)
+    print(f"  LoRA from checkpoint: r={_r} alpha={_acfg.get('lora_alpha')} "
+          f"rslora={_acfg.get('use_rslora')} targets={_acfg.get('target_modules')}", flush=True)
     model = TinyAyaMoshiComposite(num_codebooks=8)
-    model.backbone = apply_lora(model.backbone, r=args.lora_r, num_full_ft_layers=0)
+    model.backbone = apply_lora(
+        model.backbone,
+        r=_r,
+        lora_alpha=_acfg.get("lora_alpha", 2 * _r),
+        target_modules=_acfg.get("target_modules"),
+        use_rslora=_acfg.get("use_rslora", False),
+        num_full_ft_layers=0,
+    )
     load_checkpoint(model, None, None, args.checkpoint)
     model = model.to(device).to(torch.bfloat16).eval()
 
