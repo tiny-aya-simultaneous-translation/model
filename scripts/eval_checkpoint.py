@@ -27,6 +27,17 @@ from src.data.dataset import StreamingTranslationDataset, undo_codebook_delay, S
 from src.data.mimi_encoder import MimiEncoder
 from transformers import AutoTokenizer
 
+# Compute dtype for the eval forward. Set from --fp32 in main(). On CPU, bf16
+# matmuls accumulate in low precision (unlike the TPU MXU's fp32 accumulate), so
+# a bf16 CPU eval materially under-reads accuracy vs the on-TPU training metric;
+# fp32 on CPU recovers it.
+_AC_DTYPE = torch.bfloat16
+
+
+def _autocast(device):
+    dt = device.split(":")[0]
+    return torch.amp.autocast(dt, dtype=_AC_DTYPE, enabled=(_AC_DTYPE != torch.float32))
+
 
 def generate_teacher_forced(model, sample, device, num_codebooks=8):
     """Teacher-forced generation — upper bound on quality."""
@@ -39,7 +50,7 @@ def generate_teacher_forced(model, sample, device, num_codebooks=8):
     mask = torch.ones(1, T, dtype=torch.long, device=device)
     full_model = sample["model_audio_codes"].unsqueeze(0).to(device)
 
-    with torch.no_grad(), torch.amp.autocast(device.split(":")[0], dtype=torch.bfloat16):
+    with torch.no_grad(), _autocast(device):
         output = model(
             text_ids=text, audio_codes=user_cb0, model_audio_codes=model_cb0,
             attention_mask=mask, full_audio_codes=full_model[:, :num_codebooks, :],
@@ -65,7 +76,7 @@ def generate_autoregressive(model, sample, device, temp=0.8, top_p=0.9):
     for t in range(src_len, T):
         ar_mask = torch.ones(1, t + 1, dtype=torch.long, device=device)
 
-        with torch.no_grad(), torch.amp.autocast(device.split(":")[0], dtype=torch.bfloat16):
+        with torch.no_grad(), _autocast(device):
             bb_out = model.backbone(
                 text_ids=ar_text[:, :t + 1],
                 audio_codes=user_stream[:, :t + 1],
@@ -155,10 +166,13 @@ def main():
     parser.add_argument("--lora_r", type=int, default=16, help="LoRA rank of the checkpoint (must match)")
     parser.add_argument("--ar_temp", type=float, default=0.0, help="AR sampling temp; 0 = greedy (reproduction check)")
     parser.add_argument("--ar_top_p", type=float, default=0.9)
+    parser.add_argument("--fp32", action="store_true", help="Run the forward in fp32 (recommended on CPU; bf16-on-CPU under-reads accuracy)")
     args = parser.parse_args()
 
     os.makedirs(args.output_dir, exist_ok=True)
     device = args.device
+    global _AC_DTYPE
+    _AC_DTYPE = torch.float32 if args.fp32 else torch.bfloat16
 
     # Load model. Build the LoRA structure from the checkpoint's OWN
     # adapter_config.json (target_modules / r / alpha / rslora) rather than
@@ -186,7 +200,7 @@ def main():
         num_full_ft_layers=0,
     )
     load_checkpoint(model, None, None, args.checkpoint)
-    model = model.to(device).to(torch.bfloat16).eval()
+    model = model.to(device).to(_AC_DTYPE).eval()
 
     # Load dataset + Mimi decoder
     tokenizer = AutoTokenizer.from_pretrained("CohereLabs/tiny-aya-base", trust_remote_code=True)
