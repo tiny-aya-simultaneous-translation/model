@@ -248,6 +248,29 @@ class StreamingTranslationDataset(Dataset):
                     self.rows.append(json.loads(line))
         if not self.rows:
             raise FileNotFoundError(f"No rows in {self.jsonl_path}")
+        # The published tr-hi-mimi-encoded corpus's own splits reference a small
+        # fraction (~5%, verified 2026-07-05) of pt_paths whose .pt file is NOT
+        # present in any shipped batch tarball -- an upstream gap in the dataset
+        # repo, not a download failure (huggingface-cli fetches 100% of files).
+        # __getitem__ torch.loads pt_path unconditionally, so an unfiltered
+        # manifest crashes the instant training draws a missing row. Drop those
+        # rows once here, using the SAME _resolve() __getitem__ uses so the check
+        # matches exactly what would be loaded. In-code (vs an external
+        # pre-filter) so a re-provisioned / spot-preempted VM that re-reads this
+        # repo is robust with no operator step. One-time O(n) stat pass.
+        n_raw = len(self.rows)
+        self.rows = [r for r in self.rows if self._resolve(r["pt_path"]).exists()]
+        n_missing = n_raw - len(self.rows)
+        if not self.rows:
+            raise FileNotFoundError(
+                f"All {n_raw} rows in {self.jsonl_path} reference missing .pt files "
+                f"(encoded_dir={self.encoded_dir})"
+            )
+        if n_missing:
+            print(
+                f"StreamingTranslationDataset: dropped {n_missing}/{n_raw} rows "
+                f"referencing missing .pt files"
+            )
         print(f"StreamingTranslationDataset: {len(self.rows)} rows from {self.jsonl_path}")
 
     def __len__(self):

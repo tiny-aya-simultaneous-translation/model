@@ -181,6 +181,31 @@ if ls "$DATA_DIR"/mimi_encoded_batch*.tar.gz >/dev/null 2>&1 \
     done
     n_pt=$(find "$DATA_DIR/encoded" -maxdepth 1 -name '*.pt' | wc -l)
     echo "[startup] extracted $n_pt encoded .pt files"
+    # The published HF repo's own splits/{train,val}.jsonl reference a small
+    # number of pt_path entries (~5%, verified 2026-07-05) whose .pt file is
+    # NOT present in any of the mimi_encoded_batch*.tar.gz -- an upstream gap
+    # in the dataset repo itself, not a download failure (huggingface-cli
+    # reports 100% of files fetched). src/data/dataset.py's __getitem__ loads
+    # pt_path unconditionally (torch.load, no existence check), so an
+    # unfiltered split crashes training the moment it draws a missing row.
+    # Filter once per host, in place, before training ever reads the splits.
+    sudo python3 -c "
+import json, os
+for split in ('train', 'val'):
+    p = '$DATA_DIR/splits/' + split + '.jsonl'
+    kept, dropped = [], 0
+    with open(p) as f:
+        for line in f:
+            row = json.loads(line)
+            if os.path.exists(os.path.join('$DATA_DIR', row['pt_path'])):
+                kept.append(line)
+            else:
+                dropped += 1
+    with open(p, 'w') as f:
+        f.writelines(kept)
+    print(f'[startup] filtered {split}.jsonl: kept={len(kept)} dropped={dropped}')
+"
+    sudo chown "$USER:$USER" "$DATA_DIR/splits/train.jsonl" "$DATA_DIR/splits/val.jsonl"
     touch "$DATA_DIR/encoded/.unpacked"
 fi
 fi  # end SWEEP_DATA_GS_URI branch
