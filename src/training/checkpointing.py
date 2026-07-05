@@ -442,8 +442,17 @@ def load_checkpoint(model, optimizer, scheduler, load_dir: str) -> int:
 
         load_dir = tempfile.mkdtemp(prefix="ckpt_load_")
         print(f"[ckpt] downloading {gcs_src}/* -> {load_dir}", flush=True)
+        # NB: use "/*" (glob) NOT "/." here. The "/." contents-of idiom works for
+        # a LOCAL `cp` (and for the upload in _gsutil_cp_into whose source is
+        # local), but gsutil treats a GCS "gs://.../dir/." as a literal object
+        # named "." -> "No URLs matched" -> 0 files. Combined with the
+        # empty-checkpoint handling below, that made EVERY real GCS checkpoint
+        # download silently "start fresh from step 0" -- i.e. spot-preemption
+        # resume never actually resumed (it restarted). "/*" copies all objects
+        # incl. the peft_adapter/ subdir; a truly empty dir still yields
+        # "No URLs matched" so the start-fresh path is preserved.
         result = subprocess.run(
-            ["gsutil", "-m", "cp", "-r", gcs_src.rstrip("/") + "/.", load_dir],
+            ["gsutil", "-m", "cp", "-r", gcs_src.rstrip("/") + "/*", load_dir],
             capture_output=True,
             text=True,
         )
