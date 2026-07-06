@@ -6,14 +6,14 @@
 #   GCS_URI            - tarball URI (gs://bucket/path/file.tar.gz)
 #   REPO_DIR           - local repo dir (e.g. /opt/tinyaya)
 #   TPU_STRATEGY       - replicated | fsdpv2 | fsdpv2_lora | auto
-#   CONFIG_FILE        - relative config (e.g. configs/tpu/stage2_tpu_v6e_v2.yaml)
+#   CONFIG_FILE        - relative config (e.g. configs/tpu/stage2_tpu_v6e16_full_v03.yaml)
 #   RUN_PROBE_ONLY     - 0/1
 set -euo pipefail
 
 GCS_URI="${GCS_URI:?missing}"
 REPO_DIR="${REPO_DIR:-/opt/tinyaya}"
 TPU_STRATEGY="${TPU_STRATEGY:-auto}"
-CONFIG_FILE="${CONFIG_FILE:-configs/tpu/stage2_tpu_v6e_v2.yaml}"
+CONFIG_FILE="${CONFIG_FILE:-configs/tpu/stage2_tpu_v6e16_full_v03.yaml}"
 RUN_PROBE_ONLY="${RUN_PROBE_ONLY:-0}"
 WANDB_RENDEZVOUS_URI="${WANDB_RENDEZVOUS_URI:-}"
 TARBALL_LOCAL="/tmp/tinyaya-repo-hot.tar.gz"

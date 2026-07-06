@@ -1,11 +1,12 @@
 #!/bin/bash
-# Launch a 200-step canary on the TPU v4-64 slice.
+# Launch a short canary to validate the launch path cheaply.
 #
 # This is a thin wrapper over launch_qr.sh that overrides the QR / node names
-# and points the VM metadata at the canary config (200 steps, separate
-# checkpoint prefix). Everything else (project, zone, runtime, startup script,
-# secrets, IAM) is identical to the full run, so a green canary directly
-# validates the full-run launch path.
+# and uses a separate checkpoint prefix. Everything else (project, zone, runtime,
+# startup script, secrets, IAM) is identical to the full run, so a green canary
+# directly validates the full-run launch path. There is no dedicated short config
+# any more — the operator watches the first ~200 steps, then tears the QR down;
+# pass CONFIG_FILE=... to use a smaller config than the default.
 #
 # Run from your local workstation, after setup_gcp.sh has succeeded.
 #
@@ -29,7 +30,7 @@ load_env_file "$ENV_FILE"
 
 QR_NAME="${CANARY_QR_NAME:-tinyaya-stage2-canary-qr}"
 NODE_ID="${CANARY_NODE_ID:-tinyaya-stage2-canary}"
-CONFIG_FILE="${CONFIG_FILE:-configs/tpu/stage2_tpu_v6e_v2.yaml}"
+CONFIG_FILE="${CONFIG_FILE:-configs/tpu/stage2_tpu_v6e16_full_v03.yaml}"
 # Canary defaults to spot (preemptible) since its purpose is code validation,
 # not producing a model. Override with SPOT=0 if you want canary on-demand.
 SPOT="${SPOT:-1}"

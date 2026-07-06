@@ -39,7 +39,7 @@ read_meta() {
 }
 # Training config path (relative to repo root) is read from VM
 # metadata so canary vs full run share the same image.
-CONFIG_FILE="$(read_meta config-file configs/tpu/stage2_tpu_v6e_v2.yaml)"
+CONFIG_FILE="$(read_meta config-file configs/tpu/stage2_tpu_v6e16_full_v03.yaml)"
 # Optional GCS overlay path (see OVERLAY_GS_URI section below).
 OVERLAY_GS_URI="$(read_meta overlay-gs-uri '')"
 # Optional full-repo tarball in GCS. When set, replaces the `git clone` step

@@ -25,7 +25,7 @@ PROJECT_ID="${PROJECT_ID:-ml-pipelines-315702}"
 ZONE="${ZONE:-europe-west4-b}"
 NODE_ID="${NODE_ID:-tinyaya-stage2-canary}"
 BUCKET="${BUCKET:-tinyaya-stage2-eu}"
-CONFIG_FILE="${CONFIG_FILE:-configs/tpu/stage2_tpu_v6e_v2.yaml}"
+CONFIG_FILE="${CONFIG_FILE:-configs/tpu/stage2_tpu_v6e16_full_v03.yaml}"
 TPU_STRATEGY="${TPU_STRATEGY:-auto}"
 RUN_PROBE_ONLY="${RUN_PROBE_ONLY:-0}"
 

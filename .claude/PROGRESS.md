@@ -30,6 +30,104 @@ moved to `.claude/archive/PROGRESS-YYYY-Qn.md` by the
 
 ---
 
+## 2026-07-06T02:28:45Z | feat/v0.3-implementation@c5f8b8e | done | edit
+created `/home/cataluna84/Workspace/tinyaya-stage2-scale/docs/do.md`
+
+
+## 2026-07-06T02:28:08Z | feat/v0.3-implementation@c5f8b8e | done | exec
+cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-06T02:27:46Z | feat/v0.3-implementation@c5f8b8e | done | exec
+cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-06T02:27:27Z | feat/v0.3-implementation@c5f8b8e | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/tpu/ops.sh`
+
+
+## 2026-07-06T02:27:26Z | feat/v0.3-implementation@c5f8b8e | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/tpu/setup_gcp.sh`
+
+
+## 2026-07-06T02:27:13Z | feat/v0.3-implementation@c5f8b8e | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/tpu/launch_spot.sh`
+
+
+## 2026-07-06T02:26:51Z | feat/v0.3-implementation@c5f8b8e | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/tpu/launch_spot.sh`
+
+
+## 2026-07-06T02:26:45Z | feat/v0.3-implementation@c5f8b8e | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/tpu/launch_spot.sh`
+
+
+## 2026-07-06T02:26:33Z | feat/v0.3-implementation@c5f8b8e | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/tpu/launch_spot.sh`
+
+
+## 2026-07-06T02:26:21Z | feat/v0.3-implementation@c5f8b8e | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/tpu/launch_spot.sh`
+
+
+## 2026-07-06T02:25:59Z | feat/v0.3-implementation@c5f8b8e | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/tpu/launch_canary.sh`
+
+
+## 2026-07-06T02:25:42Z | feat/v0.3-implementation@c5f8b8e | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/tpu/launch_qr.sh`
+
+
+## 2026-07-06T02:25:20Z | feat/v0.3-implementation@c5f8b8e | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/tpu/launch_release.sh`
+
+
+## 2026-07-06T02:25:18Z | feat/v0.3-implementation@c5f8b8e | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/tpu/launch_release.sh`
+
+
+## 2026-07-06T02:24:45Z | feat/v0.3-implementation@c5f8b8e | done | exec
+cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-06T02:23:42Z | feat/v0.3-implementation@c5f8b8e | done | edit
+created `/home/cataluna84/.claude/plans/inherited-exploring-cherny.md`
+
+
+## 2026-07-06T02:18:43Z | feat/v0.3-implementation@c5f8b8e | fail | verify
+verify: 11 passed, 1 failed out of 12 on Stop
+
+FAIL [1] # the TPU↔GPU seam holds: torch_xla must NOT leak into shared model/data code
+    src/model/scan_utils.py:125:        from torch_xla.experimental.scan_layers import scan_layers
+
+
+## 2026-07-06T02:18:28Z | feat/v0.3-implementation@c5f8b8e | done | exec
+cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-06T02:18:11Z | feat/v0.3-implementation@a16eac1 | done | edit
+created `/home/cataluna84/Workspace/tinyaya-stage2-scale/docs/do.md`
+
+
+## 2026-07-06T02:17:39Z | feat/v0.3-implementation@a16eac1 | done | exec
+cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-06T02:13:10Z | feat/v0.3-implementation@a16eac1 | fail | verify
+verify: 11 passed, 1 failed out of 12 on Stop
+
+FAIL [1] # the TPU↔GPU seam holds: torch_xla must NOT leak into shared model/data code
+    src/model/scan_utils.py:125:        from torch_xla.experimental.scan_layers import scan_layers
+
+
+## 2026-07-06T02:12:42Z | feat/v0.3-implementation@a16eac1 | done | exec
+cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-06T02:12:08Z | feat/v0.3-implementation@ba2b0cc | done | exec
+cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+
+
 ## 2026-07-06T02:11:45Z | feat/v0.3-implementation@ba2b0cc | done | exec
 cd /home/cataluna84/Workspace/tinyaya-stage2-scale
 

@@ -5,7 +5,7 @@ WHY THIS EXISTS
 ---------------
 After the proxy sweep (``sweeps/sweep_stage2.yaml``) picks a recipe, the
 winning hyperparameters have to land in the production config
-(``configs/tpu/stage2_tpu_v6e_v2.yaml``) before the 15k release run. Doing
+(``configs/tpu/stage2_tpu_v6e16_full_v03.yaml``) before the 15k release run. Doing
 that by hand is error-prone: the swept *flat* names (``lr_lora``, ``lora_r``,
 ``lora_alpha_mult`` ...) map onto *nested* config sections, and a hand-edit
 easily clobbers the file's block comments or sets the wrong section.

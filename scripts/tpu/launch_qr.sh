@@ -4,10 +4,12 @@
 #
 # Run from your local workstation (after setup_gcp.sh has succeeded).
 #
-# Default behaviour: on-demand v4-64 in us-central2-b. The TRC grant
-# (see docs/tpu-trc-allocation.md) also includes spot quotas in five
-# (zone, type) combinations; for those, prefer launch_spot.sh which
-# wraps this script with TRC_PROFILE-aware defaults and SPOT=1.
+# Default behaviour: legacy **on-demand v4-64 in us-central2-b** (the only
+# on-demand quota in the TRC grant — see docs/tpu-trc-allocation.md). TRC v6e
+# is SPOT-only, so the current v6e-16 production path goes through
+# launch_spot.sh (`TRC_PROFILE=v6e-16-eu`), which wraps this script with
+# profile-aware defaults and SPOT=1. Keep these v4 hardware defaults as-is;
+# only the CONFIG_FILE default tracks the current recipe (v0.3).
 #
 # Configuration precedence (highest first):
 #   1. shell env vars (e.g. `PROJECT_ID=foo bash launch_qr.sh`)
@@ -30,7 +32,7 @@ QR_NAME="${QR_NAME:-tinyaya-stage2-qr}"
 NODE_ID="${NODE_ID:-tinyaya-stage2}"
 ACCEL_TYPE="${ACCEL_TYPE:-v4-64}"
 RUNTIME="${RUNTIME:-tpu-ubuntu2204-base}"
-CONFIG_FILE="${CONFIG_FILE:-configs/tpu/stage2_tpu_v6e_v2.yaml}"
+CONFIG_FILE="${CONFIG_FILE:-configs/tpu/stage2_tpu_v6e16_full_v03.yaml}"
 # SPOT=1  -> request preemptible (spot) capacity. Default empty = on-demand.
 SPOT="${SPOT:-}"
 # INTERNAL_IPS=1 -> create the TPU hosts WITHOUT external IPs. Required when
