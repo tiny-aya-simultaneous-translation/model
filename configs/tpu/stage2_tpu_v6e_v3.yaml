@@ -133,7 +133,7 @@ logging:
   val_on_tpu: true
   diag_metrics: true
   # Fresh save_dir + run name for v0.3 (avoid --resume auto picking up v0.2).
-  save_dir: gs://tinyaya-stage2-tpu/checkpoints/stage2-tpu-v6e-v3
+  save_dir: gs://tinyaya-stage2-eu/checkpoints/stage2-tpu-v6e-v3
   keep_last_n: 0
   keep_local_checkpoints: true
   local_checkpoint_dir: /mnt/data/checkpoints

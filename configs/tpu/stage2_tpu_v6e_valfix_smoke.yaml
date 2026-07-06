@@ -69,7 +69,7 @@ logging:
   val_on_tpu: true
   val_debug: true
   diag_metrics: true
-  save_dir: gs://tinyaya-stage2-tpu/checkpoints/stage2-tpu-v6e-valfix-smoke
+  save_dir: gs://tinyaya-stage2-eu/checkpoints/stage2-tpu-v6e-valfix-smoke
   keep_last_n: 2
   use_wandb: false
   wandb_project: tinyaya-stage2-tpu

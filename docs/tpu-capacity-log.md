@@ -8,7 +8,7 @@ Production topology has pivoted to **single-host v6e-8 spot in
 24h completed 5000/5000 baseline steps on this profile and uploaded
 the final canonical checkpoint; `opt-prod5k` then completed 5000/5000
 optimized steps with checkpoint
-`gs://tinyaya-stage2-tpu/checkpoints/stage2-tpu-v6e-spot-opt-prod5k/step_005000_final/`.
+`gs://tinyaya-stage2-eu/checkpoints/stage2-tpu-v6e-spot-opt-prod5k/step_005000_final/`.
 Phase 4 now uses the same v6e-8 EU profile, with private-repo-safe
 startup via `REPO_TARBALL_GS_URI`. v4-32 spot in `us-central2-b` is
 now legacy. The fallback policy in section 1 below is preserved as the
@@ -86,7 +86,7 @@ queued, it should follow this decision tree:
 | 2026-05-08 | -- | v6e-8 spot (europe-west4-a) | spot | ~4:44 | ACTIVE | Single-host (8 chips), 32 GiB HBM/chip. ACTIVE within 5 min from QR submission. Iter 13b (run `zd42n7di`) reached 20 steps + canonical save in 23.3 min wall. |
 | 2026-05-09 | 15:25 | v6e-8 spot (europe-west4-a) | spot | ~3 min to ACTIVE | ACTIVE / COMPLETED | Iter 24h production retry. QR reached ACTIVE at 15:28 UTC; run `7rrjupc7` completed 5000/5000 steps at 2026-05-10T01:47:24Z and uploaded `step_005000_final` (8 objects, 2.37 GiB). |
 | 2026-05-13 | ~11:30 | v6e-8 spot (europe-west4-a) | spot | immediate preemptions / capacity retry | FAILED | Phase 4 `opt-4-depth32` first attempts hit spot preemption and then QR capacity error code 8. User chose to keep retrying same zone. |
-| 2026-05-13 | ~12:00 | v6e-8 spot (europe-west4-a) | spot | ~few min to ACTIVE | ACTIVE / COMPLETED | Relaunched Phase 4 with `REPO_TARBALL_GS_URI=gs://tinyaya-stage2-tpu/code/phase4-depth32-20260513T120005Z.tar.gz`; startup avoided private GitHub clone and W&B `i15igq8d` completed 300/300 steps with exit 0. |
+| 2026-05-13 | ~12:00 | v6e-8 spot (europe-west4-a) | spot | ~few min to ACTIVE | ACTIVE / COMPLETED | Relaunched Phase 4 with `REPO_TARBALL_GS_URI=gs://tinyaya-stage2-eu/code/phase4-depth32-20260513T120005Z.tar.gz`; startup avoided private GitHub clone and W&B `i15igq8d` completed 300/300 steps with exit 0. |
 
 *(Update this table after every attempt.)*
 
@@ -163,7 +163,7 @@ VM) pushes us over.
   1. Private Google Access enabled on `default` subnet in the target
      region (`gcloud compute networks subnets update default
      --region=<R> --enable-private-ip-google-access`).
-  2. Dataset mirrored to `gs://tinyaya-stage2-tpu/encoded/` so the
+  2. Dataset mirrored to `gs://tinyaya-stage2-eu/encoded/` so the
      startup script can pull it via GCS instead of HF Hub.
   3. Code tarball already lives in GCS (already done: `code/tinyaya-repo-hot.tar.gz`).
 

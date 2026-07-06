@@ -8,10 +8,10 @@ v6e-8 in
 `tinyaya-stage2-spot-v6e8-eu`, profile shorthand `v6e-8-eu` in
 `scripts/tpu/launch_spot.sh`). Iter 24h completed 5000/5000 baseline
 steps on this profile and uploaded
-`gs://tinyaya-stage2-tpu/checkpoints/stage2-tpu-v6e-spot/step_005000_final/`.
+`gs://tinyaya-stage2-eu/checkpoints/stage2-tpu-v6e-spot/step_005000_final/`.
 The optimized `opt-prod5k` run then completed 5000/5000 steps with
 checkpoint
-`gs://tinyaya-stage2-tpu/checkpoints/stage2-tpu-v6e-spot-opt-prod5k/step_005000_final/`.
+`gs://tinyaya-stage2-eu/checkpoints/stage2-tpu-v6e-spot-opt-prod5k/step_005000_final/`.
 Phase 4 activation/depth sweeps now start from the same v6e-8 EU
 profile; `opt-4-depth32` completed its 300-step gate on this profile
 with exit 0.

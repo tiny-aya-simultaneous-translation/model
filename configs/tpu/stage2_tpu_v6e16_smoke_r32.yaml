@@ -92,7 +92,7 @@ logging:
   val_max_batches: 25
   val_on_tpu: true
   diag_metrics: false
-  save_dir: gs://tinyaya-stage2-tpu/checkpoints/stage2-tpu-v6e16-smoke-r32
+  save_dir: gs://tinyaya-stage2-eu/checkpoints/stage2-tpu-v6e16-smoke-r32
   keep_last_n: 0                  # keep ALL checkpoints
   keep_local_checkpoints: false
   use_wandb: true

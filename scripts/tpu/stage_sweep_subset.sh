@@ -8,7 +8,7 @@
 #
 # Usage:
 #   N=200000 bash scripts/tpu/stage_sweep_subset.sh
-#   # -> uploads gs://tinyaya-stage2-tpu/data/sweep-subset-200000.tar.gz
+#   # -> uploads gs://tinyaya-stage2-eu/data/sweep-subset-200000.tar.gz
 #   #    (pass that as SWEEP_DATA_GS_URI to launch_sweep_fleet.sh)
 
 set -euo pipefail
@@ -19,7 +19,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 N="${N:-200000}"
 HF_DATASET="${HF_DATASET:-tiny-aya-translate/tr-hi-mimi-encoded}"
 DATA_DIR="${DATA_DIR:-/mnt/data}"
-BUCKET="${BUCKET:-tinyaya-stage2-tpu}"
+BUCKET="${BUCKET:-tinyaya-stage2-eu}"
 OUT_GS="${OUT_GS:-gs://$BUCKET/data/sweep-subset-${N}.tar.gz}"
 STAGE="$DATA_DIR/sweep_stage"
 FILELIST="/tmp/sweep_files_${N}.txt"

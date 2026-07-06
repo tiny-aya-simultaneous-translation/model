@@ -38,14 +38,14 @@ before making `depth_chunk_size=32` the durable production default.
 **Decision:** Fresh TPU VMs for private-repo runs should launch with
 `REPO_TARBALL_GS_URI=gs://...` instead of relying on a GitHub clone.
 Phase 4 `opt-4-depth32` used
-`gs://tinyaya-stage2-tpu/code/phase4-depth32-20260513T120005Z.tar.gz`
+`gs://tinyaya-stage2-eu/code/phase4-depth32-20260513T120005Z.tar.gz`
 after spot preemptions/capacity failures; the retry reached ACTIVE and
 started W&B `i15igq8d`.
 
 **Gotcha:** If the startup path falls back to GitHub on a fresh TPU VM,
 private clone auth can fail before training starts. Package the current
 branch with `tar --exclude-vcs --exclude='./_artifacts'` and upload it
-to `gs://tinyaya-stage2-tpu/code/`, then pass that URI to
+to `gs://tinyaya-stage2-eu/code/`, then pass that URI to
 `launch_spot.sh`.
 
 ### 2026-05-13: uv CPython libpython must be exported for hot redeploy
@@ -70,7 +70,7 @@ per step and 4.7% lower loss versus the iter 24h baseline.
 
 **W&B:** `kzsijxv5` (v6e-spot-stage2-opt-prod5k)
 **Checkpoint:**
-`gs://tinyaya-stage2-tpu/checkpoints/stage2-tpu-v6e-spot-opt-prod5k/step_005000_final/`
+`gs://tinyaya-stage2-eu/checkpoints/stage2-tpu-v6e-spot-opt-prod5k/step_005000_final/`
 
 **Gotcha:** The TPU was preempted after the run completed (spot VM
 reclaimed). The QR will need recreation for future runs.
@@ -96,7 +96,7 @@ does not export `PT_XLA_DEBUG_LEVEL=1`. The hot-redeploy 1000-step
 validation (`opt-1-log10-hot1k`, W&B `pdhz1f95`) completed 1000/1000
 with p50 `5.92593s`, examples/sec `43.05558`, final loss `6.17039`,
 and final checkpoint
-`gs://tinyaya-stage2-tpu/checkpoints/stage2-tpu-v6e-spot-opt-log10-hot1k/step_001000_final/`.
+`gs://tinyaya-stage2-eu/checkpoints/stage2-tpu-v6e-spot-opt-log10-hot1k/step_001000_final/`.
 
 **Gotcha:** The earlier startup-path 1000-step retry (`58k4t99h`)
 completed but regressed to p50 `6.9605s`. A hot-redeploy 300-step
@@ -187,7 +187,7 @@ four-microbatch graph for the full 5000 steps.
    a 4-way grad-accum graph.
 4. Iter 24g's SDPA mask-elision patch remains in place.
 
-**Artifact:** ``gs://tinyaya-stage2-tpu/code/tinyaya-repo-iter24h.tar.gz``.
+**Artifact:** ``gs://tinyaya-stage2-eu/code/tinyaya-repo-iter24h.tar.gz``.
 
 **Live validation:**
 - W&B run ``7rrjupc7``:
@@ -198,7 +198,7 @@ four-microbatch graph for the full 5000 steps.
 - No NaN, OOM, RESOURCE_EXHAUSTED, fatal, traceback, bus-error, or
   kernel-panic signals were found.
 - Final canonical checkpoint uploaded to
-  ``gs://tinyaya-stage2-tpu/checkpoints/stage2-tpu-v6e-spot/step_005000_final/``.
+  ``gs://tinyaya-stage2-eu/checkpoints/stage2-tpu-v6e-spot/step_005000_final/``.
 - GCS lists 8 objects / 2.37 GiB:
   ``metadata.json``, ``text_embed.pt``, ``depth_decoder.pt``,
   ``projection.pt``, ``audio_heads.pt``, and PEFT adapter files.
@@ -239,7 +239,7 @@ graph on XLA and can expose the same v6e bf16 reduce-scatter NaN.
 4. Keep conservative ``batch_size=8, grad_accum=4`` from iter 24f until
    the run passes step 300; only then consider restoring b=16/g=2.
 
-**Artifact:** ``gs://tinyaya-stage2-tpu/code/tinyaya-repo-iter24g.tar.gz``.
+**Artifact:** ``gs://tinyaya-stage2-eu/code/tinyaya-repo-iter24g.tar.gz``.
 
 **Blocker:** QR/node ``tinyaya-stage2-spot-v6e8-eu`` was terminal
 ``PREEMPTED`` as of upload time. User approved two recreates. The first
@@ -507,7 +507,7 @@ instrumenting the run for live HBM + profiler telemetry.
     rank-0 startup; `xp.StepTrace('train_step', step_num=step)`
     wraps every step body; auto-capture a 30s trace at step 30 ->
     `/tmp/xla_profile/iter18-<ts>/`. Launcher post-train hook
-    `gsutil cp -r` to `gs://tinyaya-stage2-tpu/profiles/`.
+    `gsutil cp -r` to `gs://tinyaya-stage2-eu/profiles/`.
   * Lever 5: `export PT_XLA_DEBUG_LEVEL=1` in launcher. Iter 17 had
     0 `aten::` fallbacks per `met.metrics_report()`; this acts as a
     regression detector if iter 18 introduces any.
@@ -522,7 +522,7 @@ isolate the gain from levers 1-5 first, then A/B compare with-clip
 vs without-clip on identical config in iter 19.
 **Where:** branch `feat/tpu-support`; commit (pending iter 18
 validation), wandb run TBD, GCS checkpoint
-`gs://tinyaya-stage2-tpu/checkpoints/stage2-tpu-v6e-spot-canary/
+`gs://tinyaya-stage2-eu/checkpoints/stage2-tpu-v6e-spot-canary/
 step_000200_final/` (overwrites iter 17 artifact on completion).
 
 ### 2026-05-08: Lever 6 variants for re-enabling clip_grad_norm_ on FSDPv2 SPMD
@@ -660,7 +660,7 @@ on iter 3.
 ### 2026-05-06: Patch 9 -- wandb shared-mode rendezvous via GCS
 **Decision:** rank-0 (host 0, chip 0) creates the wandb run and
 writes the run_id to
-`gs://tinyaya-stage2-tpu/wandb-rendezvous/<run-name>.id`. Hosts 1-3
+`gs://tinyaya-stage2-eu/wandb-rendezvous/<run-name>.id`. Hosts 1-3
 poll `gsutil cat` (60 retries, 5 s spacing) to read the run_id, then
 attach via `wandb.init(mode="shared", id=<run_id>, x_primary=False,
 x_label=f"rank_{host_index}")`. Rank-0 attaches with
@@ -846,7 +846,7 @@ empirically showed:
 **Default for canary:** `fsdpv2_lora`.
 
 ### 2026-05-03: GCS bucket is code transport, not sharding
-**Decision:** `gs://tinyaya-stage2-tpu/code/` exists purely to ship
+**Decision:** `gs://tinyaya-stage2-eu/code/` exists purely to ship
 code to TPU VMs (private GitHub repo, no GitHub creds on TPUs).
 **Not** part of any sharding mechanism, not consulted at runtime.
 **Status:** Will be deprecated once TPU VM has its own `git clone`
@@ -1010,7 +1010,7 @@ dataset extraction block.
 `try/except FileNotFoundError -> return []` block. Previously the
 local branch checked `os.path.exists` but the GCS branch raised on
 the first run when the checkpoint prefix
-`gs://tinyaya-stage2-tpu/checkpoints/<run-name>/` did not exist yet.
+`gs://tinyaya-stage2-eu/checkpoints/<run-name>/` did not exist yet.
 **Fix applied 2026-05-05.**
 **Reason:** the very first canary run cannot have a checkpoint
 to resume from; `--resume auto` should mean "resume if exists, else
@@ -1042,7 +1042,7 @@ requires:
   1. Private Google Access on the `default` subnet for the region
      (`gcloud compute networks subnets update default --region=<R>
      --enable-private-ip-google-access`).
-  2. Dataset pre-mirrored to `gs://tinyaya-stage2-tpu/encoded/` so
+  2. Dataset pre-mirrored to `gs://tinyaya-stage2-eu/encoded/` so
      the boot path doesn't depend on HF Hub.
 **Reason:** observed FAILURE on 2026-05-05 spot v5e-64 in
 europe-west4-b -- transitioned to PROVISIONING for ~2 minutes then
@@ -1149,7 +1149,7 @@ multi-host is the next scale-up target once spot capacity allows.
 `tinyaya-stage2-spot-v6e8-eu-qr`; config
 `configs/stage2_tpu_v6e_spot.yaml`;
 checkpoint prefix
-`gs://tinyaya-stage2-tpu/checkpoints/stage2-tpu-v6e-spot/`;
+`gs://tinyaya-stage2-eu/checkpoints/stage2-tpu-v6e-spot/`;
 wandb run name `v6e-spot-stage2-5k`.
 **Reproduce:** `TRC_PROFILE=v6e-8-eu
 QR_NAME=tinyaya-stage2-spot-v6e8-eu-qr
@@ -1240,7 +1240,7 @@ explicitly. Do not rely on `which` under sudo on a fresh TPU VM.
 - **Final loss:** 5.3558 (text 10.3176, audio 4.3240).
 - **Steady-state throughput:** ~6.7-7.0 sec/step after startup compile.
 - **Checkpoint:** canonical final save at
-  ``gs://tinyaya-stage2-tpu/checkpoints/stage2-tpu-v6e-spot/step_005000_final/``
+  ``gs://tinyaya-stage2-eu/checkpoints/stage2-tpu-v6e-spot/step_005000_final/``
   with 8 objects / 2.37 GiB.
 - **Stability:** no NaN, OOM, RESOURCE_EXHAUSTED, fatal, traceback,
   bus-error, or kernel-panic signals in the training log.

@@ -18,13 +18,13 @@ on v6e-8 EU spot, W&B run
 [`7rrjupc7`](https://wandb.ai/cataluna84/tinyaya-stage2-tpu/runs/7rrjupc7),
 final loss 5.3558, training wall 615.9 min, exit status 0. The final
 canonical checkpoint uploaded to
-`gs://tinyaya-stage2-tpu/checkpoints/stage2-tpu-v6e-spot/step_005000_final/`
+`gs://tinyaya-stage2-eu/checkpoints/stage2-tpu-v6e-spot/step_005000_final/`
 (8 objects, 2.37 GiB). `opt-prod5k` then completed 5000/5000 steps
 with Phase 1+2+3 optimizations, W&B run
 [`kzsijxv5`](https://wandb.ai/cataluna84/tinyaya-stage2-tpu/runs/kzsijxv5),
 final loss 5.105, p50 6.14 s/step, p99 6.76 s/step, training wall
 562 min, and checkpoint
-`gs://tinyaya-stage2-tpu/checkpoints/stage2-tpu-v6e-spot-opt-prod5k/step_005000_final/`.
+`gs://tinyaya-stage2-eu/checkpoints/stage2-tpu-v6e-spot-opt-prod5k/step_005000_final/`.
 Phase 4 started with `opt-4-depth32`, W&B run
 [`i15igq8d`](https://wandb.ai/cataluna84/tinyaya-stage2-tpu/runs/i15igq8d),
 which completed 300/300 steps with exit 0, p50 5.296 s/step, p99

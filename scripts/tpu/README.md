@@ -14,12 +14,12 @@ SPMD. Iter 24h completed 5000/5000 steps on this path:
 W&B run [`7rrjupc7`](https://wandb.ai/cataluna84/tinyaya-stage2-tpu/runs/7rrjupc7),
 final loss 5.3558, training wall 615.9 min, exit status 0, final
 checkpoint
-`gs://tinyaya-stage2-tpu/checkpoints/stage2-tpu-v6e-spot/step_005000_final/`
+`gs://tinyaya-stage2-eu/checkpoints/stage2-tpu-v6e-spot/step_005000_final/`
 (8 objects, 2.37 GiB). The optimized `opt-prod5k` run
 [`kzsijxv5`](https://wandb.ai/cataluna84/tinyaya-stage2-tpu/runs/kzsijxv5)
 then completed 5000/5000 steps in 562 min with p50 6.14 s/step,
 p99 6.76 s/step, final loss 5.105, and checkpoint
-`gs://tinyaya-stage2-tpu/checkpoints/stage2-tpu-v6e-spot-opt-prod5k/step_005000_final/`.
+`gs://tinyaya-stage2-eu/checkpoints/stage2-tpu-v6e-spot-opt-prod5k/step_005000_final/`.
 Phase 4 uses the same launch path for candidate configs. The first
 candidate, `stage2_tpu_v6e_spot_opt_depth32.yaml`, completed 300/300
 steps as W&B
@@ -104,7 +104,7 @@ bash scripts/tpu/setup_gcp.sh
 tar --exclude-vcs --exclude='./_artifacts' --exclude='./wandb' \
   -czf /tmp/tinyaya-phase4.tar.gz .
 gsutil cp /tmp/tinyaya-phase4.tar.gz \
-  gs://tinyaya-stage2-tpu/code/phase4-depth32-$(date -u +%Y%m%dT%H%M%SZ).tar.gz
+  gs://tinyaya-stage2-eu/code/phase4-depth32-$(date -u +%Y%m%dT%H%M%SZ).tar.gz
 
 # 5. launch single-host v6e-8 spot in europe-west4-a
 #    (canonical command for the optimized production topology)
@@ -112,7 +112,7 @@ TRC_PROFILE=v6e-8-eu \
 QR_NAME=tinyaya-stage2-spot-v6e8-eu-qr \
 NODE_ID=tinyaya-stage2-spot-v6e8-eu \
 CONFIG_FILE=configs/tpu/stage2_tpu_v6e_v2.yaml \
-REPO_TARBALL_GS_URI=gs://tinyaya-stage2-tpu/code/<repo-tarball>.tar.gz \
+REPO_TARBALL_GS_URI=gs://tinyaya-stage2-eu/code/<repo-tarball>.tar.gz \
 TPU_STRATEGY=fsdpv2_lora \
 PROBE_FIRST=0 \
   bash scripts/tpu/launch_spot.sh
@@ -198,7 +198,7 @@ the QR or promoting the checkpoint downstream:
 5. `/tmp/train.log` reaches step 5000/5000
 6. `training exited with status 0`
 7. Canonical final save uploads to
-   the config's `gs://tinyaya-stage2-tpu/checkpoints/.../step_005000_final/`
+   the config's `gs://tinyaya-stage2-eu/checkpoints/.../step_005000_final/`
 8. GCS lists the final checkpoint files (`metadata.json`,
    `text_embed.pt`, `depth_decoder.pt`, `projection.pt`,
    `audio_heads.pt`, and `peft_adapter/*`)

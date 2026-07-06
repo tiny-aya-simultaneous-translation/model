@@ -12,7 +12,7 @@
 # byte-for-byte the same program as a normal run, only with --sweep args injected.
 #
 # Usage (launched in tmux on all workers by launch_sweep_coordinated.sh):
-#   CONTROL_PREFIX=gs://tinyaya-stage2-tpu/sweep-control/scale-grid \
+#   CONTROL_PREFIX=gs://tinyaya-stage2-eu/sweep-control/scale-grid \
 #     bash scripts/tpu/sweep_host_loop.sh
 set -uo pipefail
 

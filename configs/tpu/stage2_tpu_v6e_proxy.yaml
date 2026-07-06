@@ -66,7 +66,7 @@ logging:
   val_max_batches: 10      # cheap val
   val_on_tpu: true         # sweep overrides
   diag_metrics: true
-  save_dir: gs://tinyaya-stage2-tpu/checkpoints/stage2-tpu-v6e-proxy
+  save_dir: gs://tinyaya-stage2-eu/checkpoints/stage2-tpu-v6e-proxy
   keep_last_n: 1
   use_wandb: true
   wandb_project: tinyaya-stage2-tpu

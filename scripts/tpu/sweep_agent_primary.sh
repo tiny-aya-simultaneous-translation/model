@@ -27,7 +27,7 @@ SECRET_HF="${SECRET_HF:-hf-token}"
 # train publishes its run id to and the workers read to attach. Cleared per trial
 # so a worker can NEVER read a STALE previous-trial (or Stage-1) run id -- it must
 # wait for THIS trial's host-0 run.
-RENDEZVOUS_URI="${RENDEZVOUS_URI:-gs://tinyaya-stage2-tpu/wandb-rendezvous/scale-sweep.id}"
+RENDEZVOUS_URI="${RENDEZVOUS_URI:-gs://tinyaya-stage2-eu/wandb-rendezvous/scale-sweep.id}"
 LOG=/tmp/train.log
 
 # Stage-1 WINNER (+MLP) structure + fixed rsLoRA knobs -- NOT swept. Injected here

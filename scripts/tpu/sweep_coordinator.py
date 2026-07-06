@@ -14,7 +14,7 @@ trial index appears, launches ``train_hierarchical.py --sweep <identical args>``
 so the 4 hosts rendezvous into one mesh (exactly like the baseline launch does).
 
 PROTOCOL (all objects under ``--control-prefix``, e.g.
-gs://tinyaya-stage2-tpu/sweep-control/scale-grid/):
+gs://tinyaya-stage2-eu/sweep-control/scale-grid/):
   current_trial.json         {"index": N, "args": [...], "wandb_run_id": "...",
                               "sweep_id": "...", "stop": false}
   done/trial_<N>_host_<h>     empty marker written by each host when its trial
@@ -358,7 +358,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--num-hosts", type=int, default=4, help="hosts on the slice (v6e-16 = 4)")
     p.add_argument("--max-trials", type=int, default=0, help="cap trials (0 = all)")
     p.add_argument("--save-dir",
-                   default="gs://tinyaya-stage2-tpu/checkpoints/stage2-scale-sweep",
+                   default="gs://tinyaya-stage2-eu/checkpoints/stage2-scale-sweep",
                    help="checkpoint root (must match the proxy config's logging.save_dir); "
                         "used for checkpoint-based resume + metric reads")
     p.add_argument("--final-step", type=int, default=1500,

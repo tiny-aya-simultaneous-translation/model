@@ -1477,7 +1477,7 @@ def main():
 
         rendezvous_uri = os.environ.get(
             "WANDB_RENDEZVOUS_URI",
-            f"gs://tinyaya-stage2-tpu/wandb-rendezvous/{cfg['logging']['wandb_run_name']}.id",
+            f"gs://tinyaya-stage2-eu/wandb-rendezvous/{cfg['logging']['wandb_run_name']}.id",
         )
 
         if is_tpu and not is_main:

@@ -16,13 +16,13 @@ production run on this topology: W&B run
 [`7rrjupc7`](https://wandb.ai/cataluna84/tinyaya-stage2-tpu/runs/7rrjupc7),
 5000/5000 steps in 615.9 min, final loss 5.3558, exit status 0, and
 canonical checkpoint
-`gs://tinyaya-stage2-tpu/checkpoints/stage2-tpu-v6e-spot/step_005000_final/`
+`gs://tinyaya-stage2-eu/checkpoints/stage2-tpu-v6e-spot/step_005000_final/`
 (8 objects, 2.37 GiB). `opt-prod5k` then completed the optimized
 5000-step production pass: W&B
 [`kzsijxv5`](https://wandb.ai/cataluna84/tinyaya-stage2-tpu/runs/kzsijxv5),
 final loss 5.105, p50 6.14 s/step, p99 6.76 s/step, wall 562 min,
 checkpoint
-`gs://tinyaya-stage2-tpu/checkpoints/stage2-tpu-v6e-spot-opt-prod5k/step_005000_final/`.
+`gs://tinyaya-stage2-eu/checkpoints/stage2-tpu-v6e-spot-opt-prod5k/step_005000_final/`.
 Phase 4 started with `opt-4-depth32` (W&B
 [`i15igq8d`](https://wandb.ai/cataluna84/tinyaya-stage2-tpu/runs/i15igq8d),
 300/300 steps, exit 0, p50 5.296 s/step, p99 5.725 s/step)
@@ -93,7 +93,7 @@ recommendation in the TRC welcome email. See `tpu-trc-allocation.md`
 | Provisioning | Queued Resource API | TRC requires QR for v4; supports auto-restart loop |
 | Data | HF Hub → `/mnt/data` at boot | `tiny-aya-translate/fleurs-tr-hi-mimi-encoded`, ~few GB |
 | Secrets | GCP Secret Manager | Seeded once from local `.env`; pulled by VMs at boot |
-| Checkpoints | `gs://tinyaya-stage2-tpu/checkpoints/stage2-tpu` | Already supported by `src/training/checkpointing.py` |
+| Checkpoints | `gs://tinyaya-stage2-eu/checkpoints/stage2-tpu` | Already supported by `src/training/checkpointing.py` |
 
 ## 4. Architecture
 
@@ -427,7 +427,7 @@ logging:
   save_every: 50           # exercise save loop ~3-4 times
   val_every: 100           # exercise val once
   audio_every: 100         # exercise Mimi decode for audio sample
-  save_dir: gs://tinyaya-stage2-tpu/checkpoints/canary
+  save_dir: gs://tinyaya-stage2-eu/checkpoints/canary
   wandb_run_name: v4-64-canary
 ```
 
@@ -477,7 +477,7 @@ All seven must be green before the full run starts:
 1. QR transitions `WAITING_FOR_RESOURCES → ACTIVE` within ~10 min
 2. `tpu-info` on at least one host reports 4 chips
 3. `train.log` shows step counters incrementing on **all 4 hosts**
-4. At least one checkpoint lands in `gs://tinyaya-stage2-tpu/checkpoints/canary/`
+4. At least one checkpoint lands in `gs://tinyaya-stage2-eu/checkpoints/canary/`
 5. At least one validation pass logs to W&B
 6. `train.log` shows clean exit at step 200 (not OOM, not assertion error)
 7. `auto_wrap_policy` matched ≥1 layer (no "wrapping 0 modules" warning)

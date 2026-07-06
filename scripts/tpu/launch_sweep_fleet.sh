@@ -10,7 +10,7 @@
 #
 # Usage:
 #   SWEEP_ID=ENTITY/PROJECT/SWEEP_ID \
-#   SWEEP_DATA_GS_URI=gs://tinyaya-stage2-tpu/data/sweep-subset-200000.tar.gz \
+#   SWEEP_DATA_GS_URI=gs://tinyaya-stage2-eu/data/sweep-subset-200000.tar.gz \
 #   N_SLICES=7 \
 #       bash scripts/tpu/launch_sweep_fleet.sh
 #
@@ -27,7 +27,7 @@ source "$SCRIPT_DIR/_lib.sh"
 load_env_file "$REPO_ROOT/.env"
 
 PROJECT_ID="${PROJECT_ID:-ml-pipelines-315702}"
-BUCKET="${BUCKET:-tinyaya-stage2-tpu}"
+BUCKET="${BUCKET:-tinyaya-stage2-eu}"
 N_SLICES="${N_SLICES:-7}"
 NAME_PREFIX="${NAME_PREFIX:-tinyaya-sweep}"
 PROXY_CFG="${PROXY_CFG:-configs/tpu/stage2_tpu_v6e_v3_proxy.yaml}"

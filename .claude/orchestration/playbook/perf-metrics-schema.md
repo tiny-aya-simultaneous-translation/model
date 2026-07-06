@@ -72,7 +72,7 @@ candidate=<id> base=iter24h run=<wandb-id> steps=<n> verdict=<verdict> p50=<s>s 
 Current promoted production reference:
 
 ```text
-candidate=opt-prod5k base=iter24h run=kzsijxv5 steps=5000 verdict=promote p50=6.14s p99=6.76s eps=43.04 hbm=n/a compile_delta=0 checkpoint=gs://tinyaya-stage2-tpu/checkpoints/stage2-tpu-v6e-spot-opt-prod5k/step_005000_final/
+candidate=opt-prod5k base=iter24h run=kzsijxv5 steps=5000 verdict=promote p50=6.14s p99=6.76s eps=43.04 hbm=n/a compile_delta=0 checkpoint=gs://tinyaya-stage2-eu/checkpoints/stage2-tpu-v6e-spot-opt-prod5k/step_005000_final/
 ```
 
 Latest Phase 4 gate:

@@ -19,7 +19,7 @@ source "$SCRIPT_DIR/_lib.sh"
 load_env_file "$REPO_ROOT/.env"
 
 PROJECT_ID="${PROJECT_ID:-ml-pipelines-315702}"
-BUCKET="${BUCKET:-tinyaya-stage2-tpu}"
+BUCKET="${BUCKET:-tinyaya-stage2-eu}"
 VM_NAME="${VM_NAME:-tinyaya-sweep-supervisor}"
 VM_ZONE="${VM_ZONE:-us-central1-a}"            # cheap always-on zone (any works)
 NODE_ID="${NODE_ID:-tinyaya-v6e16-sweep-ew4}"

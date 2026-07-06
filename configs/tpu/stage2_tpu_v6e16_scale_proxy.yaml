@@ -96,7 +96,7 @@ logging:
   val_on_tpu: true
   diag_metrics: false
   # Run-id-namespaced at runtime -> gs://.../stage2-scale-sweep/<wandb_run_id>/
-  save_dir: gs://tinyaya-stage2-tpu/checkpoints/stage2-scale-sweep
+  save_dir: gs://tinyaya-stage2-eu/checkpoints/stage2-scale-sweep
   keep_last_n: 0                  # keep ALL checkpoints per trial
   keep_local_checkpoints: false
   use_wandb: true

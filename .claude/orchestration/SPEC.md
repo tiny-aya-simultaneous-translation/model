@@ -32,11 +32,11 @@ truth.
 Iter 24h validated this topology for production: 5000/5000 steps,
 W&B run `7rrjupc7`, final loss 5.3558, exit status 0, and canonical
 checkpoint
-`gs://tinyaya-stage2-tpu/checkpoints/stage2-tpu-v6e-spot/step_005000_final/`.
+`gs://tinyaya-stage2-eu/checkpoints/stage2-tpu-v6e-spot/step_005000_final/`.
 `opt-prod5k` then validated the optimized production config:
 5000/5000 steps, W&B run `kzsijxv5`, final loss 5.105, p50 6.14
 s/step, p99 6.76 s/step, exit status 0, and checkpoint
-`gs://tinyaya-stage2-tpu/checkpoints/stage2-tpu-v6e-spot-opt-prod5k/step_005000_final/`.
+`gs://tinyaya-stage2-eu/checkpoints/stage2-tpu-v6e-spot-opt-prod5k/step_005000_final/`.
 Phase 4 candidates should use the same bounded loop plus
 `REPO_TARBALL_GS_URI` for private-repo-safe fresh TPU startup.
 Future orchestrator use should treat "canary" language below as the

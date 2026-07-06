@@ -98,7 +98,7 @@ logging:
   val_max_batches: 4
   val_on_tpu: true
   diag_metrics: true              # need [diag] gradnorm to see depth_blocks
-  save_dir: gs://tinyaya-stage2-tpu/checkpoints/stage2-tpu-v6e-v3-smoke
+  save_dir: gs://tinyaya-stage2-eu/checkpoints/stage2-tpu-v6e-v3-smoke
   keep_last_n: 0
   keep_local_checkpoints: false
   use_wandb: false                # smoke: no wandb

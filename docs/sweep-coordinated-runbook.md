@@ -51,7 +51,7 @@ gcloud compute tpus tpu-vm ssh $NODE_ID --zone $ZONE --worker=0 \
 gcloud compute tpus tpu-vm ssh $NODE_ID --zone $ZONE --worker=all \
   --command 'tmux kill-session -t sweephost; tmux kill-session -t sweepcoord'
 ```
-Checkpoints land per trial at `gs://tinyaya-stage2-tpu/checkpoints/stage2-scale-sweep/<run_id>/step_*` (all kept).
+Checkpoints land per trial at `gs://tinyaya-stage2-eu/checkpoints/stage2-scale-sweep/<run_id>/step_*` (all kept).
 
 ## Promote the winner
 ```bash

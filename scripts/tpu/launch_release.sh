@@ -23,7 +23,7 @@ export DATASET_REVISION="${DATASET_REVISION:-$(cat .dataset_revision 2>/dev/null
 
 CONFIG="${1:-configs/tpu/stage2_tpu_v6e_v2.yaml}"
 LOG=/tmp/train.log
-GCS_PREFIX="${GCS_LOG_PREFIX:-gs://tinyaya-stage2-tpu/checkpoints/stage2-tpu-v6e-v2}"
+GCS_PREFIX="${GCS_LOG_PREFIX:-gs://tinyaya-stage2-eu/checkpoints/stage2-tpu-v6e-v2}"
 
 LIBPYTHON_DIR="$(dirname "$(find "$HOME/.local/share/uv/python" -name "libpython3.12.so.1.0" -type f 2>/dev/null | head -1)")"
 echo "[release] $(date -Is) start; GIT_SHA=$GIT_SHA dirty=$GIT_DIRTY config=$CONFIG" | tee "$LOG"

@@ -30,7 +30,7 @@ load_env_file "$ENV_FILE"
 
 PROJECT_ID="${PROJECT_ID:-ml-pipelines-315702}"
 REGION="${REGION:-us-central2}"
-BUCKET="${BUCKET:-tinyaya-stage2-tpu}"
+BUCKET="${BUCKET:-tinyaya-stage2-eu}"
 SECRET_HF="${SECRET_HF:-hf-token}"
 SECRET_WANDB="${SECRET_WANDB:-wandb-api-key}"
 

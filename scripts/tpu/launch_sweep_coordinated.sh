@@ -35,7 +35,7 @@ load_env_file "$REPO_ROOT/.env"
 PROJECT_ID="${PROJECT_ID:-ml-pipelines-315702}"
 ZONE="${ZONE:-europe-west4-a}"
 NODE_ID="${NODE_ID:-tinyaya-v6e16-batch-ew4}"
-BUCKET="${BUCKET:-tinyaya-stage2-tpu}"
+BUCKET="${BUCKET:-tinyaya-stage2-eu}"
 NAME="${NAME:-scale-grid}"
 STAGE="${STAGE:-grid}"                       # grid | bayes
 SWEEP_ID="${SWEEP_ID:-}"                      # required for STAGE=bayes

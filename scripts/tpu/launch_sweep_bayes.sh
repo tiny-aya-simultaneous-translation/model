@@ -24,7 +24,7 @@ load_env_file "$REPO_ROOT/.env"
 PROJECT_ID="${PROJECT_ID:-ml-pipelines-315702}"
 ZONE="${ZONE:-europe-west4-a}"
 NODE_ID="${NODE_ID:-tinyaya-v6e16-sweep-ew4}"
-BUCKET="${BUCKET:-tinyaya-stage2-tpu}"
+BUCKET="${BUCKET:-tinyaya-stage2-eu}"
 NAME="${NAME:-scale-bayes}"
 MAX_TRIALS="${MAX_TRIALS:-8}"                 # W&B bayes trial budget (agent --count)
 NUM_HOSTS="${NUM_HOSTS:-4}"
