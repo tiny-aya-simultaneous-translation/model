@@ -32,6 +32,6 @@ Steps:
 Failure handling:
 
 - If any of the four memory files is missing, render a Callout of
-  type=warning and link to `MEMORY-INSTALLATION.md`.
+  type=warning and link to `MEMORY-SYSTEM.md`.
 - If PLAN.md has no `## Goal` heading, the Goal section reads
   "(none — run /plan to generate)".

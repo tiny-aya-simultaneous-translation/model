@@ -1,20 +1,13 @@
 # TPU capacity log -- observed queue times + autonomous fallback policy
 
-## 2026-05-13 update
+## 2026-07-06 update
 
-Production topology has pivoted to **single-host v6e-8 spot in
-`europe-west4-a`** (QR `tinyaya-stage2-spot-v6e8-eu-qr`, node
-`tinyaya-stage2-spot-v6e8-eu`, profile shorthand `v6e-8-eu`). Iter
-24h completed 5000/5000 baseline steps on this profile and uploaded
-the final canonical checkpoint; `opt-prod5k` then completed 5000/5000
-optimized steps with checkpoint
-`gs://tinyaya-stage2-eu/checkpoints/stage2-tpu-v6e-spot-opt-prod5k/step_005000_final/`.
-Phase 4 now uses the same v6e-8 EU profile, with private-repo-safe
-startup via `REPO_TARBALL_GS_URI`. v4-32 spot in `us-central2-b` is
-now legacy. The fallback policy in section 1 below is preserved as the
-canonical autonomous decision tree for new capacity attempts, but
-day-to-day operation starts at the v6e-8 EU profile unless the user
-explicitly asks for another topology.
+Current topology: **v6e-16 spot in `europe-west4-a`** (production) + **v6e-8** (smoke /
+overfit / eval), both from the v6e spot quota. v6e-64 spot proved un-gettable on both
+zones; v4-32 (`us-central2-b`) and v5e are legacy. The fallback policy in section 1 below
+is preserved as the autonomous decision tree for new capacity attempts. See
+[`tpu-trc-allocation.md`](tpu-trc-allocation.md) for the grant table and
+[`tpu-runbook.md`](tpu-runbook.md) for launch.
 
 **Purpose:** Record real queue-wait durations so future sessions can
 make smart autonomous decisions about which TRC slice to try. Updated

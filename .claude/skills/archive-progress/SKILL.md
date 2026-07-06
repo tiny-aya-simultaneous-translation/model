@@ -11,7 +11,7 @@ droid.
 
 ## When to run
 
-- Monthly, as part of `MEMORY-MAINTENANCE.md`.
+- Monthly, as part of `MEMORY-SYSTEM.md`.
 - Whenever `PROGRESS.md` exceeds 500 lines.
 - Before a major branch cut where you want a clean log.
 

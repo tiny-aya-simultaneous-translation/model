@@ -47,7 +47,7 @@ both laptop and TPU contexts.
 
 ## Failure modes
 
-- VERIFY.md missing -> point the user at `MEMORY-INSTALLATION.md`.
+- VERIFY.md missing -> point the user at `MEMORY-SYSTEM.md`.
 - A block runs longer than 60s total -> kill it and report `timeout`.
 - A block prints to stderr but returns 0 -> still counts as pass; the
   stderr lands in the `tail` column.

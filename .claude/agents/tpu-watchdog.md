@@ -9,11 +9,11 @@ tools: Read, Bash
 
 Subagent role: structured observation of the active TPU run. As of
 2026-05-13 the validated production path is the **single-host v6e-8
-spot** at
-`tinyaya-stage2-spot-v6e8-eu` (zone `europe-west4-a`); historically
-it was the multi-host v4-32 spot at `tinyaya-stage2-spot-v4-canary`
-(zone `us-central2-b`). You **read only** -- never patch, restart,
-or recreate anything.
+spot** in `europe-west4-a` — the v0.3 production run uses the
+**v6e-16** mesh (`tinyaya-v6e16-sweep-ew4`, 4 hosts); a **v6e-8**
+(`tinyaya-v6e8-overfit`) is used for smoke/eval. Historically it was
+the multi-host v4-32 spot in `us-central2-b`. You **read only** --
+never patch, restart, or recreate anything.
 
 Current reference runs: iter 24h baseline `7rrjupc7`, optimized
 production `kzsijxv5`, and Phase 4 depth32 gate `i15igq8d`.

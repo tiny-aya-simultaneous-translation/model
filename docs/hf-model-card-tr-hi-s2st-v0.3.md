@@ -24,14 +24,16 @@ model-index:
 
 # TinyAya — Turkish⇄Hindi Speech-to-Speech Translation (v0.3)
 
-> 🚧 **Training in progress — preliminary card.** Weights and downstream metrics
-> are **not yet published**. This card documents the dataset and the corrected
-> setup ahead of the run, for transparency. It will be updated with checkpoints,
-> the recipe-as-run, and evaluation once training completes.
+> 🚧 **Held — recipe frozen, weights pending.** The 3-epoch production run has not yet
+> completed, so weights and downstream metrics are **not yet published**. This card
+> documents the dataset and the recipe-as-frozen, for transparency; it will be updated
+> with checkpoints and evaluation once the run finishes.
 
-Moshi-style **simultaneous speech-to-speech translation** for **Turkish ⇄ Hindi**:
+Moshi-style **audio-only speech-to-speech translation** for **Turkish ⇄ Hindi**:
 a LoRA-fine-tuned **Cohere2** backbone fused with a **frozen Moshi depth decoder**,
-operating on **Mimi** audio codes in a parallel two-stream format.
+operating on **Mimi** audio codes in a parallel two-stream format. **Audio-only**: the
+corpus has no text alignments, so the Moshi inner-monologue/text stream is untrainable
+(`text_weight=0`).
 
 - **Developed by:** [tiny-aya-translate](https://huggingface.co/tiny-aya-translate)
 - **Funded by:** Google **TPU Research Cloud (TRC)**
@@ -42,11 +44,11 @@ operating on **Mimi** audio codes in a parallel two-stream format.
 ## Dataset (corrected from v0.2)
 
 v0.3 trains on **[`tiny-aya-translate/tr-hi-mimi-encoded`](https://huggingface.co/datasets/tiny-aya-translate/tr-hi-mimi-encoded)**
-— the project's **synthetic** pipeline: ~56k parallel text pairs from **FLORES**,
-**OPUS-100**, and machine-translated **conversational** datasets, rendered with
-multi-voice TTS (kokoro / XTTS-v2 / chatterbox) into ~**1.3M** Mimi-encoded clips
-(`conv_*`, `flores_dev_*`, `flores_devtest_*`, `opus_*`). Training uses a
-quality-filtered subset (size finalized at run time).
+— the project's **synthetic** pipeline: parallel text from **FLORES**, **OPUS-100**, and
+machine-translated **conversational** datasets, rendered with multi-voice TTS (kokoro /
+XTTS-v2 / chatterbox) into ~**1.24M** Mimi-encoded clips. After filtering ~5% of rows
+with missing `.pt` files: **1,178,302 train / 62,036 val**. **No text alignments ship
+with the corpus** → trained audio-only.
 
 ### ⚠️ The honest mistake this fixes
 
@@ -59,34 +61,39 @@ corpus described in our write-up. v0.3 repoints the data loader to
 `tr-hi-mimi-encoded` so the run and the description agree. We're documenting this
 openly rather than silently re-labeling v0.2.
 
-## What else changed from v0.2
+## Recipe (capacity-sweep winner)
 
-Beyond the data-source fix, v0.3 carries codebase corrections and the
-anti-overfitting recipe:
+Beyond the data-source fix, v0.3 carries codebase corrections and a recipe chosen by a
+**two-stage capacity sweep on the full corpus** (not the small-data anti-overfit tuning):
 
-- **Parallel-stream collator fix** — v0.2's pre-fix collator dropped the model
-  audio stream, so `model_audio_embed` received **zero gradient** (the audio
-  stream was effectively untrained). Restored in v0.3 (TPU-verified: grad 0 → nonzero).
-- **Regularization** — `lora_dropout`, train-only `label_smoothing`, early
-  stopping, lower capacity (`lora_r` 64 → 16), higher `weight_decay`, cosine
-  LR to zero — directly targeting v0.2's overfit (val bottomed at step 1,000).
-- **Deep-codebook learning** — per-codebook loss weighting + progressive
-  coarse→fine unmasking (+ an optional low-LR depth-block unfreeze lever) to
-  address CB1–7 collapse (v0.2: CB1–7 ≈ 0.5–3.9% val accuracy).
+- **Parallel-stream collator fix** — v0.2's pre-fix collator dropped the model audio
+  stream, so `model_audio_embed` received **zero gradient**. Restored in v0.3.
+- **Capacity sweep** — Stage 1 (structural grid) chose **+MLP** target modules
+  (`q,k,v,o + gate,up,down + embed_tokens`); Stage 2 (Bayesian `lr × rank`) chose
+  **`lora_r=32, alpha=64, rsLoRA, lr_lora=1.716e-4`** (`exclude_top=2`). In the data-rich
+  regime more LoRA capacity → lower loss (opposite of the small-data overfit regime).
+- **Deep-codebook learning** — per-codebook loss weighting; the frozen depth decoder's
+  I/O layers train while its blocks stay frozen.
+- **Pipeline validated** — an overfit gate (32-example train==val) memorizes **all 8
+  codebooks to 89–98%**. Note: an earlier per-codebook accuracy metric scored CB1–7
+  against the *undelayed* target and read a false ~0%; fixed — CB1–7 were always learning.
+
+Production config: `configs/tpu/stage2_tpu_v6e16_full_v03.yaml`, **14,532 steps (3 epochs)**.
 
 ## Status checklist
 
 | Item | Status |
 |---|---|
 | Data source repointed to `tr-hi-mimi-encoded` | ✅ |
-| TPU env validated (uv, sharding, compile, unmask caching) | ✅ smoke-passed |
-| Production training run | ☐ in progress |
+| Capacity sweep → recipe frozen (r=32/+MLP/rsLoRA) | ✅ |
+| Pipeline validated (all 8 codebooks memorize) | ✅ |
+| Production training run (3 epochs) | ☐ held |
 | Checkpoints published | ☐ pending |
-| ASR-BLEU / chrF / DNSMOS / WER eval | ☐ pending |
+| Per-codebook acc / ASR-BLEU / DNSMOS eval | ☐ pending |
 
 ## Acknowledgements
 
-Trained on Cloud TPU **v6e-8** provided by **Google's TPU Research Cloud (TRC)**.
+Trained on Cloud TPU **v6e-16** provided by **Google's TPU Research Cloud (TRC)**.
 
 ## Citation
 
@@ -95,7 +102,7 @@ Trained on Cloud TPU **v6e-8** provided by **Google's TPU Research Cloud (TRC)**
   title  = {TinyAya: Turkish-Hindi Speech-to-Speech Translation (v0.3)},
   author = {tiny-aya-translate},
   year   = {2026},
-  note   = {Cohere2 + frozen Moshi depth decoder, LoRA; synthetic FLORES/OPUS/conversational corpus; Google TRC TPU v6e-8},
+  note   = {Cohere2 + frozen Moshi depth decoder, LoRA (r=32, +MLP, rsLoRA); audio-only synthetic FLORES/OPUS/conversational corpus; Google TRC TPU v6e-16},
   url    = {https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3}
 }
 ```

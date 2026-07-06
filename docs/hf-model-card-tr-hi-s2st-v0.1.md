@@ -134,18 +134,9 @@ the YAML `model-index` + below.
   **the text stream did
   not learn in this version** (use v0.2 for text); generation is autoregressive
   and not optimized for latency here.
-- **History (transparency)**: the run was a spot v6e-8 (preemptible); an
-  earlier run had a checkpoint GCS-path bug (fixed) and three W&B metrics
-  (per-codebook loss, grad-norm, HBM) that logged as zero (fixed in this run).
-
-## Bias, risks & limitations
-
-Trained on synthetic multi-voice TTS speech (FLORES / OPUS-100 / conversational
-text; a fixed set of TTS voices) — quality and fairness across real speakers,
-dialects, accents, code-switching, and spontaneous speech are untested.
-Speech translation can mistranslate, omit, or fabricate content — outputs must
-not be relied upon for high-stakes communication. As noted above, the text /
-inner-monologue stream is not functional in this version.
+- **Bias & risks**: a fixed set of TTS voices — fairness across real speakers,
+  dialects, accents, code-switching, and spontaneous speech is untested. Speech
+  translation can mistranslate, omit, or fabricate content; not for high-stakes use.
 
 ## Inference quickstart
 

@@ -50,7 +50,7 @@ Audio tokens [8 codebooks, T_src] --- only codebook 0 goes to backbone
 +-- audio_embed(cb0_codes) --+
     |
     v
-TinyAya Backbone (8B Cohere2, LoRA r=16 on layers 0-33, full FT on 34-35)
+TinyAya Backbone (~3.4B Cohere2, LoRA r=32 +MLP on layers 0-33, top-2 excluded)
     |
     v
 Hidden states [B, T, 2048]
@@ -131,7 +131,7 @@ simultaneous-translation/
 |   +-- stage2_tpu.yaml             # TPU training config
 |
 +-- docs/
-    +-- tpu-changes.md              # Detailed TPU adaptation guide
+    +-- tpu-runbook.md              # Current TPU launch / resume / staging
     +-- onboarding.md               # This file
 ```
 
@@ -170,6 +170,11 @@ Audio:    [a0] [a1] [a2] [a3] [a4] [a5] [a6] [a7] [a8] [a9]
 Text:     "mer" "ha" "ba"  PAD  PAD "dun" "ya"  PAD  PAD  PAD
                                     ^word start
 ```
+
+> **v0.3 note (audio-only):** the interleaver *supports* word-level text alignments, but
+> the v0.3 synthetic corpus **ships none** — so the text stream is padded and trained at
+> `text_weight=0`. The alignment path below describes the capability; it is inactive on
+> the current data.
 
 The Interleaver (line 29) takes Whisper word-level timestamps and maps them to audio frames:
 
@@ -336,9 +341,10 @@ Input: text_ids [B, T], audio_codes [B, T], attention_mask [B, T]
 
 We don't fine-tune all 8B parameters. LoRA adapts the model with ~26% trainable params:
 
-**apply_lora()** (line 31):
-- **Layers 0-33**: LoRA r=16 on `q_proj` and `v_proj` (low-rank adapters)
-- **Layers 34-35**: Full fine-tuning (all parameters trainable)
+**apply_lora()** (line 31) — v0.3 capacity-sweep winner:
+- **Layers 0-33**: LoRA **r=32, alpha=64, rsLoRA**, **+MLP** target modules
+  (`q,k,v,o + gate,up,down + embed_tokens`); top 2 layers excluded (`exclude_top=2`).
+- **Full fine-tuning**: none (`num_full_ft_layers=0`).
 - **text_embed**: Wrapped with `LoRAEmbedding` (line 8) — frozen base + trainable low-rank adapter
 - **audio_heads**: Always trainable (they predict audio tokens)
 - **embed_tokens**: LoRA adapter on the extended embedding table
@@ -702,8 +708,8 @@ With W&B enabled (`--use_wandb true`), the following metrics are logged:
 | Depth decoder hidden | 1,024 | `depth_decoder.py:58` | Moshi depth decoder hidden size |
 | Depth decoder input | 4,096 | `depth_decoder.py:59` | Projection output -> depth decoder input |
 | Num backbone layers | 36 | `lora_setup.py` | Cohere2 layers in TinyAya |
-| LoRA rank | 16 | `lora_setup.py:37` | Low-rank adapter dimension |
-| LoRA target modules | q_proj, v_proj | `lora_setup.py` | Which attention matrices get LoRA |
-| Full FT layers | 34, 35 | `lora_setup.py:43` | Last 2 layers fully fine-tuned |
+| LoRA rank | 32 (rsLoRA, α=64) | config `lora.r` | Low-rank adapter dimension (capacity-sweep winner) |
+| LoRA target modules | +MLP (q,k,v,o,gate,up,down,embed) | config `lora.target_modules` | Which matrices get LoRA |
+| Full FT layers | none | config `lora.num_full_ft_layers` | 0 in v0.3 |
 | Depth decoder layers | 6 | `depth_decoder.py:60` | Moshi depth decoder transformer layers |
 | Sliding window | 4,096 | Cohere2 config | Attention window (causes XLA issue -> use_cache=False) |

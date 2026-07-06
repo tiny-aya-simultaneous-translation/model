@@ -78,6 +78,11 @@ python3 tests/test_sweep_promote.py
 ```
 
 ```bash
+# checkpoint retention + scan-namespace remap (the #71 adapter-load fix) unit tests
+python3 tests/test_checkpoint_retention.py
+```
+
+```bash
 # secrets check on tracked + new files
 ! grep -rnE '(hf_[a-zA-Z0-9]{20,}|sk-[a-zA-Z0-9]{20,}|gh[ps]_[a-zA-Z0-9]{30,}|AKIA[A-Z0-9]{16})' \
     --exclude-dir='.venv' --exclude-dir='__pycache__' --exclude-dir='.mypy_cache' \

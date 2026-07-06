@@ -17,9 +17,17 @@ does **not** relicense any of them.
 
 ## Datasets
 
-| Dataset | Source | License | What you must know |
+The v0.3 corpus (`tr-hi-mimi-encoded`) is **synthetic**: source text from FLORES /
+OPUS-100 / conversational MT, rendered to speech by TTS models, then Mimi-encoded. v0.2
+used FLEURS. All sources below apply.
+
+| Dataset / source | Source | License | What you must know |
 |---------|--------|---------|--------------------|
-| **FLEURS** (source speech/text) | Google | **CC BY 4.0** | Attribution required for redistribution of derived data. |
+| **FLORES** (source text) | Meta / NLLB | **CC BY-SA 4.0** | Attribution + share-alike on derived text. |
+| **OPUS-100** (source text) | OPUS project | Per-subcorpus (mixed) | Check the specific subcorpus terms. |
+| Conversational MT (source text) | Per-source | Per-source | Inherit each source's terms. |
+| **TTS-model outputs** (synthetic speech) | kokoro / XTTS-v2 / chatterbox | Per-model terms | The synthetic audio inherits each TTS model's license/AUP. |
+| **FLEURS** (v0.2 only) | Google | **CC BY 4.0** | Attribution required for redistribution of derived data. |
 | `tiny-aya-translate/*` encoded datasets | HuggingFace Hub | See each dataset card | Derived from the above; inherit upstream obligations. |
 
 ## Libraries (runtime dependencies)
@@ -33,8 +41,8 @@ does **not** relicense any of them.
 | Weights & Biases (`wandb`) | MIT |
 | `gcsfs`, `sacrebleu`, `pyyaml`, `tqdm` | Apache-2.0 / MIT / BSD |
 
-Library versions are pinned in `simultaneous-translation/pyproject.toml` /
-`uv.lock`; consult each upstream project for the authoritative license text.
+Library versions are pinned in `pyproject.toml` / `uv.lock`; consult each upstream
+project for the authoritative license text.
 
 ## Compute acknowledgment
 
