@@ -193,12 +193,20 @@ class TinyAyaMoshiComposite(nn.Module):
                 use_scan_layers=use_scan_layers,
                 use_grad_checkpoint=xla_grad_checkpoint,
             )
-            # MoshiDepthDecoder: the layers attribute lives directly
-            # on the module.
+            # MoshiDepthDecoder: the layers attribute lives directly on the
+            # module. NEVER scan it -- its per-codebook index_select raises a
+            # FakeTensor "allow_non_fake_inputs" AssertionError during scan's
+            # tracing (torch_xla 2.9), which permanently disables scan for the
+            # WHOLE run. It is only 6 layers, so unrolling is cheap. Canonical
+            # pattern: scan only the homogeneous backbone stack and run
+            # index_select-bearing submodules unscanned (pytorch/xla
+            # examples/scan/decoder_with_scan.py; verified via deep research
+            # 2026-07-07). Grad-checkpoint still applies to keep its activations
+            # bounded.
             replace_layers_with_scan(
                 self.depth_decoder,
                 "layers",
-                use_scan_layers=use_scan_layers,
+                use_scan_layers=False,
                 use_grad_checkpoint=xla_grad_checkpoint,
             )
 
