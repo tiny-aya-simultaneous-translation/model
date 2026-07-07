@@ -959,6 +959,15 @@ def build_parser():
     p.add_argument("--target_modules", type=str, default=None,
                    help='lora.target_modules as a JSON list or comma/space-separated '
                         'string (W&B sweep categorical, e.g. \'["q_proj","v_proj"]\')')
+    # Depth-path capacity knobs (v0.3 reval arm F). Unlike lora_r/alpha these need
+    # no explicit mapping: the names match cfg["lora"].depth_unfreeze_blocks and
+    # cfg["optim"].lr_depth_blocks, so load_config's section-matcher routes them.
+    p.add_argument("--depth_unfreeze_blocks", type=int, default=None,
+                   help="lora.depth_unfreeze_blocks: unfreeze last N Moshi depth "
+                        "blocks (adds CB1-7 capacity; watch HBM). 0 = frozen (default).")
+    p.add_argument("--lr_depth_blocks", type=float, default=None,
+                   help="optim.lr_depth_blocks: low LR for the unfrozen depth blocks "
+                        "(only used when depth_unfreeze_blocks > 0).")
     return p
 
 
