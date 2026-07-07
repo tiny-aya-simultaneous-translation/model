@@ -28,6 +28,11 @@
 #   DRY_RUN=1          materialise configs only; do not create any QR
 #   SWEEP_DATA_GS_URI  full-corpus tarball in GCS (forwarded to each slice; if
 #                      unset each slice falls back to the full HF download)
+#   REPO_TARBALL_GS_URI  GCS repo tarball the slice runs (REQUIRED for live launch:
+#                      the repo is private so a bare VM cannot git-clone it, and the
+#                      startup default branch is stale. Build with `git archive HEAD`
+#                      + upload to gs://tinyaya-stage2-eu/code/). DRY_RUN skips this.
+#   GIT_SHA            optional provenance string logged to W&B (default: HEAD sha)
 
 set -euo pipefail
 
@@ -49,6 +54,18 @@ EOF
 
 WANT="${ARMS:-A B C D E F}"
 WANT="${WANT//,/ }"
+
+# Repo tarball is mandatory for a real launch (private repo, stale default branch).
+# Fail loud BEFORE provisioning any slice rather than silently git-cloning the wrong code.
+if [ "${DRY_RUN:-0}" != "1" ] && [ -z "${REPO_TARBALL_GS_URI:-}" ]; then
+    echo "ERROR: REPO_TARBALL_GS_URI is unset. The repo is private and the startup" >&2
+    echo "  default branch is stale, so the slice must run a GCS repo tarball. Build one:" >&2
+    echo "    git archive --format=tar.gz -o /tmp/repo.tgz HEAD" >&2
+    echo "    gcloud storage cp /tmp/repo.tgz gs://tinyaya-stage2-eu/code/reval-\$(git rev-parse --short HEAD).tar.gz" >&2
+    echo "  then re-run with REPO_TARBALL_GS_URI set. (DRY_RUN=1 skips this check.)" >&2
+    exit 3
+fi
+GIT_SHA="${GIT_SHA:-$(git -C "$REPO_ROOT" rev-parse --short HEAD 2>/dev/null || echo unknown)}"
 
 mkdir -p "$OUT_DIR"
 
@@ -106,11 +123,16 @@ PY
     echo "==> launching reval arm $LETTER"
     echo "    config: $rel_config"
     echo "    QR/node: $qr / $node"
+    echo "    repo tarball: $REPO_TARBALL_GS_URI  (git_sha=$GIT_SHA)"
     echo "    SWEEP_DATA_GS_URI=${SWEEP_DATA_GS_URI:-<unset: full HF download>}"
+    # NOTE: GIT_SHA is shown above for operator provenance but is NOT forwarded to
+    # the VM -- launch_qr.sh only stamps specific metadata, and the git-archive
+    # tarball has no .git. W&B logs git_sha="unknown"; the tarball name carries it.
     TRC_PROFILE=v6e-8-eu \
     CONFIG_FILE="$rel_config" \
     QR_NAME="$qr" \
     NODE_ID="$node" \
+    REPO_TARBALL_GS_URI="$REPO_TARBALL_GS_URI" \
     SWEEP_DATA_GS_URI="${SWEEP_DATA_GS_URI:-}" \
         bash "$SCRIPT_DIR/launch_spot.sh"
 done <<< "$ARM_MATRIX"
