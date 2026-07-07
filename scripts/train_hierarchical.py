@@ -1535,6 +1535,10 @@ def main():
             wandb.init(
                 project=cfg["logging"]["wandb_project"],
                 name=cfg["logging"]["wandb_run_name"],
+                # Optional run group: lets a fleet of sibling runs (e.g. the v0.3
+                # reval arms A..F) share one dashboard group. None = ungrouped
+                # (prior behavior). Env WANDB_RUN_GROUP still overrides if set.
+                group=cfg["logging"].get("wandb_group") or os.environ.get("WANDB_RUN_GROUP"),
                 # Prefer a resumed id; else honor WANDB_RUN_ID (the sweep coordinator
                 # pre-generates it so it can read this trial's metric back + so the
                 # checkpoint dir is namespaced by the same id). else wandb generates.
