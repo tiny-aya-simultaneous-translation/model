@@ -47,7 +47,13 @@ train:
   fsdp_barrier_hook: false
   depth_chunk_size: 16
   precision: bfloat16
-  use_scan_layers: false
+  use_scan_layers: true           # REQUIRED on full-corpus 300-frame seqs: scan collapses
+                                  # the 36 backbone layers into ONE scanned op so XLA does
+                                  # not unroll them at compile -- scan=false OOMs at ~64G
+                                  # (2x a v6e chip) on a single-host v6e-8 (verified 2026-07-07,
+                                  # all 6 arms). Checkpoint load/save is scan-namespace-safe
+                                  # since eb17609 (#71). The v6e-16 production config has the
+                                  # same latent bug and must flip this too before its full run.
   xla_grad_checkpoint: true
   final_canonical_save: false     # probe run -- no publishable final artifact
 

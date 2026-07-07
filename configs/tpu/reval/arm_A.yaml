@@ -25,7 +25,7 @@ train:
   fsdp_barrier_hook: false
   depth_chunk_size: 16
   precision: bfloat16
-  use_scan_layers: false
+  use_scan_layers: true
   xla_grad_checkpoint: true
   final_canonical_save: false
 loss:
