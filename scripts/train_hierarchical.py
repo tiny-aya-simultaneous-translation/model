@@ -1097,6 +1097,10 @@ def main():
         lora_exclude_top=_lora_cfg.get("lora_exclude_top", 2),
         lora_dropout=_lora_cfg.get("dropout", 0.0),
         use_rslora=bool(_lora_cfg.get("use_rslora", False)),
+        # scan_layers stacks per-layer param pytrees and requires identical
+        # keys on every layer; under scan, exclude_top is realised by
+        # FREEZING the top adapters instead of not creating them.
+        scan_homogeneous=use_scan,
     )
     freeze_depth_internals(
         model, unfreeze_last_n_blocks=int(_lora_cfg.get("depth_unfreeze_blocks", 0))
@@ -1580,6 +1584,7 @@ def main():
             wandb.define_metric("val/composite", step_metric="global_step")
             wandb.define_metric("audio/*", step_metric="global_step")
             wandb.define_metric("mem/*", step_metric="global_step")
+            wandb.define_metric("tpu/*", step_metric="global_step")
             if is_tpu:
                 run_id = wandb.run.id
                 try:
@@ -1662,6 +1667,10 @@ def main():
     _early_stop = False
 
     grad_accum = cfg["train"]["grad_accum"]
+    # Opt-in graph break after every micro-batch (see the mark_step call in
+    # the micro loop). Default off: the one-graph-per-macro-step behaviour
+    # is load-bearing for the tuned v6e-16 production path.
+    micro_mark_step = bool(cfg["train"].get("micro_mark_step", False)) and is_tpu
     # XLA traces all grad-accum micro-batches into one macro-step graph.
     # Never let one macro-step straddle an epoch reset: that host-side
     # branch was the remaining step-259 topology risk after iter 24g.
@@ -1969,6 +1978,18 @@ def main():
                 micro_text_xla = micro_text_xla + losses["text_loss"].detach()
                 micro_audio_xla = micro_audio_xla + losses["audio_loss"].detach()
                 micro_per_cb_xla = micro_per_cb_xla + losses["per_codebook_loss"].detach()
+                if micro_mark_step:
+                    # Graph break per micro-batch. Without it, all grad_accum
+                    # micro fwd+bwd passes trace into ONE program; under scan
+                    # the resulting buffer-assignment problem fragments HBM
+                    # catastrophically (observed 2026-07-08 on v6e-8: 81.08G
+                    # "used" of which 66.87G was 82.5% fragmentation over
+                    # 14.21G of real buffers). Numerics are identical --
+                    # gradients accumulate in .grad across graphs -- and the
+                    # 8 identical micro graphs compile once.
+                    import torch_xla.core.xla_model as _xm_micro
+
+                    _xm_micro.mark_step()
             else:
                 micro_loss_sum += losses["loss"].item()
                 micro_text += losses["text_loss"].item()
@@ -2392,6 +2413,13 @@ def main():
                 }
                 for i, v in enumerate(avg["per_cb"]):
                     log[f"train/per_codebook_loss_{i}"] = v
+                # Per-chip HBM + duty-cycle timeseries (tpu/chip{i}/hbm_gib,
+                # tpu/chip{i}/duty_pct, tpu/hbm_max_gib, ...). TPU backend
+                # only; internally cached 30 s so calling every log step is
+                # free. Multi-host note: reports the PRIMARY host's chips.
+                per_chip = getattr(backend, "per_chip_metrics", None)
+                if per_chip is not None:
+                    log.update(per_chip())
                 if args.sweep:
                     # Health flag so the sweep can auto-reject trials whose text
                     # stream is stuck at random (CE ~ ln(text_vocab) ~ 12.5).

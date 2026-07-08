@@ -710,6 +710,83 @@ class TPUBackend(BackendBase):
             "hbm_available": 1.0,
         }
 
+    def per_chip_metrics(self) -> dict[str, float]:
+        """Per-chip HBM + duty-cycle telemetry for W&B, all chips on this host.
+
+        WHY THIS EXISTS
+        ---------------
+        ``get_memory_info`` reports chip 0 only, which is fine under SPMD
+        replicated (chips are near-identical) but hides stragglers and makes
+        per-chip regressions invisible in W&B. This parses ONE plain
+        ``tpu-info`` run -- its "TPU Runtime Utilization" table carries both
+        HBM and duty cycle for every chip on the host::
+
+            | 0    | 22.37 GiB / 31.25 GiB | 0.00%      |
+
+        Returns
+        -------
+        dict[str, float]
+            Flat W&B-ready keys per chip: ``tpu/chip{i}/hbm_gib``,
+            ``tpu/chip{i}/hbm_peak_gib`` (host-side running max over this
+            process's samples -- libtpu exposes no true peak counter),
+            ``tpu/chip{i}/duty_pct``; plus ``tpu/hbm_max_gib`` /
+            ``tpu/hbm_min_gib`` across chips for cheap dashboarding.
+            Empty dict when telemetry is unavailable (never raises).
+
+        Notes
+        -----
+        TPU note: the subprocess costs ~1-2 s, so results are cached for
+        30 s -- call it every logging step and let the cache throttle.
+        Under multi-host (v6e-16+) this reports the CALLING host's chips
+        only; each host would need its own logger for full coverage.
+        """
+        import subprocess as _sp
+        import time as _time
+
+        now = _time.monotonic()
+        cached = getattr(self, "_per_chip_cache", None)
+        if cached is not None and now - cached[0] < 30.0:
+            return cached[1]
+
+        tpu_info = self._find_tpu_info_binary()
+        if not tpu_info:
+            return {}
+        try:
+            out = _sp.run(
+                [tpu_info],
+                capture_output=True,
+                text=True,
+                timeout=15,
+                env={**os.environ, "PJRT_DEVICE": "TPU"},
+            )
+        except Exception:
+            return {}
+
+        # Rows: | <chip> | <used> GiB / <limit> GiB | <duty>% |
+        row_re = re.compile(
+            r"^\|\s*(\d+)\s*\|\s*([0-9.]+)\s*GiB\s*/\s*[0-9.]+\s*GiB\s*\|"
+            r"\s*([0-9.]+)%\s*\|"
+        )
+        peaks: dict[int, float] = getattr(self, "_per_chip_peaks", {})
+        metrics: dict[str, float] = {}
+        used_vals: list[float] = []
+        for line in out.stdout.splitlines():
+            m = row_re.match(line.strip())
+            if not m:
+                continue
+            chip, used, duty = int(m.group(1)), float(m.group(2)), float(m.group(3))
+            peaks[chip] = max(peaks.get(chip, 0.0), used)
+            metrics[f"tpu/chip{chip}/hbm_gib"] = used
+            metrics[f"tpu/chip{chip}/hbm_peak_gib"] = peaks[chip]
+            metrics[f"tpu/chip{chip}/duty_pct"] = duty
+            used_vals.append(used)
+        if used_vals:
+            metrics["tpu/hbm_max_gib"] = max(used_vals)
+            metrics["tpu/hbm_min_gib"] = min(used_vals)
+        self._per_chip_peaks = peaks
+        self._per_chip_cache = (now, metrics)
+        return metrics
+
     def sync(self) -> None:
         """``torch_xla.sync()`` -- fence the lazy graph builder."""
         import torch_xla
