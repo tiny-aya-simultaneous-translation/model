@@ -80,6 +80,34 @@ Beyond the data-source fix, v0.3 carries codebase corrections and a recipe chose
 
 Production config: `configs/tpu/stage2_tpu_v6e16_full_v03.yaml`, **14,532 steps (3 epochs)**.
 
+## Training infrastructure: replicated strategy + XLA architecture changes
+
+**Parallelism = `replicated` (SPMD data-parallel).** The composite is **5.23B params
+total but only ~122M trainable** (LoRA + depth-decoder I/O), so the whole model is
+**replicated on every TPU chip** and only the *data* is sharded (global batch 256 across
+chips; gradients are averaged by SPMD). There is **no tensor/FSDP sharding of weights**
+in the released checkpoints — a checkpoint is a plain single-replica state and loads on
+one GPU without any resharding. (The trainer auto-selects `replicated` whenever
+trainable params < 500M; see `src/backend/tpu_backend.py::_resolve_strategy`.)
+
+**Architecture / lowering changes made to train this on TPU** (all verified
+numerics-identical to stock; needed because XLA compiles static graphs and has no
+stride-0 broadcast views):
+
+| Change | Why | Inference impact |
+|---|---|---|
+| `MoshiFlexibleLinear.forward` rewritten as equal-batch `bmm` (`src/model/depth_decoder.py::_patch_flexible_linear_bmm`) | stock broadcast-batched `matmul` materialises the per-codebook weight **per token** on XLA (5.5 GiB/FFN call → OOM) | none on GPU (identical math); apply the patch if running inference on XLA |
+| Identity-gather skip in the same patch (`index_select(weight, arange(C))` → read weight directly) | the training path always selects ALL codebook rows; XLA copies the full weight per call otherwise | none (identical math) |
+| Full-attention forcing under `use_scan_layers` (`composite.py::_force_full_attention_for_scan`) | Cohere2 interleaves sliding/full attention (`sliding_window_pattern=4`); `scan_layers` needs 36 homogeneous layers. Sliding window 4096 ≫ max seq 300 ⇒ identical | none — attention pattern is a config read at load; released config unchanged |
+| **LoRA adapters on ALL 36 layers, top-2 frozen** (`lora_setup.py::apply_lora(scan_homogeneous=True)`) instead of `exclude_top=2` omitting them | scan stacks per-layer param pytrees and requires identical keys | **checkpoint-structural**: `peft_adapter/` contains 36 layers of adapters; the top-2 are zero (`lora_B` never trained) ⇒ mathematically identical to exclusion. Load with the shipped `adapter_config.json`, not a hand-written one |
+| Scan-safe dropout (`scan_utils.py::_ScanSafeDropout`) | `native_dropout`'s bool-mask meta vs bf16 XLA lowering breaks `scan`'s stacked activation buffers | none — train-time only, eval-mode is a no-op |
+| Per-micro-batch graph break (`train.micro_mark_step`) + `depth_chunk_size` | XLA buffer-assignment fragmentation (81 GiB "used" over 14 GiB real) when 8 grad-accum micros trace into one program | none — pure scheduling |
+
+> **Note for checkpoint consumers:** only the bolded row changes what is *in* the
+> checkpoint (extra zero adapters on the top layers). Everything else is training-time
+> lowering. Runs trained without `use_scan_layers` (e.g. an unscanned v6e-16 run) keep
+> the classic 34-layer adapter layout; `metadata.json` records which applies.
+
 ## Status checklist
 
 | Item | Status |

@@ -5,7 +5,21 @@ the backlog of loose ends. Delete an item when it's done.
 
 ## Open
 
-_(none)_
+### Keep the v0.3 HF model card's infra section in sync with the production run
+
+`docs/hf-model-card-tr-hi-s2st-v0.3.md` now has a "Training infrastructure: replicated
+strategy + XLA architecture changes" section (added 2026-07-08), and
+`docs/v0.3-public-release-plan.md` §2 has the matching checklist item. Before publishing:
+
+- Confirm which layout the published checkpoints actually use: `scan_homogeneous`
+  (adapters on ALL 36 layers, top-2 frozen/zero — any run with `use_scan_layers: true`,
+  e.g. the v6e-8 reval arms) vs classic `exclude_top=2` 34-layer layout (unscanned
+  v6e-16). Update the card's bolded checkpoint-structural row + `metadata.json` note.
+- Verify `metadata.json` actually records the adapter layout / `use_scan_layers` flag —
+  add it to the checkpoint writer if it doesn't yet.
+- Re-verify the "numerics-identical" claims one final time on the shipped code
+  (FlexibleLinear bmm + identity-skip parity test, `_ScanSafeDropout` eval no-op,
+  full-attention forcing gated to seq ≤ sliding_window).
 
 ---
 
