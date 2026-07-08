@@ -52,6 +52,70 @@ from .scan_utils import replace_layers_with_scan
 from .surgery import create_projection, extract_depth_decoder_state_dict
 
 
+def _force_full_attention_for_scan(cohere2_model) -> None:
+    """Make every backbone layer full-attention so ``scan_layers`` can fuse them.
+
+    WHY THIS EXISTS
+    ---------------
+    tiny-aya-base (Cohere2) interleaves attention types via
+    ``sliding_window_pattern=4``: 27 sliding-window layers + 9 full-attention
+    layers (indices 3, 7, 11, ... full; the rest sliding). ``scan_layers``
+    fuses ONE layer function and runs it N times, so heterogeneous per-layer
+    attention behaviour both (a) makes the fused function wrong for 3/4 of the
+    layers and (b) trips a FakeTensor assertion, because the sliding branch
+    rebuilds a mask via ``torch.ones_like(attention_mask, dtype=bool)``
+    (modeling_cohere2.py) on the real, loop-invariant mask during scan's trace.
+
+    THE SAFE UNIFICATION
+    --------------------
+    The sliding window is 4096 while our sequences are <= ``max_frames`` (300).
+    When seq_len <= sliding_window, sliding attention is IDENTICAL to full
+    attention -- the window already covers the whole sequence. So forcing every
+    layer to full attention (``is_sliding=False``, ``sliding_window=None``) is a
+    numerical no-op here, yet makes all 36 layers homogeneous (same function,
+    no ``ones_like`` branch), which is exactly what ``scan_layers`` requires.
+
+    TPU note: only call this when ``use_scan_layers`` is on. It is a no-op on
+    any model whose layers are already full-attention. If a future run ever
+    uses seq_len > 4096 this would change results, so it stays gated behind the
+    scan flag + the max_frames<=300 contract.
+    """
+    n_forced = 0
+    for layer in cohere2_model.layers:
+        if getattr(layer, "is_sliding", False):
+            layer.is_sliding = False
+            n_forced += 1
+        # DecoderLayer and its attention both carry a sliding_window knob.
+        if getattr(layer, "sliding_window", None) is not None:
+            layer.sliding_window = None
+        attn = getattr(layer, "self_attn", None)
+        if attn is not None and getattr(attn, "sliding_window", None) is not None:
+            attn.sliding_window = None
+
+    # Force EAGER attention. SDPA builds a boolean (PRED) mask and mutates it
+    # via dynamic-update-slice INSIDE the layer forward; under scan's fused HLO
+    # that lowers to a "PRED vs BF16 dynamic-update-slice" type error. Eager
+    # attention instead just does ``attn_weights + causal_mask`` with the
+    # prebuilt additive bf16 mask (which we already thread through the scan
+    # carry) -- no boolean mask ops in the scanned region. Fine for our short
+    # (<=max_frames=300) sequences; the O(T^2) eager matmul is cheap at T=300.
+    if getattr(cohere2_model, "config", None) is not None:
+        cohere2_model.config._attn_implementation = "eager"
+    n_eager = 0
+    for layer in cohere2_model.layers:
+        attn = getattr(layer, "self_attn", None)
+        cfg = getattr(attn, "config", None) if attn is not None else None
+        if cfg is not None:
+            cfg._attn_implementation = "eager"
+            n_eager += 1
+
+    print(
+        f"[composite] scan homogeneity: forced full-attention on {n_forced} "
+        f"sliding layers + eager attn on {n_eager} (seq<=max_frames<<"
+        f"sliding_window, numerically identical)"
+    )
+
+
 def _checkpoint(fn, *args, use_reentrant: bool = False):
     """XLA-aware gradient checkpoint shim.
 
@@ -187,6 +251,8 @@ class TinyAyaMoshiComposite(nn.Module):
         if use_scan_layers or xla_grad_checkpoint:
             # Cohere backbone: AutoModelForCausalLM -> .model is the
             # base Cohere2Model, .model.layers is the ModuleList.
+            if use_scan_layers:
+                _force_full_attention_for_scan(self.backbone.model.model)
             replace_layers_with_scan(
                 self.backbone.model.model,
                 "layers",

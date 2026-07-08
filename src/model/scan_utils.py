@@ -311,6 +311,230 @@ class _ScanLayerWrapper(nn.Module):
         return _call(hidden_states)
 
 
+def _ensure_fake_tensor_allows_non_fake() -> None:
+    """Make torch_xla ``scan``'s internal fake trace tolerate real tensors.
+
+    ``scan`` traces the layer body with AOTAutograd, which spins up its OWN
+    ``FakeTensorMode`` (default ``allow_non_fake_inputs=False``). Any real,
+    loop-invariant tensor the layer touches during that trace -- the attention
+    mask (``ones_like`` / ``alias``), RoPE constants (``_tensor_constant0``) --
+    trips ``FakeTensorMode``'s non-fake-input assertion and scan is disabled.
+
+    Carry-threading the mask/cos/sin fixes the ones we can reach, but recent
+    transformers build the 4D causal mask lazily *inside* the attention
+    (masking_utils), so it never reaches our carry. The robust, class-wide fix
+    (per the pytorch/xla + PyTorch FakeTensor guidance) is to let that internal
+    mode accept non-fake inputs -- it then fakeifies the real constant on the
+    fly, which is exactly what we want (real value at execution, fake at trace).
+    We can't reach scan's private mode, so we patch the ``FakeTensorMode``
+    constructor to default ``allow_non_fake_inputs=True`` (idempotent, TPU-only,
+    applied lazily right before the first scan trace).
+
+    TPU note: scoped to training runs that use scan. It relaxes a debug-time
+    assertion, not execution semantics -- the compiled graph still uses the real
+    tensor values at run time.
+    """
+    import torch._subclasses.fake_tensor as _ft
+
+    if getattr(_ft.FakeTensorMode, "_tinyaya_allow_non_fake", False):
+        return
+    _orig_init = _ft.FakeTensorMode.__init__
+
+    def _init(self, *args, **kwargs):
+        kwargs.setdefault("allow_non_fake_inputs", True)
+        _orig_init(self, *args, **kwargs)
+
+    _ft.FakeTensorMode.__init__ = _init
+    _ft.FakeTensorMode._tinyaya_allow_non_fake = True
+    print("[scan_utils] patched FakeTensorMode default allow_non_fake_inputs=True")
+
+
+class _ScanSafeDropout(nn.Module):
+    """Dropout whose saved-for-backward mask dtype matches the activation.
+
+    WHY THIS EXISTS
+    ---------------
+    ``aten.native_dropout`` (what ``nn.Dropout`` dispatches to) declares its
+    mask output as **bool** in the meta/decomposition semantics
+    (``torch/_decomp/decompositions.py::native_dropout`` -> ``rand_like(x) > p``),
+    but torch_xla's runtime lowering materialises the mask in the *input*
+    dtype (bf16). Outside scan nobody notices. Inside ``scan``, AOTAutograd
+    sizes the per-layer stacked activation buffer from the abstract trace
+    (PRED) while execution writes the real mask (BF16) into it -- XLA fails
+    lowering with ``Dynamic update slice: operand PRED vs update BF16``.
+
+    THE FIX
+    -------
+    Express dropout as plain composed ops and cast the mask to the activation
+    dtype *immediately*, so the tensor saved for backward is bf16 in both the
+    abstract trace and the lowered graph. Numerics are identical to
+    ``nn.Dropout`` (inverted dropout: ``x * mask / (1 - p)``).
+
+    TPU note: only swapped in when the backbone runs under ``scan``; GPU/CPU
+    and unrolled paths keep the stock ``nn.Dropout``. Inside scan's fused
+    body the RNG op may reuse the same seed stream across layer iterations
+    (masks correlated across layers) -- acceptable for LoRA-dropout
+    regularization, and strictly better than having no dropout at all.
+    """
+
+    def __init__(self, p: float) -> None:
+        """Store the drop probability (same meaning as ``nn.Dropout(p)``)."""
+        super().__init__()
+        self.p = float(p)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Apply inverted dropout with a dtype-consistent mask."""
+        if not self.training or self.p == 0.0:
+            return x
+        keep = (torch.rand_like(x) >= self.p).to(x.dtype)
+        return x * keep * (1.0 / (1.0 - self.p))
+
+    def extra_repr(self) -> str:
+        """Match ``nn.Dropout``'s repr shape for debuggability."""
+        return f"p={self.p}"
+
+
+def _swap_dropout_for_scan(raw_layers) -> int:
+    """Replace every active ``nn.Dropout`` in the scanned layers with
+    ``_ScanSafeDropout``.
+
+    Runs lazily on the first scanned forward (NOT at composite init) because
+    PEFT's ``lora_dropout`` modules -- the only p>0 dropout in the backbone;
+    Cohere2's ``attention_dropout`` is 0.0 -- are created by ``apply_lora``,
+    which the train script calls AFTER the composite (and its scan proxy) is
+    built. Swapping p=0 dropouts too is harmless but pointless (they never
+    dispatch ``native_dropout``), so we leave them.
+
+    Parameters
+    ----------
+    raw_layers : list[nn.Module]
+        The unwrapped HF decoder layers about to be scanned.
+
+    Returns
+    -------
+    int
+        Number of modules swapped (0 on the second call -- idempotent).
+    """
+    n_swapped = 0
+    for layer in raw_layers:
+        for module in layer.modules():
+            for name, child in list(module.named_children()):
+                if isinstance(child, nn.Dropout) and child.p > 0:
+                    setattr(module, name, _ScanSafeDropout(child.p))
+                    n_swapped += 1
+    if n_swapped:
+        print(
+            f"[scan_utils] swapped {n_swapped} nn.Dropout -> _ScanSafeDropout "
+            "(bf16 mask; avoids scan's PRED/BF16 dynamic-update-slice mismatch)"
+        )
+    return n_swapped
+
+
+def _run_scan_with_carry(raw_layers, hidden_states, kwargs):
+    """Run a homogeneous HF layer stack via torch_xla ``scan``, threading the
+    loop-invariant FLOAT tensors through the carry.
+
+    WHY (the crux of the FakeTensor failures)
+    -----------------------------------------
+    ``scan_layers`` calls each layer with ONLY the carry (hidden state); the
+    layer's other inputs (attention mask, RoPE ``position_embeddings``) have to
+    be closed over. During scan's AOTAutograd *fake* trace those closed-over
+    REAL tensors trip ``FakeTensorMode``'s non-fake-input assertion (the
+    ``ones_like`` on the mask, the ``_tensor_constant0`` on cos/sin). The fix is
+    to make those tensors part of the scan **carry**: scan fakeifies the carry
+    (``torch.empty_like``) before tracing, so the trace sees fakes, while
+    execution threads the real tensors through unchanged.
+
+    Only FLOAT loop-invariants go in the carry -- scan forces ``requires_grad``
+    on carry leaves and integer tensors (``position_ids``, ``cache_position``)
+    cannot require grad. Those ints are left closed over; they are unused inside
+    the layer once ``position_embeddings`` is supplied and full-attention is
+    forced (see ``composite._force_full_attention_for_scan``), so they never hit
+    the ops that assert.
+
+    Activation memory: we pass ``min_cut_rematerialization_partition`` so scan
+    checkpoints the layer body (recompute in backward) -- the memory win that
+    lets the stack fit on one v6e-8 chip.
+
+    Parameters
+    ----------
+    raw_layers : list[nn.Module]
+        The homogeneous HF decoder layers (already parameter-uniform).
+    hidden_states : torch.Tensor
+        The initial carry ``[batch, time, hidden]``.
+    kwargs : dict
+        Loop-invariant kwargs HF passes to every layer.
+
+    Returns
+    -------
+    torch.Tensor
+        The stack's final hidden state.
+    """
+    from copy import deepcopy
+
+    from functorch.compile import min_cut_rematerialization_partition
+    from torch.func import functional_call
+    from torch.utils._pytree import tree_flatten, tree_map, tree_unflatten
+    from torch_xla.experimental.scan import scan
+    from torch_xla.experimental.scan_layers import (
+        _ensure_same_structure,
+        _extract_weights_and_buffers,
+    )
+
+    # Let scan's internal AOTAutograd fake trace tolerate real loop-invariant
+    # tensors (the 4D causal mask that recent transformers build lazily inside
+    # the attention, RoPE constants, ...) instead of asserting on them.
+    _ensure_fake_tensor_allows_non_fake()
+
+    # native_dropout's bool-mask meta vs bf16-mask XLA lowering breaks scan's
+    # stacked activation buffers (PRED vs BF16 DUS). Swap in dtype-consistent
+    # dropout before stacking/tracing. Idempotent; no-op when all p==0.
+    _swap_dropout_for_scan(raw_layers)
+
+    # 1. Stack params + buffers across layers (what scan_layers does internally).
+    pnb = [_extract_weights_and_buffers(layer) for layer in raw_layers]
+    params_list = [p for p, _ in pnb]
+    buffers_list = [b for _, b in pnb]
+    _ensure_same_structure(params_list)
+    _ensure_same_structure(buffers_list)
+    stacked_params = tree_map(lambda *t: torch.stack(t, dim=0), *params_list)
+    stacked_buffers = tree_map(lambda *t: torch.stack(t, dim=0), *buffers_list)
+
+    # 2. Split kwargs: float tensor leaves ride the carry; the rest are static.
+    kflat, kspec = tree_flatten(kwargs)
+    carry_slots = [
+        i for i, v in enumerate(kflat)
+        if isinstance(v, torch.Tensor) and v.is_floating_point()
+    ]
+    carried = [kflat[i] for i in carry_slots]
+
+    example_layer = deepcopy(raw_layers[0])
+
+    def one_layer(carry, params_buffers):
+        hidden = carry[0]
+        # Reinsert the carried (now real, at execution / fake, at trace) floats.
+        kf = list(kflat)
+        for j, slot in enumerate(carry_slots):
+            kf[slot] = carry[1 + j]
+        call_kwargs = tree_unflatten(kf, kspec)
+        params, buffers = params_buffers
+        out = functional_call(
+            example_layer, {**params, **buffers}, (hidden,), call_kwargs
+        )
+        new_hidden = out[0] if isinstance(out, tuple) else out
+        # Thread the loop-invariants through unchanged.
+        return (new_hidden, *carry[1:]), None
+
+    init = (hidden_states, *carried)
+    final_carry, _ = scan(
+        one_layer,
+        init,
+        (stacked_params, stacked_buffers),
+        partition_fn=min_cut_rematerialization_partition,
+    )
+    return final_carry[0]
+
+
 # ---------------------------------------------------------------------------
 # Fused scan-layer that runs the whole stack in one shot
 # ---------------------------------------------------------------------------
@@ -387,43 +611,29 @@ class _FusedScanLayer(nn.Module):
         scan_fn = self.stack.scan_fn
 
         if scan_fn is not None and _is_tpu_runtime():
-            # torch_xla 2.9 signature:
-            #     scan_layers(layers, input_data, partition_fn=None,
-            #                 is_layer_pure=False)
-            # It does NOT accept **kwargs, so we must bind the per-step
-            # loop-invariants (attention_mask, position_embeddings, etc.)
-            # into per-layer closures. We pass the *raw* HF layer (not
-            # the checkpoint-wrapped one) so scan_layers can manage
-            # remat itself; otherwise we would stack a
-            # torch.utils.checkpoint region inside an xla.while_loop
-            # body and double the saved-tensor work.
-            #
-            # Failure modes we have observed in production
-            # (see .factory/memories.md 2026-05-05/06):
-            #   1. ValueError "mismatched keys" -- the layer stack is
-            #      not parameter-uniform (e.g., last K layers do full
-            #      FT while first N-K layers do LoRA). scan_layers
-            #      needs identical parameter structure across layers.
-            #   2. AssertionError "FakeTensor" -- the is_layer_pure
-            #      symbolic-trace path tripped on a non-faked op
-            #      (typically a position-embedding gather).
-            # When ANY scan attempt fails we permanently disable scan
-            # for this stack so we don't pay the overhead of a doomed
-            # retry on every forward call. The HLO produced by the
-            # manual-loop fallback is the same regardless, so the
-            # XLA persistent cache can warm up uninterrupted.
-            bound_layers = nn.ModuleList([_KwargBoundLayer(w.layer, args, kwargs) for w in layers])
+            # We bypass the high-level ``scan_layers`` (which calls each layer
+            # with ONLY the carry, forcing the mask/RoPE loop-invariants into
+            # closures that trip FakeTensor during the trace) and instead call
+            # the low-level ``scan`` via ``_run_scan_with_carry``, threading the
+            # float loop-invariants through the carry. See that helper for the
+            # full rationale + the historical failure modes it fixes:
+            #   1. "mismatched keys"  -> parameter-uniform layers (exclude_top=0).
+            #   2. "ones_like"/"_tensor_constant0" FakeTensor asserts -> the
+            #      mask + cos/sin are now carry, not closures.
+            #   3. sliding/full heterogeneity -> forced full-attention upstream.
+            # A latched failure disables scan for this stack (unrolled fallback).
             try:
-                # PyTorch issue #105485: is_layer_pure=True triggers a
-                # FakeTensorMode trace through aten.index_select, which
-                # asserts on the position-embedding gather inside the
-                # decoder layer. We drop the flag (let scan_layers fall
-                # through its non-pure path) so the trace stays real.
-                output = scan_fn(bound_layers, hidden_states)
+                if args:
+                    raise RuntimeError(
+                        "carry-scan path expects kwargs-only HF layers; "
+                        f"got {len(args)} positional args"
+                    )
+                raw_layers = [w.layer for w in layers]
+                output = _run_scan_with_carry(raw_layers, hidden_states, kwargs)
                 return (output,)
             except Exception as err:  # pragma: no cover - depends on TPU runtime
                 print(
-                    f"[scan_utils] scan_layers raised "
+                    f"[scan_utils] carry-scan raised "
                     f"{type(err).__name__}: {err!r}; "
                     "permanently disabling scan for this stack."
                 )
