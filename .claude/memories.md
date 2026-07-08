@@ -11,14 +11,19 @@
 
 ---
 
-## Project context (2026-07-06)
+## Project context (2026-07-06; amended 2026-07-08)
 
-- **Name / goal:** TinyAya Stage 2 — **audio-only** TR↔HI speech-to-speech translation on TPU (TRC).
+- **Name / goal:** TinyAya Stage 2 — **text+audio** TR↔HI speech-to-speech translation on
+  TPU (TRC). *(SUPERSEDED: "audio-only" — see Data below.)*
 - **Model:** composite Cohere2 backbone (LoRA) + **frozen** Moshi depth decoder → 8 RVQ
   Mimi codebooks. **~3.4B total params**, ~57M trainable (LoRA + projection + audio heads +
   depth I/O + embeddings). CB0 from backbone+audio_heads; CB1–7 from the depth decoder.
-- **Data:** synthetic `tr-hi-mimi-encoded`, ~1.24M → 1,178,302 train / 62,036 val. **No
-  text alignments** → trained audio-only (`text_weight=0`).
+- **Data:** synthetic `tr-hi-mimi-encoded`, ~1.24M → 1,178,302 train / 62,036 val.
+  **SUPERSEDED 2026-07-08: the corpus DOES ship text alignments** — 840,426
+  `.src.alignments.json` + 840,426 `.tgt.alignments.json` at the data root (100%
+  coverage); the "no alignments" verification used legacy filenames and the loader only
+  looked in `encoded/`. Loader fixed (`dataset.py::_resolve_alignment` + fail-loud
+  coverage guard); v0.3 trains **text_weight 0.2**.
 - **Recipe (capacity-sweep winner):** LoRA r=32, alpha=64, rsLoRA, **+MLP** target modules,
   `lr_lora=1.716e-4`, `exclude_top=2`. Production config `stage2_tpu_v6e16_full_v03.yaml`
   (14,532 steps) on **v6e-16**.

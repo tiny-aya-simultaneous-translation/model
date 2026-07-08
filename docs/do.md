@@ -5,6 +5,24 @@ the backlog of loose ends. Delete an item when it's done.
 
 ## Open
 
+### Text+audio pivot follow-ups (2026-07-08)
+
+- **Fix the upstream split manifests** (or publish corrected ones): the dataset repo's
+  `splits/{train,val}.jsonl` still carry `encoded/{stem}_src.json` alignment paths; our
+  loader fallback (`_resolve_alignment`) papers over it, but external consumers will hit
+  the same silent-audio-only wall. Consider a dataset-repo PR + card note.
+- **`smoke-b1` QR still ACTIVE** (8 idle chips, unrolled batch-1 experiment — moot since
+  scan works). Delete on user approval; it's the quota needed for arms E/F.
+- **Audio-only partials**: arms A/B/C's first ~100-125 audio-only steps live in W&B group
+  `v03-5k-reval` — cite as ablation reference in the writeup, or clean up.
+- **Post-hoc composite-weight ranking script**: selection rule §5 needs a small script
+  pulling `val/{text,audio}_loss` series from the W&B group and re-ranking arms under
+  {0.2/0.8, 0.4/0.6, 0.5/0.5} (can be a notebook; write before arms finish).
+- **`val/text_acc` sanity**: after the first TA val passes, eyeball that the metric's
+  real-token masking (< 262144) matches the interleaver's token layout — a first-word-
+  subtoken-only stream means acc is measured on sparse positions; document the expected
+  scale on the card.
+
 ### Keep the v0.3 HF model card's infra section in sync with the production run
 
 `docs/hf-model-card-tr-hi-s2st-v0.3.md` now has a "Training infrastructure: replicated

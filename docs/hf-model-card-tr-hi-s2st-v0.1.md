@@ -132,7 +132,10 @@ the YAML `model-index` + below.
   OPUS-100 / conversational text) — expect degradation on real, spontaneous, or
   noisy audio and on voices outside the TTS set; two language directions only;
   **the text stream did
-  not learn in this version** (use v0.2 for text); generation is autoregressive
+  not learn in this version** (root cause found 2026-07-08: a loader path bug —
+  the corpus's word-level alignments ship under `{stem}.{src,tgt}.alignments.json`
+  at the dataset root, which the v0.1 loader never resolved, so text supervision
+  was silently all-padding; fixed in v0.3); generation is autoregressive
   and not optimized for latency here.
 - **Bias & risks**: a fixed set of TTS voices — fairness across real speakers,
   dialects, accents, code-switching, and spontaneous speech is untested. Speech

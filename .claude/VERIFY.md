@@ -83,6 +83,13 @@ python3 tests/test_checkpoint_retention.py
 ```
 
 ```bash
+# alignment-loader resolution (the 2026-07-08 text+audio fix): legacy manifest
+# names must map to the shipped {stem}.{src,tgt}.alignments.json layout, and the
+# coverage guard must fail loud when text is supervised but nothing resolves.
+uv run --extra dev pytest tests/test_dataset_alignments.py -q
+```
+
+```bash
 # secrets check on tracked + new files
 ! grep -rnE '(hf_[a-zA-Z0-9]{20,}|sk-[a-zA-Z0-9]{20,}|gh[ps]_[a-zA-Z0-9]{30,}|AKIA[A-Z0-9]{16})' \
     --exclude-dir='.venv' --exclude-dir='__pycache__' --exclude-dir='.mypy_cache' \

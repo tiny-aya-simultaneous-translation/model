@@ -1,5 +1,17 @@
 # TPU capacity log -- observed queue times + autonomous fallback policy
 
+## 2026-07-08 update
+
+**v6e-8 spot in ew4a is readily gettable** (three same-day QRs went
+WAITING→PROVISIONING→ACTIVE in ~2-5 min each: smoke-scan2, smoke-scan3 after
+quota freed) BUT the 64-chip preemptible quota counts **SUSPENDED/FAILED QR
+husks too**: with 3 arms + 2 dead smokes + 1 failed arm QR still registered,
+new creates 429'd (`TPUV6EPreemptiblePerProjectPerZoneForTPUAPI exhausted`)
+even though only 32 chips were live. Deleting the husks un-jammed launches
+immediately. Same-day preemption observed on a v6e-8 (~2h lifetime,
+smoke-scan) -- plan for spot churn on multi-hour arms (`--resume auto` +
+GCS-staged data tarball keep recovery cheap).
+
 ## 2026-07-06 update
 
 Current topology: **v6e-16 spot in `europe-west4-a`** (production) + **v6e-8** (smoke /

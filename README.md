@@ -1,8 +1,8 @@
 # TinyAya — TR↔HI Speech-to-Speech Translation
 
-Moshi-style **audio-only** speech-to-speech translation for Turkish↔Hindi, built on a
-LoRA-fine-tuned Cohere2 backbone (3B) with a **frozen** Moshi depth decoder producing
-8 RVQ Mimi codebooks.
+Moshi-style **speech-to-speech translation with a text inner-monologue** for
+Turkish↔Hindi, built on a LoRA-fine-tuned Cohere2 backbone (3B) with a **frozen** Moshi
+depth decoder producing 8 RVQ Mimi codebooks.
 
 > **Status (v0.3):** recipe frozen and pipeline-validated; the full 3-epoch production
 > run has not yet completed, so eval numbers are pending. This is a research checkpoint
@@ -30,7 +30,7 @@ Key design choices:
 - **Parallel two-stream format** — user audio + model audio run simultaneously (Moshi-style), the model learns turn-taking via silence tokens
 - **Codebook delay pattern** — CB_k shifted right by k frames for causal lookahead (predictions are decoded with `undo_codebook_delay` before Mimi decode)
 - **CB0 from backbone, CB1-7 from the frozen depth decoder** — only the depth decoder's I/O layers are trained; its transformer blocks stay frozen
-- **Audio-only** — the synthetic corpus ships **no text alignments**, so the Moshi inner-monologue/text stream is untrainable on this data; v0.3 trains audio-only (`text_weight=0`)
+- **Text+audio** (corrected 2026-07-08) — the corpus ships word-level alignments for every sample (`{stem}.{src,tgt}.alignments.json` at the dataset root; earlier "no alignments" checks used the wrong filenames), so the Moshi inner-monologue/text stream IS supervised; v0.3 trains `text_weight=0.2`
 
 ## Repository Structure
 
@@ -141,7 +141,8 @@ Mimi-encoded **synthetic** parallel TR↔HI speech pairs (FLORES/OPUS-100/conver
 MT → TTS → Mimi-encode):
 - ~1.24M pairs; ~5% missing `.pt` filtered → **1,178,302 train / 62,036 val**
 - Each sample: source audio (8 codebooks) + target audio (8 codebooks) as `.pt` files
-- **No text alignments** → trained audio-only
+  **plus** word-level text alignments (`{stem}.{src,tgt}.alignments.json` at the dataset
+  root — note the split manifests point at legacy names; `src/data/dataset.py` maps them)
 
 Dataset on HuggingFace: `tiny-aya-translate/tr-hi-mimi-encoded`
 

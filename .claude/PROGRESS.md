@@ -30,6 +30,371 @@ moved to `.claude/archive/PROGRESS-YYYY-Qn.md` by the
 
 ---
 
+## 2026-07-08T11:19:09Z | feat/v0.3-implementation@77d0cf2 | done | edit
+edited `/home/cataluna84/.claude/jobs/2908a7e9/tmp/build_tarball.sh`
+
+
+## 2026-07-08T11:17:40Z | feat/v0.3-implementation@77d0cf2 | done | edit
+created `/home/cataluna84/.claude/jobs/2908a7e9/tmp/build_tarball.sh`
+
+
+## 2026-07-08T11:14:49Z | feat/v0.3-implementation@77d0cf2 | fail | verify
+verify: 11 passed, 1 failed out of 12 on Stop
+
+FAIL [1] # the TPU↔GPU seam holds: torch_xla must NOT leak into shared model/data code
+    src/model/scan_utils.py:479:    from torch_xla.experimental.scan_layers import (
+
+
+## 2026-07-08T11:08:13Z | feat/v0.3-implementation@77d0cf2 | fail | verify
+verify: 11 passed, 1 failed out of 12 on Stop
+
+FAIL [1] # the TPU↔GPU seam holds: torch_xla must NOT leak into shared model/data code
+    src/model/scan_utils.py:479:    from torch_xla.experimental.scan_layers import (
+
+
+## 2026-07-08T11:07:30Z | feat/v0.3-implementation@77d0cf2 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/docs/hf-model-card-tr-hi-s2st-v0.1.md`
+
+
+## 2026-07-08T11:07:20Z | feat/v0.3-implementation@77d0cf2 | done | exec
+sed -n 130,140p docs/hf-model-card-tr-hi-s2st-v0.1.md
+
+
+## 2026-07-08T11:07:05Z | feat/v0.3-implementation@77d0cf2 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/AGENTS.md`
+
+
+## 2026-07-08T11:07:02Z | feat/v0.3-implementation@77d0cf2 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/docs/onboarding.md`
+
+
+## 2026-07-08T11:06:53Z | feat/v0.3-implementation@77d0cf2 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/README.md`
+
+
+## 2026-07-08T11:06:49Z | feat/v0.3-implementation@77d0cf2 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/README.md`
+
+
+## 2026-07-08T11:06:46Z | feat/v0.3-implementation@77d0cf2 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/README.md`
+
+
+## 2026-07-08T11:06:19Z | feat/v0.3-implementation@77d0cf2 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/.claude/memories.md`
+
+
+## 2026-07-08T11:05:52Z | feat/v0.3-implementation@77d0cf2 | done | exec
+sed -n 12,30p .claude/memories.md
+
+
+## 2026-07-08T11:05:34Z | feat/v0.3-implementation@77d0cf2 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/.claude/VERIFY.md`
+
+
+## 2026-07-08T11:05:18Z | feat/v0.3-implementation@77d0cf2 | done | exec
+sed -n 72,92p .claude/VERIFY.md
+
+
+## 2026-07-08T11:04:42Z | feat/v0.3-implementation@77d0cf2 | done | edit
+created `/home/cataluna84/Workspace/tinyaya-stage2-scale/.claude/PLAN.md`
+
+
+## 2026-07-08T11:04:01Z | feat/v0.3-implementation@77d0cf2 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/.claude/PROGRESS.md`
+
+
+## 2026-07-08T11:05:00Z | feat/v0.3-implementation@77d0cf2 | done | decide
+TEXT+AUDIO PIVOT (user decision): "no text alignments" premise was FALSE — corpus ships 840,426×2 alignment JSONs (100% coverage) at the data root; the old check used legacy filenames and the loader only looked in encoded/.
+
+Detail: audio-only arms stopped (~step 100-125); loader fixed (`dataset.py::_resolve_alignment`
++ fail-loud coverage guard, proven live: "alignment coverage 100.0%"); `val/text_acc` metric
+added; configs flipped to text_weight 0.2 / composite 0.4/0.6 (reval base + all 6 arms +
+production, which also got the scan recipe); namespace v03-5k-reval-ta /
+stage2-reval-5k-ta/. Selection rule amended: text gate (CE<11.5 by 1k) + post-hoc
+composite-weight sweep {0.2/0.8, 0.4/0.6, 0.5/0.5} from logged val series. Docs reconciled
+(release plan premise correction, model card text+audio, runbook scan recipe + QR-husk-quota
++ pipefail gotchas, capacity log, do.md follow-ups incl. tarball MUST include alignment
+JSONs). Earlier same day: 9-blocker v6e-8 scan enablement committed (812a0df..77d0cf2) +
+PR #10 comments. In flight: TA gate smoke on arm-a; scan3 full-corpus dataprep (pipefail
+bug fixed). Next: smoke gate → relaunch A/B/C → arm D → tarball → E/F → commit + PR comment.
+
+## 2026-07-08T11:03:21Z | feat/v0.3-implementation@77d0cf2 | done | exec
+sed -n 30,45p .claude/PROGRESS.md; git rev-parse --short HEAD
+
+
+## 2026-07-08T11:03:14Z | feat/v0.3-implementation@77d0cf2 | done | exec
+sed -n 1,30p .claude/PROGRESS.md
+
+
+## 2026-07-08T11:03:04Z | feat/v0.3-implementation@77d0cf2 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/docs/v0.3-reval-sweep-plan.md`
+
+
+## 2026-07-08T11:02:47Z | feat/v0.3-implementation@77d0cf2 | done | exec
+sed -n 95,112p docs/v0.3-reval-sweep-plan.md
+
+
+## 2026-07-08T11:02:40Z | feat/v0.3-implementation@77d0cf2 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/docs/v0.3-reval-sweep-plan.md`
+
+
+## 2026-07-08T11:02:07Z | feat/v0.3-implementation@77d0cf2 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/docs/do.md`
+
+
+## 2026-07-08T11:01:44Z | feat/v0.3-implementation@77d0cf2 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/docs/tpu-capacity-log.md`
+
+
+## 2026-07-08T11:01:32Z | feat/v0.3-implementation@77d0cf2 | done | exec
+sed -n 1,40p docs/tpu-capacity-log.md
+
+
+## 2026-07-08T11:01:24Z | feat/v0.3-implementation@77d0cf2 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/docs/tpu-runbook.md`
+
+
+## 2026-07-08T11:00:58Z | feat/v0.3-implementation@77d0cf2 | done | exec
+sed -n 54,96p docs/tpu-runbook.md
+
+
+## 2026-07-08T10:57:52Z | feat/v0.3-implementation@77d0cf2 | fail | verify
+verify: 11 passed, 1 failed out of 12 on Stop
+
+FAIL [1] # the TPU↔GPU seam holds: torch_xla must NOT leak into shared model/data code
+    src/model/scan_utils.py:479:    from torch_xla.experimental.scan_layers import (
+
+
+## 2026-07-08T10:57:15Z | feat/v0.3-implementation@77d0cf2 | done | edit
+edited `/home/cataluna84/.claude/projects/-home-cataluna84-Workspace-tinyaya-stage2-scale/memory/v03-reval-sweep-launch.md`
+
+
+## 2026-07-08T10:54:18Z | feat/v0.3-implementation@77d0cf2 | done | edit
+edited `/home/cataluna84/.claude/jobs/2908a7e9/tmp/dataprep_scan3.sh`
+
+
+## 2026-07-08T10:47:14Z | feat/v0.3-implementation@77d0cf2 | done | exec
+bash /home/cataluna84/.claude/jobs/2908a7e9/tmp/watch_ta_smoke.sh
+
+
+## 2026-07-08T10:46:09Z | feat/v0.3-implementation@77d0cf2 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/configs/tpu/reval/smoke_scan.yaml`
+
+
+## 2026-07-08T10:45:29Z | feat/v0.3-implementation@77d0cf2 | done | edit
+edited `/home/cataluna84/.claude/projects/-home-cataluna84-Workspace-tinyaya-stage2-scale/memory/MEMORY.md`
+
+
+## 2026-07-08T10:45:05Z | feat/v0.3-implementation@77d0cf2 | done | edit
+created `/home/cataluna84/.claude/projects/-home-cataluna84-Workspace-tinyaya-stage2-scale/memory/v03-audio-only-public-release.md`
+
+
+## 2026-07-08T10:44:35Z | feat/v0.3-implementation@77d0cf2 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/docs/hf-model-card-tr-hi-s2st-v0.3.md`
+
+
+## 2026-07-08T10:44:32Z | feat/v0.3-implementation@77d0cf2 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/docs/hf-model-card-tr-hi-s2st-v0.3.md`
+
+
+## 2026-07-08T10:44:27Z | feat/v0.3-implementation@77d0cf2 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/docs/hf-model-card-tr-hi-s2st-v0.3.md`
+
+
+## 2026-07-08T10:44:15Z | feat/v0.3-implementation@77d0cf2 | done | exec
+sed -n 28,55p docs/hf-model-card-tr-hi-s2st-v0.3.md; sed -n 130,136p docs/hf-model-card-tr-hi-s2st-v0.3.md
+
+
+## 2026-07-08T10:44:02Z | feat/v0.3-implementation@77d0cf2 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/docs/v0.3-public-release-plan.md`
+
+
+## 2026-07-08T10:43:58Z | feat/v0.3-implementation@77d0cf2 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/docs/v0.3-public-release-plan.md`
+
+
+## 2026-07-08T10:43:46Z | feat/v0.3-implementation@77d0cf2 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/docs/v0.3-public-release-plan.md`
+
+
+## 2026-07-08T10:43:23Z | feat/v0.3-implementation@77d0cf2 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/docs/v0.3-public-release-plan.md`
+
+
+## 2026-07-08T10:43:03Z | feat/v0.3-implementation@77d0cf2 | done | exec
+sed -n 1,10p docs/v0.3-public-release-plan.md; sed -n 21,40p docs/v0.3-public-release-plan.md; sed -n 88,110p docs/v0.3-public-release-plan.md
+
+
+## 2026-07-08T10:42:57Z | feat/v0.3-implementation@77d0cf2 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/docs/v0.3-reval-sweep-plan.md`
+
+
+## 2026-07-08T10:42:42Z | feat/v0.3-implementation@77d0cf2 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/docs/v0.3-reval-sweep-plan.md`
+
+
+## 2026-07-08T10:42:34Z | feat/v0.3-implementation@77d0cf2 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/docs/v0.3-reval-sweep-plan.md`
+
+
+## 2026-07-08T10:42:12Z | feat/v0.3-implementation@77d0cf2 | done | exec
+sed -n 50,60p docs/v0.3-reval-sweep-plan.md; sed -n 1,20p docs/v0.3-reval-sweep-plan.md
+
+
+## 2026-07-08T10:41:35Z | feat/v0.3-implementation@77d0cf2 | done | exec
+bash /home/cataluna84/.claude/jobs/2908a7e9/tmp/watch_ta_smoke.sh
+
+
+## 2026-07-08T10:41:22Z | feat/v0.3-implementation@77d0cf2 | done | edit
+created `/home/cataluna84/.claude/jobs/2908a7e9/tmp/watch_ta_smoke.sh`
+
+
+## 2026-07-08T10:39:47Z | feat/v0.3-implementation@77d0cf2 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/tpu/launch_reval_arms.sh`
+
+
+## 2026-07-08T10:39:38Z | feat/v0.3-implementation@77d0cf2 | done | exec
+sed -n 95,112p scripts/tpu/launch_reval_arms.sh
+
+
+## 2026-07-08T10:39:31Z | feat/v0.3-implementation@77d0cf2 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/configs/tpu/reval/smoke_scan.yaml`
+
+
+## 2026-07-08T10:39:29Z | feat/v0.3-implementation@77d0cf2 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/configs/tpu/reval/smoke_scan.yaml`
+
+
+## 2026-07-08T10:39:28Z | feat/v0.3-implementation@77d0cf2 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/configs/tpu/reval/smoke_scan.yaml`
+
+
+## 2026-07-08T10:39:27Z | feat/v0.3-implementation@77d0cf2 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/configs/tpu/reval/smoke_scan.yaml`
+
+
+## 2026-07-08T10:39:04Z | feat/v0.3-implementation@77d0cf2 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/configs/tpu/stage2_tpu_v6e16_full_v03.yaml`
+
+
+## 2026-07-08T10:38:49Z | feat/v0.3-implementation@77d0cf2 | done | exec
+sed -n 44,66p configs/tpu/stage2_tpu_v6e16_full_v03.yaml
+
+
+## 2026-07-08T10:38:42Z | feat/v0.3-implementation@77d0cf2 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/configs/tpu/stage2_tpu_v6e8_reval.yaml`
+
+
+## 2026-07-08T10:38:30Z | feat/v0.3-implementation@77d0cf2 | done | exec
+sed -n 64,80p configs/tpu/stage2_tpu_v6e8_reval.yaml
+
+
+## 2026-07-08T10:38:09Z | feat/v0.3-implementation@77d0cf2 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/train_hierarchical.py`
+
+
+## 2026-07-08T10:37:59Z | feat/v0.3-implementation@77d0cf2 | done | exec
+sed -n 2548,2575p scripts/train_hierarchical.py
+
+
+## 2026-07-08T10:37:45Z | feat/v0.3-implementation@77d0cf2 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/train_hierarchical.py`
+
+
+## 2026-07-08T10:37:36Z | feat/v0.3-implementation@77d0cf2 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/train_hierarchical.py`
+
+
+## 2026-07-08T10:37:28Z | feat/v0.3-implementation@77d0cf2 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/train_hierarchical.py`
+
+
+## 2026-07-08T10:37:15Z | feat/v0.3-implementation@77d0cf2 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/train_hierarchical.py`
+
+
+## 2026-07-08T10:37:06Z | feat/v0.3-implementation@77d0cf2 | done | exec
+sed -n 705,720p scripts/train_hierarchical.py
+
+
+## 2026-07-08T10:36:52Z | feat/v0.3-implementation@77d0cf2 | done | exec
+sed -n 745,805p scripts/train_hierarchical.py
+
+
+## 2026-07-08T10:36:18Z | feat/v0.3-implementation@77d0cf2 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/tests/test_dataset_alignments.py`
+
+
+## 2026-07-08T10:36:16Z | feat/v0.3-implementation@77d0cf2 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/tests/test_dataset_alignments.py`
+
+
+## 2026-07-08T10:35:45Z | feat/v0.3-implementation@77d0cf2 | done | edit
+created `/home/cataluna84/Workspace/tinyaya-stage2-scale/tests/test_dataset_alignments.py`
+
+
+## 2026-07-08T10:35:07Z | feat/v0.3-implementation@77d0cf2 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/make_splits.py`
+
+
+## 2026-07-08T10:34:54Z | feat/v0.3-implementation@77d0cf2 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/train_hierarchical.py`
+
+
+## 2026-07-08T10:34:32Z | feat/v0.3-implementation@77d0cf2 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/src/data/dataset.py`
+
+
+## 2026-07-08T10:34:23Z | feat/v0.3-implementation@77d0cf2 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/src/data/dataset.py`
+
+
+## 2026-07-08T10:34:06Z | feat/v0.3-implementation@77d0cf2 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/src/data/dataset.py`
+
+
+## 2026-07-08T10:33:52Z | feat/v0.3-implementation@77d0cf2 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/src/data/dataset.py`
+
+
+## 2026-07-08T10:33:44Z | feat/v0.3-implementation@77d0cf2 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/src/data/dataset.py`
+
+
+## 2026-07-08T10:31:21Z | feat/v0.3-implementation@77d0cf2 | done | edit
+created `/home/cataluna84/.claude/plans/fix-the-sweep-startegy-linear-flask.md`
+
+
+## 2026-07-08T10:15:03Z | feat/v0.3-implementation@77d0cf2 | fail | verify
+verify: 11 passed, 1 failed out of 12 on Stop
+
+FAIL [1] # the TPU↔GPU seam holds: torch_xla must NOT leak into shared model/data code
+    src/model/scan_utils.py:479:    from torch_xla.experimental.scan_layers import (
+
+
+## 2026-07-08T10:11:33Z | feat/v0.3-implementation@77d0cf2 | fail | verify
+verify: 11 passed, 1 failed out of 12 on Stop
+
+FAIL [1] # the TPU↔GPU seam holds: torch_xla must NOT leak into shared model/data code
+    src/model/scan_utils.py:479:    from torch_xla.experimental.scan_layers import (
+
+
+## 2026-07-08T10:08:52Z | feat/v0.3-implementation@77d0cf2 | fail | verify
+verify: 11 passed, 1 failed out of 12 on Stop
+
+FAIL [1] # the TPU↔GPU seam holds: torch_xla must NOT leak into shared model/data code
+    src/model/scan_utils.py:479:    from torch_xla.experimental.scan_layers import (
+
+
+## 2026-07-08T10:08:29Z | feat/v0.3-implementation@77d0cf2 | done | exec
+gh pr comment 10 --body-file /home/cataluna84/.claude/jobs/2908a7e9/tmp/pr10-commit-map.md 2>&1
+
+
+## 2026-07-08T10:08:15Z | feat/v0.3-implementation@77d0cf2 | done | edit
+created `/home/cataluna84/.claude/jobs/2908a7e9/tmp/pr10-commit-map.md`
+
+
 ## 2026-07-08T09:25:07Z | feat/v0.3-implementation@ab196fe | fail | verify
 verify: 11 passed, 1 failed out of 12 on Stop
 

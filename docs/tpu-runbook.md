@@ -84,6 +84,29 @@ Stage-1 grid via `sweep_coordinator.py` (GCS control-file broadcast) and Stage-2
 via `sweep_agent_primary.sh` (host-0 runs the native W&B agent, broadcasts trial args to
 workers over a GCS rendezvous). Details + launchers in [`sweeps/README.md`](../sweeps/README.md).
 
+## Single-host v6e-8 scan recipe (2026-07-08 — REQUIRED)
+
+Replicated strategy (trainable <500M) puts the whole 5.17B composite + activations on
+EVERY chip; the unrolled 36-layer path OOMs v6e-8 outright (64–94G vs 31.25G HBM) and is
+not viable at any batch size. The working recipe — all pieces mandatory together:
+
+- `use_scan_layers: true` + `micro_mark_step: true` + `depth_chunk_size: 100`. One graph
+  per macro-step = 82.5% XLA allocator fragmentation (81G "used" over 14.2G real buffers);
+  the per-micro-batch graph break fixes it. Proven: 8.4 s/step, peak 25–29G, batch 4×8.
+- Scan needs parameter-uniform layers → `scan_homogeneous` LoRA (adapters on ALL 36
+  layers, top-`exclude_top` frozen at zero — state-dict shape differs from the classic
+  34-layer layout; loader remaps, see checkpoint portability above).
+- LoRA dropout under scan needs `_ScanSafeDropout` (auto-swapped): `native_dropout`'s
+  bool-mask meta vs torch_xla's bf16-mask lowering breaks scan's stacked buffers
+  ("Dynamic update slice: operand PRED vs update BF16").
+- Scan backward under SPMD needs **jax + torchax + flax** (pinned in pyproject; torchax
+  imports flax without declaring it). CPU wheels; jax only traces sharding hints.
+- The depth decoder is never scanned (6 layers; `index_select` breaks scan tracing) and
+  runs the equal-batch `bmm` FlexibleLinear patch (stock transformers' broadcast matmul
+  materializes a 5.5G weight copy PER TOKEN on XLA — the real historical OOM cause).
+
+Full blocker chain + evidence: PR #10 comments (2026-07-08).
+
 ## Gotchas
 
 - **`uv` under `sudo`** is not on `PATH` on fresh TPU VMs — enumerate `/root/.local/bin/uv`.
@@ -94,3 +117,15 @@ workers over a GCS rendezvous). Details + launchers in [`sweeps/README.md`](../s
   `_remote_redeploy.sh`.
 - **Never write to `/opt/tinyaya/` from a worker session** — `hot_redeploy.sh` overwrites it.
 - **TRC is a free grant** — never stop/delete/reprovision a slice without explicit intent.
+- **SUSPENDED/FAILED QRs still hold TPU quota**: preempted-spot husks silently book chips
+  against the 64-chip limit and 429 every new launch (`RESOURCE_EXHAUSTED`). Delete dead
+  QRs promptly (`ops.sh delete`) — with explicit approval, per the TRC rule above.
+- **`--resume auto` + reused `save_dir`**: a re-purposed config that keeps an old
+  `save_dir` resumes the OLD run's final checkpoint and may exit instantly at
+  `step >= max_steps`. New experiment ⇒ new `save_dir`.
+- **`set -o pipefail` + `find | head`** in helper scripts: `head`'s early exit SIGPIPEs
+  `find` (exit 141) and `set -e` kills the script silently mid-line. Use a candidate loop
+  (see `_remote_redeploy.sh`) instead of piping to `head`.
+- **`wandb.log` per-chip TPU telemetry** is on by default now (`tpu/chip{i}/hbm_gib`,
+  `duty_pct`, `tpu/hbm_max_gib`): straggler chips are visible in W&B, chip 0 alone is not
+  representative under load imbalance.

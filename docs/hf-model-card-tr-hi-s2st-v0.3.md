@@ -29,11 +29,12 @@ model-index:
 > documents the dataset and the recipe-as-frozen, for transparency; it will be updated
 > with checkpoints and evaluation once the run finishes.
 
-Moshi-style **audio-only speech-to-speech translation** for **Turkish ⇄ Hindi**:
-a LoRA-fine-tuned **Cohere2** backbone fused with a **frozen Moshi depth decoder**,
-operating on **Mimi** audio codes in a parallel two-stream format. **Audio-only**: the
-corpus has no text alignments, so the Moshi inner-monologue/text stream is untrainable
-(`text_weight=0`).
+Moshi-style **speech-to-speech translation with a text inner-monologue** for
+**Turkish ⇄ Hindi**: a LoRA-fine-tuned **Cohere2** backbone fused with a **frozen Moshi
+depth decoder**, operating on **Mimi** audio codes in a parallel two-stream format.
+**Text+audio** (`text_weight=0.2`): the corpus ships word-level alignments for every
+sample (see Dataset), so the inner-monologue/text stream is supervised alongside audio —
+earlier versions trained audio-only due to a loader bug, disclosed below.
 
 - **Developed by:** [tiny-aya-translate](https://huggingface.co/tiny-aya-translate)
 - **Funded by:** Google **TPU Research Cloud (TRC)**
@@ -47,8 +48,13 @@ v0.3 trains on **[`tiny-aya-translate/tr-hi-mimi-encoded`](https://huggingface.c
 — the project's **synthetic** pipeline: parallel text from **FLORES**, **OPUS-100**, and
 machine-translated **conversational** datasets, rendered with multi-voice TTS (kokoro /
 XTTS-v2 / chatterbox) into ~**1.24M** Mimi-encoded clips. After filtering ~5% of rows
-with missing `.pt` files: **1,178,302 train / 62,036 val**. **No text alignments ship
-with the corpus** → trained audio-only.
+with missing `.pt` files: **1,178,302 train / 62,036 val**. The corpus ships
+**word-level text alignments for every sample** (`{stem}.{src,tgt}.alignments.json`,
+840,426 pairs, 100% coverage) → **trained text+audio**. Note for reimplementers: the
+alignment files live at the dataset root (not `encoded/`) under names that differ from
+the split manifests' `src_align_path`/`tgt_align_path` fields — v0.1–v0.2 missed them
+entirely because of this (silently zero text loss); our loader maps the names
+(`src/data/dataset.py::_resolve_alignment`).
 
 ### ⚠️ The honest mistake this fixes
 
@@ -130,7 +136,7 @@ Trained on Cloud TPU **v6e-16** provided by **Google's TPU Research Cloud (TRC)*
   title  = {TinyAya: Turkish-Hindi Speech-to-Speech Translation (v0.3)},
   author = {tiny-aya-translate},
   year   = {2026},
-  note   = {Cohere2 + frozen Moshi depth decoder, LoRA (r=32, +MLP, rsLoRA); audio-only synthetic FLORES/OPUS/conversational corpus; Google TRC TPU v6e-16},
+  note   = {Cohere2 + frozen Moshi depth decoder, LoRA (r=32, +MLP, rsLoRA); text+audio S2ST on the synthetic FLORES/OPUS/conversational corpus; Google TRC TPU v6e},
   url    = {https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3}
 }
 ```

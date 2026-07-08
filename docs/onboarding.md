@@ -171,10 +171,12 @@ Text:     "mer" "ha" "ba"  PAD  PAD "dun" "ya"  PAD  PAD  PAD
                                     ^word start
 ```
 
-> **v0.3 note (audio-only):** the interleaver *supports* word-level text alignments, but
-> the v0.3 synthetic corpus **ships none** — so the text stream is padded and trained at
-> `text_weight=0`. The alignment path below describes the capability; it is inactive on
-> the current data.
+> **v0.3 note (corrected 2026-07-08 — text+audio):** the corpus DOES ship word-level
+> alignments (`{stem}.{src,tgt}.alignments.json` at the dataset root, one pair per `.pt`,
+> 100% coverage) — the earlier "ships none" claim came from checking legacy filenames.
+> `src/data/dataset.py::_resolve_alignment` maps the split manifests' legacy paths to the
+> real layout, and v0.3 trains the text stream at `text_weight=0.2`. The alignment path
+> below is ACTIVE.
 
 The Interleaver (line 29) takes Whisper word-level timestamps and maps them to audio frames:
 

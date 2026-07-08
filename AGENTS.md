@@ -102,7 +102,9 @@ torch_xla >= 2.6 and silently no-op. Use the explicit
 - `stage2_tpu_v6e16_scale_proxy.yaml` — the capacity-sweep proxy (de-regularized, batch 256).
 - `stage2_tpu_v6e8_overfit.yaml` — overfit / pipeline-validation (32-example memorize).
 
-Each TPU config carries: `loss.text_padding_weight` (audio-only → `text_weight 0`), the
+Each TPU config carries: the `loss:` text/audio weights (text+audio since 2026-07-08:
+`text_weight 0.2`, `composite_text_w 0.4` — the corpus ships alignments; see
+`docs/v0.3-reval-sweep-plan.md`), the
 `lora:` block (`r`/`alpha`/`use_rslora`/`target_modules`/`lora_exclude_top`/
 `num_full_ft_layers`), and `logging.{val_on_tpu,diag_metrics,save_dir}` (save_dir under
 `gs://tinyaya-stage2-eu/`).
