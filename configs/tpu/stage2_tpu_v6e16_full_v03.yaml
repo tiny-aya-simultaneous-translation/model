@@ -45,19 +45,30 @@ train:
   clip_grad_norm: 1.0
   log_grad_norm: true
   fsdp_barrier_hook: false
-  depth_chunk_size: 16
+  # Scan recipe (2026-07-08, proven on v6e-8 smoke + arms): scan collapses the
+  # 36 backbone layers into one HLO; micro_mark_step breaks the graph per
+  # grad-accum micro-batch (one macro-graph = 82.5% XLA allocator
+  # fragmentation); depth_chunk 100 = 3 large depth graphs instead of 19.
+  # The old unrolled path (scan=false) OOMs single-host v6e-8 and carries the
+  # same latent MoshiFlexibleLinear broadcast bug everywhere.
+  micro_mark_step: true
+  depth_chunk_size: 100
   precision: bfloat16
-  use_scan_layers: false
+  use_scan_layers: true
   xla_grad_checkpoint: true
   final_canonical_save: true      # production: publishable final safetensors artifact
 
 loss:
-  # AUDIO-ONLY (corpus has no text alignments).
-  text_weight: 0.0
+  # TEXT+AUDIO (2026-07-08 pivot): the "no text alignments" premise was FALSE
+  # -- 840,426 .src + .tgt alignments.json ship at the data root (100%
+  # coverage); the old check used legacy filenames. Loader fixed in
+  # src/data/dataset.py. Winner hyperparameters from the v03-5k-reval-ta sweep
+  # land here before the production launch (sweep plan Phase 3).
+  text_weight: 0.2
   audio_weight: 1.0
   text_weight_curriculum_frac: 0.0
-  composite_text_w: 0.0
-  composite_audio_w: 1.0
+  composite_text_w: 0.4
+  composite_audio_w: 0.6
   text_padding_weight: 0.01
   zero_padding_weight: 0.0
   label_smoothing: 0.1

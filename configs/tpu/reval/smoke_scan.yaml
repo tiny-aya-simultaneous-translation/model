@@ -1,6 +1,8 @@
-# GENERATED arm-recipe smoke -- validates the two paths every reval arm uses:
+# GENERATED arm-recipe smoke -- validates every path the reval arms use:
 # _ScanSafeDropout (dropout=0.05 under scan) + scan_homogeneous LoRA
-# (exclude_top=2 as frozen zero adapters on ALL 36 layers).
+# (exclude_top=2 as frozen zero adapters on ALL 36 layers) + TEXT+AUDIO
+# (text_weight 0.2 via the fixed alignment loader). Gate: train text loss
+# < 11.5 and falling (not stuck at ln(vocab)~12.5), val/text_acc > 0.
 backend: tpu
 data:
   encoded_dir: /mnt/data/encoded
@@ -34,11 +36,11 @@ train:
   xla_grad_checkpoint: true
   final_canonical_save: false
 loss:
-  text_weight: 0.0
+  text_weight: 0.2
   audio_weight: 1.0
   text_weight_curriculum_frac: 0.0
-  composite_text_w: 0.0
-  composite_audio_w: 1.0
+  composite_text_w: 0.4
+  composite_audio_w: 0.6
   text_padding_weight: 0.01
   zero_padding_weight: 0.0
   label_smoothing: 0.1
@@ -86,12 +88,12 @@ logging:
   val_max_batches: 10
   val_on_tpu: true
   diag_metrics: false
-  save_dir: gs://tinyaya-stage2-eu/checkpoints/stage2-reval-smoke/scan
+  save_dir: gs://tinyaya-stage2-eu/checkpoints/stage2-reval-smoke/scan-ta
   keep_last_n: 1
   keep_local_checkpoints: false
   use_wandb: true
   wandb_project: tinyaya-stage2-tpu
-  wandb_run_name: v03-reval-smoke-scan-armlike
+  wandb_run_name: v03-reval-smoke-ta
   wandb_group: v03-reval-smoke
 perf:
   enabled: true

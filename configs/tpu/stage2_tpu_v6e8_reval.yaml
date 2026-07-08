@@ -64,12 +64,18 @@ train:
   final_canonical_save: false     # probe run -- no publishable final artifact
 
 loss:
-  # AUDIO-ONLY (corpus has no text alignments).
-  text_weight: 0.0
+  # TEXT+AUDIO (2026-07-08 pivot). The "corpus has no text alignments" premise
+  # was FALSE: 840,426 .src + 840,426 .tgt alignments.json ship at the data
+  # root (100% coverage); the old check used legacy filenames. Loader fixed in
+  # src/data/dataset.py (_resolve_alignment). Constant text weight (no
+  # curriculum) keeps the arm comparison clean; composite 0.4/0.6 drives
+  # in-run best_by_val only -- final arm ranking is recomputed post-hoc across
+  # weightings from the logged val/{text,audio}_loss series (sweep plan §5).
+  text_weight: 0.2
   audio_weight: 1.0
   text_weight_curriculum_frac: 0.0
-  composite_text_w: 0.0
-  composite_audio_w: 1.0
+  composite_text_w: 0.4
+  composite_audio_w: 0.6
   text_padding_weight: 0.01
   zero_padding_weight: 0.0
   label_smoothing: 0.1
