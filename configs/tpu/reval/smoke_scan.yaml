@@ -1,7 +1,6 @@
-# GENERATED scan-fix smoke -- exclude_top=0 (homogeneous backbone) + use_scan_layers=true.
-# Backbone is scanned (36 layers -> 1 HLO); depth decoder stays UNSCANNED
-# (composite.py forces it: index_select breaks scan's FakeTensor tracing).
-# Tests whether scan restores batch 4 AND cuts the ~45-min unrolled compile.
+# GENERATED arm-recipe smoke -- validates the two paths every reval arm uses:
+# _ScanSafeDropout (dropout=0.05 under scan) + scan_homogeneous LoRA
+# (exclude_top=2 as frozen zero adapters on ALL 36 layers).
 backend: tpu
 data:
   encoded_dir: /mnt/data/encoded
@@ -25,7 +24,11 @@ train:
   clip_grad_norm: 1.0
   log_grad_norm: true
   fsdp_barrier_hook: false
-  depth_chunk_size: 16
+  # Graph break per micro-batch + fewer/larger depth chunks: both target the
+  # 82.5% HBM fragmentation seen when 8 micros x 19 depth chunks trace into
+  # one program (81.08G "used" over 14.21G of real buffers).
+  micro_mark_step: true
+  depth_chunk_size: 100
   precision: bfloat16
   use_scan_layers: true
   xla_grad_checkpoint: true
@@ -64,7 +67,7 @@ lora:
   - up_proj
   - down_proj
   - embed_tokens
-  lora_exclude_top: 0
+  lora_exclude_top: 2
   num_full_ft_layers: 0
   depth_unfreeze_blocks: 0
 optim:
@@ -88,7 +91,7 @@ logging:
   keep_local_checkpoints: false
   use_wandb: true
   wandb_project: tinyaya-stage2-tpu
-  wandb_run_name: v03-reval-smoke-scan
+  wandb_run_name: v03-reval-smoke-scan-armlike
   wandb_group: v03-reval-smoke
 perf:
   enabled: true

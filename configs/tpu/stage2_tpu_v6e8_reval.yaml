@@ -45,7 +45,13 @@ train:
   clip_grad_norm: 1.0
   log_grad_norm: true
   fsdp_barrier_hook: false
-  depth_chunk_size: 16
+  # micro_mark_step + depth_chunk 100: REQUIRED with scan on v6e-8. One graph
+  # per macro-step fragments the XLA allocator to death (81G "used" over 14.2G
+  # real buffers, 82.5% fragmentation -- verified 2026-07-08 on smoke-scan2);
+  # a graph break per micro-batch + 3 (not 19) depth chunks fixed it:
+  # step 5 ran at peak 26.22G/31.25G per chip.
+  micro_mark_step: true
+  depth_chunk_size: 100
   precision: bfloat16
   use_scan_layers: true           # REQUIRED on full-corpus 300-frame seqs: scan collapses
                                   # the 36 backbone layers into ONE scanned op so XLA does
