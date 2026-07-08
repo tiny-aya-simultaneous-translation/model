@@ -713,6 +713,11 @@ def run_validation(
     cb0_total = torch.zeros((), device=device)
     # Per-codebook top-1 accuracy accumulator (audio-codebook health, metric #6).
     cb_correct = torch.zeros(num_codebooks, device=device)
+    # Text-stream teacher-forced accuracy (text+audio selection gate): counted
+    # only on REAL text tokens (id < TEXT_PADDING=262144 -- excludes the 4
+    # frame-padding specials, which dominate positions and would inflate acc).
+    text_correct = torch.zeros((), device=device)
+    text_total = torch.zeros((), device=device)
     n_finite = torch.zeros((), device=device)
     n = 0
     for batch in val_loader:
@@ -836,6 +841,17 @@ def run_validation(
         cb_correct = cb_correct + (
             (preds_cb == tgts_cb).to(m.dtype) * m.unsqueeze(1)
         ).sum(dim=(0, 2))
+        # Text teacher-forced next-token acc (same shift convention as the
+        # text loss). Static-shape masked reduction like cb0 above. Mask =
+        # target span AND real text tokens only: the interleaver fills most
+        # frames with padding specials (TEXT/END_OF_TEXT/ZERO/IN_WORD, ids >=
+        # 262144), and counting those would report ~100% acc on a stream
+        # that never learned a single real word.
+        text_pred = text_logits[:, :-1].argmax(dim=-1)  # [B, T-1]
+        text_tgt = text_ids[:, 1:]
+        m_txt = m * (text_tgt < 262144).to(m.dtype)
+        text_correct = text_correct + ((text_pred == text_tgt).to(m.dtype) * m_txt).sum()
+        text_total = text_total + m_txt.sum()
         n += 1
         if is_tpu:
             _xm.mark_step()
@@ -856,6 +872,8 @@ def run_validation(
         cb0_correct = backend.reduce_mean(cb0_correct) * ws
         cb0_total = backend.reduce_mean(cb0_total) * ws
         cb_correct = backend.reduce_mean(cb_correct) * ws
+        text_correct = backend.reduce_mean(text_correct) * ws
+        text_total = backend.reduce_mean(text_total) * ws
         n_finite = backend.reduce_mean(n_finite) * ws
 
     # Single host-sync point for the whole validation pass.
@@ -883,6 +901,13 @@ def run_validation(
             float(loss_cfg.get("composite_audio_w", 0.6)),
         ),
         "val/cb0_acc": (cc / ct) if ct > 0 else 0.0,
+        # Real-token text acc; 0.0 with tt==0 means "no real text tokens seen"
+        # (audio-only data), distinct from "text stream stuck at random".
+        "val/text_acc": (
+            (float(text_correct.item()) / float(text_total.item()))
+            if float(text_total.item()) > 0
+            else 0.0
+        ),
         "val/per_codebook_loss": (per_cb_sum * inv).detach().cpu().tolist(),
         "val/per_codebook_acc": (
             (cb_correct / ct).detach().cpu().tolist() if ct > 0 else [0.0] * num_codebooks
@@ -1217,12 +1242,17 @@ def main():
     if args.dataset_mode == "streaming":
         if not cfg["data"]["train_split"]:
             raise ValueError("train_split required in streaming mode")
+        # Text supervision active => alignment resolution failures must be
+        # fatal, not a silent all-ZERO_PADDING text stream (the v0.3
+        # "audio-only" misdiagnosis).
+        _require_align = float(cfg["loss"].get("text_weight", 0.0)) > 0.0
         train_ds = StreamingTranslationDataset(
             cfg["data"]["train_split"],
             unwrapped.backbone.tokenizer,
             max_frames=max_frames,
             audio_frame_rate=cfg["data"]["audio_frame_rate"],
             encoded_dir=cfg["data"]["encoded_dir"],
+            require_alignments=_require_align,
         )
         val_ds = None
         if cfg["data"]["val_split"] and Path(cfg["data"]["val_split"]).exists():
@@ -1232,6 +1262,7 @@ def main():
                 max_frames=max_frames,
                 audio_frame_rate=cfg["data"]["audio_frame_rate"],
                 encoded_dir=cfg["data"]["encoded_dir"],
+                require_alignments=_require_align,
             )
     else:
         train_ds = TranslationDataset(
@@ -2520,7 +2551,8 @@ def main():
                 print(
                     f"  val/composite={val.get('val/composite', float('nan')):.4f} "
                     f"(text={val['val/text_loss']:.4f} audio={val['val/audio_loss']:.4f}) "
-                    f"val/loss={val['val/loss']:.4f} cb0_acc={val['val/cb0_acc'] * 100:.1f}%"
+                    f"val/loss={val['val/loss']:.4f} cb0_acc={val['val/cb0_acc'] * 100:.1f}% "
+                    f"text_acc={val.get('val/text_acc', 0.0) * 100:.1f}%"
                 )
                 _cba = val.get("val/per_codebook_acc")
                 if _cba:

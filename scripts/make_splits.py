@@ -72,11 +72,16 @@ def main():
         rows.append(
             {
                 "pt_path": str(pt_path),
+                # Alignment JSONs extract to the DATA ROOT (parent of encoded/),
+                # not encoded/ -- verified live 2026-07-08 (840,426 of each at
+                # /mnt/data/*.{src,tgt}.alignments.json). Legacy manifests that
+                # pointed into encoded/ still resolve via the dataset's
+                # _resolve_alignment fallback.
                 "src_align_path": str(
-                    encoded_dir / f"{pair_id}_{src_lang}{tgt_lang}.src.alignments.json"
+                    encoded_dir.parent / f"{pair_id}_{src_lang}{tgt_lang}.src.alignments.json"
                 ),
                 "tgt_align_path": str(
-                    encoded_dir / f"{pair_id}_{src_lang}{tgt_lang}.tgt.alignments.json"
+                    encoded_dir.parent / f"{pair_id}_{src_lang}{tgt_lang}.tgt.alignments.json"
                 ),
                 "direction": direction,
                 "sentence_id": sid,

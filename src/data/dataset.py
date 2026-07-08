@@ -234,11 +234,15 @@ class StreamingTranslationDataset(Dataset):
         max_frames: int = 300,
         audio_frame_rate: float = 12.5,
         encoded_dir: str | Path | None = None,
+        require_alignments: bool = False,
     ):
         self.jsonl_path = Path(jsonl_path)
         self.max_frames = max_frames
         self.interleaver = Interleaver(tokenizer, audio_frame_rate=audio_frame_rate)
         self.encoded_dir = Path(encoded_dir) if encoded_dir else None
+        # True when the text stream is supervised (text_weight > 0): zero
+        # alignment coverage then becomes a hard error instead of a warning.
+        self.require_alignments = require_alignments
 
         self.rows = []
         with open(self.jsonl_path) as f:
@@ -273,6 +277,33 @@ class StreamingTranslationDataset(Dataset):
             )
         print(f"StreamingTranslationDataset: {len(self.rows)} rows from {self.jsonl_path}")
 
+        # Alignment-coverage guard. A row with unresolvable alignments silently
+        # degrades to an all-ZERO_PADDING text stream in __getitem__, and with
+        # zero_padding_weight=0.0 that means STRUCTURALLY ZERO text loss -- the
+        # exact silent failure that got v0.3 misdiagnosed as "no text
+        # alignments". Sample-check coverage here (sampling keeps init O(1)-ish
+        # on 1.2M-row manifests) and fail loud when nothing resolves.
+        sample = self.rows[:: max(1, len(self.rows) // 1000)][:1000]
+        n_align = sum(
+            1
+            for r in sample
+            if self._resolve_alignment(r["src_align_path"], "src").exists()
+            and self._resolve_alignment(r["tgt_align_path"], "tgt").exists()
+        )
+        cov = n_align / max(1, len(sample))
+        print(
+            f"StreamingTranslationDataset: alignment coverage {cov:.1%} "
+            f"({n_align}/{len(sample)} sampled rows resolve both src+tgt)"
+        )
+        if self.require_alignments and n_align == 0:
+            raise FileNotFoundError(
+                f"0/{len(sample)} sampled rows resolve alignment JSONs "
+                f"(encoded_dir={self.encoded_dir}, example "
+                f"src_align_path={sample[0]['src_align_path']!r}) but the text "
+                "stream is supervised (text_weight > 0). Text loss would be "
+                "silently all-ZERO_PADDING; refusing to start."
+            )
+
     def __len__(self):
         return len(self.rows)
 
@@ -282,6 +313,56 @@ class StreamingTranslationDataset(Dataset):
             return pp
         if self.encoded_dir:
             cand = self.encoded_dir / pp.name
+            if cand.exists():
+                return cand
+        return pp
+
+    # Manifest alignment-path suffixes seen in the wild, worst first. The
+    # published tr-hi-mimi-encoded splits write "encoded/{stem}_src.json" /
+    # "encoded/{stem}_tgt.json" -- but the corpus actually ships
+    # "{stem}.src.alignments.json" / "{stem}.tgt.alignments.json", extracted to
+    # the DATA ROOT (parent of encoded_dir), not encoded/. That double mismatch
+    # (name AND directory) is why v0.3 was misdiagnosed as "no text alignments"
+    # (2026-07-08: 840,426 of each kind verified present, 100% coverage).
+    _ALIGN_SUFFIXES = ("_src.json", "_tgt.json", ".src.alignments.json", ".tgt.alignments.json")
+
+    def _resolve_alignment(self, p: str, kind: str) -> Path:
+        """Resolve an alignment JSON path, tolerating the manifest's legacy names.
+
+        Tries, in order:
+        1. the manifest path as-is (covers correctly-written future manifests);
+        2. ``encoded_dir / name`` (the old basename fallback);
+        3. the REAL shipped layout: ``data_root / f"{base}.{kind}.alignments.json"``
+           where ``data_root = encoded_dir.parent`` and ``base`` is the manifest
+           filename stripped of any known alignment suffix.
+
+        Parameters
+        ----------
+        p : str
+            Path from the manifest row (``src_align_path`` / ``tgt_align_path``).
+        kind : str
+            ``"src"`` or ``"tgt"`` -- which alignment stream this path is for.
+
+        Returns
+        -------
+        Path
+            An existing path when any candidate matches; otherwise the original
+            (non-existent) path so the caller's ``.exists()`` check stays the
+            single decision point.
+        """
+        pp = Path(p)
+        if pp.exists():
+            return pp
+        if self.encoded_dir:
+            cand = self.encoded_dir / pp.name
+            if cand.exists():
+                return cand
+            base = pp.name
+            for suf in self._ALIGN_SUFFIXES:
+                if base.endswith(suf):
+                    base = base[: -len(suf)]
+                    break
+            cand = self.encoded_dir.parent / f"{base}.{kind}.alignments.json"
             if cand.exists():
                 return cand
         return pp
@@ -299,9 +380,10 @@ class StreamingTranslationDataset(Dataset):
         T_src = src_codes.shape[1]
         T_tgt = tgt_codes.shape[1]
 
-        # Load alignments
-        src_align_path = self._resolve(row["src_align_path"])
-        tgt_align_path = self._resolve(row["tgt_align_path"])
+        # Load alignments (kind-aware resolution: manifest names are wrong for
+        # the shipped corpus -- see _resolve_alignment).
+        src_align_path = self._resolve_alignment(row["src_align_path"], "src")
+        tgt_align_path = self._resolve_alignment(row["tgt_align_path"], "tgt")
         src_align = load_alignments(src_align_path) if src_align_path.exists() else None
         tgt_align = load_alignments(tgt_align_path) if tgt_align_path.exists() else None
 
