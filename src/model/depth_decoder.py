@@ -81,6 +81,71 @@ def extend_weights(state_dict: dict, orig_q: int, new_q: int) -> dict:
     return extended
 
 
+def _patch_flexible_linear_bmm() -> None:
+    """Rewrite ``MoshiFlexibleLinear.forward`` as an equal-batch ``bmm``.
+
+    WHY THIS EXISTS
+    ---------------
+    Stock transformers (modeling_moshi.py) computes the per-codebook linear as
+
+        torch.matmul(x[:, :, None, :], weight.transpose(1, 2)[None])
+
+    i.e. a batched matmul whose batch dims are ``(B, C)`` on the left and
+    ``(1, C)`` on the right. On CUDA the implied ``expand`` of the weight to
+    ``(B, C, H, O)`` is a stride-0 view and cuBLAS handles it for free. On
+    XLA there are no strides: the expand lowers to a REAL ``broadcast`` and
+    the compiler materialises the weight once per token. Observed live on a
+    v6e-8 (2026-07-08): ``bf16[64, 8, 1024, 5632]`` = 5.5 GiB for ONE FFN
+    weight (batch 4 x depth_chunk 16 tokens), the dominant term of a
+    93.94G/31.25G HBM OOM.
+
+    THE FIX
+    -------
+    Express the same contraction with equal batch dims so XLA lowers it to a
+    plain ``dot_general`` with batch dim C and no weight broadcast:
+
+        bmm(x.transpose(0, 1) [C, B, H], w.transpose(1, 2) [C, H, O])
+
+    Numerically identical (same contraction, same dtype); only the lowering
+    changes. Applied to the CLASS (idempotent), so every FlexibleLinear in
+    the depth decoder -- FFN, in-projections, audio heads -- benefits, on
+    GPU and TPU alike (pure torch; no backend seam violation).
+    """
+    from transformers.models.moshi import modeling_moshi as _mm
+
+    if getattr(_mm.MoshiFlexibleLinear, "_tinyaya_bmm_forward", False):
+        return
+
+    def forward(self, x, layer_idx=None):
+        # Skip the gather when layer_idx selects every codebook row. The
+        # training path always passes the FULL arange(num_codebooks) (the
+        # depth sequence positions ARE the codebook indices, and
+        # modeling_moshi only ever passes monotonic cache positions), so
+        # index_select would be an identity gather -- but on XLA it
+        # materialises a fresh copy of the whole weight PER CALL, and each
+        # copy is saved for the bmm backward. Observed live on a v6e-8
+        # (2026-07-08): thousands of bf16[8,1024,1024] 16M gather copies
+        # (19 chunks x 6 layers x 4 attn projs x 8 grad-accum micros)
+        # totalling ~50G of an 82.52G/31.25G OOM. Reading self.weight
+        # directly shares ONE buffer across all calls.
+        w = self.weight
+        if layer_idx is not None and layer_idx.numel() != w.shape[0]:
+            w = torch.index_select(w, 0, layer_idx)
+        if w.shape[0] == 1 and x.shape[1] != 1:
+            # Single selected codebook applied to every sequence position
+            # (generation path): a plain matmul has no batch-dim mismatch.
+            return torch.matmul(x, w[0].transpose(0, 1))
+        # x: [B, C, H] -> [C, B, H]; w: [C, O, H] -> [C, H, O]
+        return torch.bmm(x.transpose(0, 1), w.transpose(1, 2)).transpose(0, 1)
+
+    _mm.MoshiFlexibleLinear.forward = forward
+    _mm.MoshiFlexibleLinear._tinyaya_bmm_forward = True
+    print(
+        "[depth_decoder] patched MoshiFlexibleLinear.forward -> equal-batch "
+        "bmm (avoids XLA materialising the per-token weight broadcast)"
+    )
+
+
 def create_depth_decoder(
     state_dict: dict[str, torch.Tensor],
     num_codebooks: int = 8,
@@ -136,6 +201,7 @@ def create_depth_decoder(
     )
 
     print(f"Creating MoshiDepthDecoder: {num_codebooks} codebooks, {num_layers} layers")
+    _patch_flexible_linear_bmm()
     decoder = MoshiDepthDecoder(config)
 
     missing, unexpected = decoder.load_state_dict(state_dict, strict=False)
