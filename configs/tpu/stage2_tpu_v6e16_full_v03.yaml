@@ -1,4 +1,12 @@
-# TPU v6e-16 PRODUCTION run v0.3 (Stage-2 winner): r=32, lr=1.716e-4, 3 epochs.
+# TPU v6e-16 PRODUCTION run v0.3: text+audio, reval winner (arm D), 3 epochs.
+#
+# RECIPE PROVENANCE (2026-07-09): the v03-5k-reval-ta sweep (6 arms x 5,000
+# full-corpus text+audio steps, docs/v0.3-reval-report.md) re-picked the
+# recipe. Winner = arm D: the r=32/lr=1.716e-4/+MLP/rsLoRA base with
+# lora_exclude_top: 0 (adapters on ALL 36 layers) -- gates-clean at every
+# composite weighting; the old frozen champion (exclude_top=2) finished LAST.
+# Pipeline validated by the 32-sample memorization gate + TF/AR examination
+# (PR #10 gate report) before this config is allowed to launch.
 #
 # WHY THIS EXISTS
 # ---------------
@@ -82,7 +90,7 @@ lora:
   dropout: 0.05                    # de-regularized
   use_rslora: true                 # Stage-2 winner used rsLoRA (rank>=16)
   target_modules: [q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, down_proj, embed_tokens]  # Stage-1 +MLP winner
-  lora_exclude_top: 2
+  lora_exclude_top: 0             # reval winner (arm D): adapters on ALL 36 layers
   num_full_ft_layers: 0
   depth_unfreeze_blocks: 0
 

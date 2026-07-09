@@ -76,8 +76,9 @@ Beyond the data-source fix, v0.3 carries codebase corrections and a recipe chose
   stream, so `model_audio_embed` received **zero gradient**. Restored in v0.3.
 - **Capacity sweep** — Stage 1 (structural grid) chose **+MLP** target modules
   (`q,k,v,o + gate,up,down + embed_tokens`); Stage 2 (Bayesian `lr × rank`) chose
-  **`lora_r=32, alpha=64, rsLoRA, lr_lora=1.716e-4`** (`exclude_top=2`). In the data-rich
+  **`lora_r=32, alpha=64, rsLoRA, lr_lora=1.716e-4`**. In the data-rich
   regime more LoRA capacity → lower loss (opposite of the small-data overfit regime).
+  The final re-validation (below) then flipped `exclude_top` 2 → **0**.
 - **Deep-codebook learning** — per-codebook loss weighting; the frozen depth decoder's
   I/O layers train while its blocks stay frozen.
 - **Pipeline validated** — an overfit gate (32-example train==val) memorizes **all 8
@@ -85,6 +86,30 @@ Beyond the data-source fix, v0.3 carries codebase corrections and a recipe chose
   against the *undelayed* target and read a false ~0%; fixed — CB1–7 were always learning.
 
 Production config: `configs/tpu/stage2_tpu_v6e16_full_v03.yaml`, **14,532 steps (3 epochs)**.
+
+## Recipe re-validation: 6-arm text+audio sweep (`v03-5k-reval-ta`, 2026-07-09)
+
+Before production, the recipe was re-validated as **text+audio** on the full 1.24 M-pair
+corpus — 6 arms × 5,000 steps (≈1 epoch) at global batch 256, one v6e-8 per arm. Full
+report: [`v0.3-reval-report.md`](v0.3-reval-report.md). Winner: **arm D,
+`lora_exclude_top: 0`** — adapters on all 36 layers. The previously frozen champion
+(exclude_top=2) placed **last at every composite weighting**; the ranking
+E ≺ D ≺ C ≺ F ≺ B ≺ A is unanimous across text/audio weightings {0.2/0.8, 0.4/0.6,
+0.5/0.5}, and D is the winner after the pre-registered cb0-accuracy gate (E and C fall
+>1 pt below best cb0). Headline science: **top-layer adapters are the text lever** —
+exclude_top=0 buys ~0.5 text CE at zero audio cost.
+
+| arm | delta | val text loss | val audio loss | composite (0.4/0.6) | W&B |
+|---|---|---|---|---|---|
+| **D (winner)** | exclude_top=0 | 1.181 | 4.985 | **3.464** | [0noyz5tr](https://wandb.ai/cataluna84/tinyaya-stage2-tpu/runs/0noyz5tr) |
+| E | dropout .10/wd .05 | 1.140 | 4.989 | 3.450 (cb0 gate ⚠) | [7rb9pc85](https://wandb.ai/cataluna84/tinyaya-stage2-tpu/runs/7rb9pc85) |
+| C | r16, lr 2.4e-4 | 1.155 | 5.009 | 3.467 (cb0 gate ⚠) | [rag7amc2](https://wandb.ai/cataluna84/tinyaya-stage2-tpu/runs/rag7amc2) |
+| F | depth_unfreeze=2 | 1.476 | 4.953 | 3.562 | [jqozgc36](https://wandb.ai/cataluna84/tinyaya-stage2-tpu/runs/jqozgc36) |
+| B | r64 | 1.566 | 4.958 | 3.601 | [2jtqcnla](https://wandb.ai/cataluna84/tinyaya-stage2-tpu/runs/2jtqcnla) |
+| A | frozen champion | 1.692 | 4.960 | 3.653 | [powp1a50](https://wandb.ai/cataluna84/tinyaya-stage2-tpu/runs/powp1a50) |
+
+All per-arm `best_by_val` checkpoints:
+`gs://tinyaya-stage2-eu/checkpoints/stage2-reval-5k-ta/arm_{A..F}/best_by_val`.
 
 ## Training infrastructure: replicated strategy + XLA architecture changes
 
