@@ -14,18 +14,19 @@ import os
 import sys
 import time
 
-import torch
-import soundfile as sf
 import numpy as np
+import soundfile as sf
+import torch
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+from transformers import AutoTokenizer
+
+from src.data.dataset import SILENCE_TOKEN, StreamingTranslationDataset, undo_codebook_delay
+from src.data.mimi_encoder import MimiEncoder
 from src.model.composite import TinyAyaMoshiComposite
 from src.model.lora_setup import apply_lora
 from src.training.checkpointing import load_checkpoint
-from src.data.dataset import StreamingTranslationDataset, undo_codebook_delay, SILENCE_TOKEN
-from src.data.mimi_encoder import MimiEncoder
-from transformers import AutoTokenizer
 
 # Compute dtype for the eval forward. Set from --fp32 in main(). On CPU, bf16
 # matmuls accumulate in low precision (unlike the TPU MXU's fp32 accumulate), so
@@ -40,7 +41,16 @@ def _autocast(device):
 
 
 def generate_teacher_forced(model, sample, device, num_codebooks=8):
-    """Teacher-forced generation — upper bound on quality."""
+    """Teacher-forced generation — upper bound on quality.
+
+    Returns
+    -------
+    (pred_codes, text_pred) : tuple[torch.Tensor, torch.Tensor]
+        ``pred_codes`` [8, tgt_len] argmax audio codes in DELAYED space;
+        ``text_pred`` [tgt_len] argmax next-token TEXT ids over the same
+        target region (same shift convention as the audio prediction and the
+        training text loss).
+    """
     T = sample["text_ids"].shape[0]
     src_len = sample["source_length"]
 
@@ -56,15 +66,63 @@ def generate_teacher_forced(model, sample, device, num_codebooks=8):
             attention_mask=mask, full_audio_codes=full_model[:, :num_codebooks, :],
             depth_chunk_size=16,
         )
-        _, audio_logits, _ = output
+        text_logits, audio_logits, _ = output
 
     # Next-token predictions for target region
     pred_codes = audio_logits[0, :, src_len - 1:-1, :].argmax(dim=-1)  # [8, tgt_len]
-    return pred_codes.cpu()
+    text_pred = text_logits[0, src_len - 1:-1, :].argmax(dim=-1)  # [tgt_len]
+    return pred_codes.cpu(), text_pred.cpu()
+
+
+# The interleaver's 4 frame-padding specials occupy ids >= TEXT_PADDING; real
+# text tokens are strictly below. Accuracy counted over padding positions
+# would read ~100% on a text stream that never learned a word.
+_TEXT_SPECIALS_START = 262144
+
+
+def text_examination(text_pred, sample, tokenizer):
+    """Text-stream TF accuracy (real tokens only) + decoded strings.
+
+    Mirrors train_hierarchical's ``val/text_acc`` masking: only target-region
+    positions whose GROUND-TRUTH token is a real text id (< 262144) count.
+
+    Returns
+    -------
+    dict with ``text_acc`` (float; -1.0 when the sample has no real text
+    tokens), ``text_target_str``, ``text_pred_str`` (tokenizer-decoded, real
+    positions only, prediction read at the same positions as the target).
+    """
+    src_len = sample["source_length"]
+    tgt_text = sample["text_ids"][src_len:src_len + text_pred.shape[0]]
+    real = tgt_text < _TEXT_SPECIALS_START
+    n_real = int(real.sum())
+    if n_real == 0:
+        return {"text_acc": -1.0, "text_target_str": "", "text_pred_str": ""}
+    acc = float((text_pred[real] == tgt_text[real]).float().mean())
+    target_str = tokenizer.decode(tgt_text[real].tolist())
+    # Read the prediction at the SAME positions so the two strings align
+    # word-for-word; clamp any (wrong) special-id prediction into vocab range
+    # for decodability -- it still counts as a miss in text_acc.
+    pred_ids = text_pred[real].clamp(max=_TEXT_SPECIALS_START - 1)
+    pred_str = tokenizer.decode(pred_ids.tolist())
+    return {"text_acc": acc, "text_target_str": target_str, "text_pred_str": pred_str}
 
 
 def generate_autoregressive(model, sample, device, temp=0.8, top_p=0.9):
-    """Autoregressive generation — realistic quality."""
+    """Autoregressive generation — realistic quality.
+
+    NEXT-TOKEN CONVENTION (the off-by-one this gate caught, 2026-07-09)
+    -------------------------------------------------------------------
+    Training computes ``pred = logits[:, :-1]`` vs ``target[:, 1:]``: the
+    hidden state at position ``t-1`` predicts the token AT ``t``. So to
+    generate position ``t`` the backbone must run over the clean prefix
+    ``[:, :t]`` (positions ``0..t-1``) and the head reads ``hidden[:, -1]``
+    (= position ``t-1``). The original loop ran over ``[:, :t+1]`` — one
+    position too far: it read the hidden AT ``t`` (whose input was still the
+    SILENCE placeholder) and wrote the resulting ``t+1`` prediction at ``t``.
+    Result: every token shifted one frame + conditioned on a placeholder —
+    ~2-5% reproduction on a fully memorized sample (TF 100%) until fixed.
+    """
     T = sample["text_ids"].shape[0]
     src_len = sample["source_length"]
 
@@ -74,13 +132,13 @@ def generate_autoregressive(model, sample, device, temp=0.8, top_p=0.9):
     gen_all = torch.full((8, T), SILENCE_TOKEN, dtype=torch.long, device=device)
 
     for t in range(src_len, T):
-        ar_mask = torch.ones(1, t + 1, dtype=torch.long, device=device)
+        ar_mask = torch.ones(1, t, dtype=torch.long, device=device)
 
         with torch.no_grad(), _autocast(device):
             bb_out = model.backbone(
-                text_ids=ar_text[:, :t + 1],
-                audio_codes=user_stream[:, :t + 1],
-                model_audio_codes=model_stream[:, :t + 1],
+                text_ids=ar_text[:, :t],
+                audio_codes=user_stream[:, :t],
+                model_audio_codes=model_stream[:, :t],
                 attention_mask=ar_mask,
             )
             hidden = bb_out["hidden_states"]
@@ -188,8 +246,20 @@ def main():
         with open(_acfg_uri) as _f:
             _acfg = json.load(_f)
     _r = _acfg.get("r", args.lora_r)
+    # Adapter LAYOUT must match the checkpoint exactly, or load_checkpoint's
+    # missing-keys guard can't protect us: scan_homogeneous checkpoints
+    # (layers_to_transform == null) carry adapters on ALL 36 layers, and an
+    # eval model built with the classic exclude_top=2 (34 layers) would
+    # silently DROP the top-2 tensors as "unexpected" keys. They are frozen
+    # zeros in training, so numerics happen to survive -- but silent drops are
+    # exactly the class of bug this eval exists to rule out. Mirror the layout.
+    _ltt = _acfg.get("layers_to_transform")
+    _scan_homog = _ltt is None
+    _excl = 0 if _scan_homog else max(0, 36 - len(_ltt))
     print(f"  LoRA from checkpoint: r={_r} alpha={_acfg.get('lora_alpha')} "
-          f"rslora={_acfg.get('use_rslora')} targets={_acfg.get('target_modules')}", flush=True)
+          f"rslora={_acfg.get('use_rslora')} targets={_acfg.get('target_modules')} "
+          f"layout={'ALL-36 (scan_homogeneous)' if _scan_homog else f'0..{35 - _excl}'}",
+          flush=True)
     model = TinyAyaMoshiComposite(num_codebooks=8)
     model.backbone = apply_lora(
         model.backbone,
@@ -198,6 +268,8 @@ def main():
         target_modules=_acfg.get("target_modules"),
         use_rslora=_acfg.get("use_rslora", False),
         num_full_ft_layers=0,
+        lora_exclude_top=_excl,
+        scan_homogeneous=_scan_homog,
     )
     load_checkpoint(model, None, None, args.checkpoint)
     model = model.to(device).to(_AC_DTYPE).eval()
@@ -239,7 +311,8 @@ def main():
 
         # Teacher-forced generation
         t0 = time.time()
-        tf_codes = generate_teacher_forced(model, sample, device)
+        tf_codes, text_pred = generate_teacher_forced(model, sample, device)
+        text_exam = text_examination(text_pred, sample, tokenizer)
         # tf_codes are in the DELAYED codebook space (the model predicts the
         # delayed model_audio_codes). Undo the per-codebook delay before Mimi
         # decode so every codebook is temporally realigned -- decoding delayed
@@ -260,6 +333,7 @@ def main():
         # Autoregressive generation
         ar_wav = None
         ar_time = 0
+        ar_per_cb_match = None
         if not args.skip_ar:
             t0 = time.time()
             ar_codes = generate_autoregressive(model, sample, device, temp=args.ar_temp, top_p=args.ar_top_p)
@@ -268,6 +342,15 @@ def main():
             ar_wav = mimi.decode(ar_codes_clean.to(device)).numpy()
             sf.write(os.path.join(sample_dir, "autoregressive.wav"), ar_wav, 24000)
             ar_time = time.time() - t0
+            # AR reproduction rate: exact match vs the ground-truth DELAYED
+            # codes (same comparison as the TF accuracy above). On a memorized
+            # sample with greedy decoding, CB0 match should approach the TF
+            # acc; a large TF->AR gap = generation-path bug (feedback /
+            # delay / depth seeding), invisible to TF metrics.
+            ar_gt = sample["model_audio_codes"][:, src_len:src_len + ar_codes.shape[1]]
+            ar_per_cb_match = [
+                (ar_codes[cb] == ar_gt[cb]).float().mean().item() for cb in range(8)
+            ]
 
         # ASR on generated audio (skippable -- Whisper is CUDA-oriented + slow;
         # for an audio-only reproduction sanity check the per-codebook accuracy
@@ -275,7 +358,7 @@ def main():
         gt_transcript = tf_transcript = ar_transcript = ""
         tf_bleu = ar_bleu = 0.0
         if not args.skip_asr:
-            print(f"  Running ASR...", flush=True)
+            print("  Running ASR...", flush=True)
             gt_transcript = run_asr(os.path.join(sample_dir, "target_gt.wav"), args.whisper_model, language=tgt_lang)
             tf_transcript = run_asr(os.path.join(sample_dir, "teacher_forced.wav"), args.whisper_model, language=tgt_lang)
             ar_transcript = run_asr(os.path.join(sample_dir, "autoregressive.wav"), args.whisper_model, language=tgt_lang) if ar_wav is not None else ""
@@ -290,6 +373,10 @@ def main():
             "cb0_acc": cb_accs[0],
             "cb_avg_acc": np.mean(cb_accs),
             "per_cb_acc": cb_accs,
+            "text_acc": text_exam["text_acc"],
+            "text_target_str": text_exam["text_target_str"],
+            "text_pred_str": text_exam["text_pred_str"],
+            "ar_per_cb_match": ar_per_cb_match,
             "tf_bleu": tf_bleu,
             "ar_bleu": ar_bleu,
             "gt_transcript": gt_transcript,
@@ -302,6 +389,19 @@ def main():
 
         print(f"  Direction: {direction}", flush=True)
         print(f"  CB0 acc: {cb_accs[0]*100:.1f}%, Avg: {np.mean(cb_accs)*100:.1f}%", flush=True)
+        if text_exam["text_acc"] >= 0:
+            print(f"  TEXT acc: {text_exam['text_acc']*100:.1f}% (real tokens)", flush=True)
+            print(f"  TEXT tgt:  {text_exam['text_target_str'][:100]}", flush=True)
+            print(f"  TEXT pred: {text_exam['text_pred_str'][:100]}", flush=True)
+        else:
+            print("  TEXT: no real text tokens in target region (audio-only sample)", flush=True)
+        if ar_per_cb_match is not None:
+            print(
+                f"  AR reproduction (greedy vs GT): cb0={ar_per_cb_match[0]*100:.1f}% "
+                f"avg={np.mean(ar_per_cb_match)*100:.1f}% "
+                "(AR text is teacher-forced by design)",
+                flush=True,
+            )
         print(f"  GT:  {gt_transcript[:80]}", flush=True)
         print(f"  TF:  {tf_transcript[:80]}", flush=True)
         print(f"  AR:  {ar_transcript[:80]}", flush=True)
@@ -315,14 +415,26 @@ def main():
     avg_cb_all = np.mean([r["cb_avg_acc"] for r in results])
     avg_tf_bleu = np.mean([r["tf_bleu"] for r in results])
     avg_ar_bleu = np.mean([r["ar_bleu"] for r in results])
+    _text_accs = [r["text_acc"] for r in results if r["text_acc"] >= 0]
+    avg_text_acc = float(np.mean(_text_accs)) if _text_accs else -1.0
+    _ar_matches = [r["ar_per_cb_match"] for r in results if r["ar_per_cb_match"]]
+    avg_ar_cb0 = float(np.mean([m[0] for m in _ar_matches])) if _ar_matches else -1.0
+    avg_ar_all = float(np.mean([np.mean(m) for m in _ar_matches])) if _ar_matches else -1.0
     print(f"  Avg CB0 accuracy:     {avg_cb0*100:.1f}%", flush=True)
     print(f"  Avg all-CB accuracy:  {avg_cb_all*100:.1f}%", flush=True)
+    if avg_text_acc >= 0:
+        print(f"  Avg TEXT accuracy:    {avg_text_acc*100:.1f}% ({len(_text_accs)} samples w/ text)", flush=True)
+    if avg_ar_cb0 >= 0:
+        print(f"  Avg AR reproduction:  cb0={avg_ar_cb0*100:.1f}% all-CB={avg_ar_all*100:.1f}%", flush=True)
     print(f"  Avg TF BLEU:          {avg_tf_bleu:.1f}", flush=True)
     print(f"  Avg AR BLEU:          {avg_ar_bleu:.1f}", flush=True)
 
     # Save results
     with open(os.path.join(args.output_dir, "results.json"), "w") as f:
         json.dump({"summary": {"avg_cb0_acc": avg_cb0, "avg_cb_all_acc": avg_cb_all,
+                                "avg_text_acc": avg_text_acc,
+                                "avg_ar_cb0_match": avg_ar_cb0,
+                                "avg_ar_all_cb_match": avg_ar_all,
                                 "avg_tf_bleu": avg_tf_bleu, "avg_ar_bleu": avg_ar_bleu,
                                 "num_samples": num_samples},
                    "samples": results}, f, indent=2)

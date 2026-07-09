@@ -57,19 +57,24 @@ train:
                                   # catches extreme spikes; normal updates stay gradient-scaled.
   log_grad_norm: true
   fsdp_barrier_hook: false
-  depth_chunk_size: 16
+  # Scan recipe: validate the SHIPPING stack (scan + micro graph breaks +
+  # depth_chunk 100) -- the same code path the arms and production use.
+  micro_mark_step: true
+  depth_chunk_size: 100
   precision: bfloat16
-  use_scan_layers: false
+  use_scan_layers: true
   xla_grad_checkpoint: true
   final_canonical_save: false
 
 loss:
-  # AUDIO-ONLY (corpus has no text alignments).
-  text_weight: 0.0
+  # TEXT+AUDIO (2026-07-09): gate the full shipping objective. On a memorized
+  # 32-example set the text CE must fall toward ~0 and val/text_acc toward
+  # ~100% -- a text stream that plateaus high means a text-path bug.
+  text_weight: 0.2
   audio_weight: 1.0
   text_weight_curriculum_frac: 0.0
-  composite_text_w: 0.0
-  composite_audio_w: 1.0
+  composite_text_w: 0.4
+  composite_audio_w: 0.6
   text_padding_weight: 0.01
   zero_padding_weight: 0.0
   label_smoothing: 0.0            # OVERFIT: let loss reach ~0 and argmax acc ~100%
@@ -108,12 +113,12 @@ logging:
   val_max_batches: 10             # covers all 32 examples (global batch 32)
   val_on_tpu: true
   diag_metrics: false
-  save_dir: gs://tinyaya-stage2-eu/checkpoints/stage2-tpu-v6e8-overfit-r32
+  save_dir: gs://tinyaya-stage2-eu/checkpoints/stage2-tpu-v6e8-overfit-ta-scan
   keep_last_n: 0
   keep_local_checkpoints: false
   use_wandb: true
   wandb_project: tinyaya-stage2-tpu
-  wandb_run_name: v0.3-overfit-r32
+  wandb_run_name: v03-overfit-ta-scan
 
 perf:
   enabled: true

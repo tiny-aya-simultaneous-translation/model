@@ -5,6 +5,15 @@ the backlog of loose ends. Delete an item when it's done.
 
 ## Open
 
+### eval_checkpoint ASR needs a CPU path before release eval (2026-07-09)
+
+`run_asr` hardcodes `WhisperModel(..., device="cuda", compute_type="float16")` and
+`faster_whisper` is not in the lockfile. The pipeline-validation gate runs `--skip_asr`
+(token-level reproduction is the right memorization metric); the RELEASE eval (ASR-BLEU
+per release-plan §3) needs: `faster-whisper` pinned (+ int8 CPU branch or a GPU box),
+and the `rows[i]`/`ds[i]` positional-desync fixed if eval ever runs on splits with
+missing `.pt` rows (dataset drops them; `rows` doesn't).
+
 ### Text+audio pivot follow-ups (2026-07-08)
 
 - **Fix the upstream split manifests** (or publish corrected ones): the dataset repo's

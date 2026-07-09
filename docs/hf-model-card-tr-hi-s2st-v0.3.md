@@ -114,6 +114,29 @@ stride-0 broadcast views):
 > lowering. Runs trained without `use_scan_layers` (e.g. an unscanned v6e-16 run) keep
 > the classic 34-layer adapter layout; `metadata.json` records which applies.
 
+## Pipeline validation (memorization gate, 2026-07-09)
+
+Before the production run, the exact shipping stack (scan + all-36-layer adapter layout +
+FlexibleLinear bmm + text+audio objective) passed a 32-example memorization gate
+(train==val, regularization stripped, 800 steps) with an independent checkpoint-reload
+inference examination. W&B: [`v03-overfit-ta-scan`](https://wandb.ai/cataluna84/tinyaya-stage2-tpu/runs/n768udgi).
+
+| check | result |
+|---|---|
+| CB0 teacher-forced accuracy | **99.6%** (train-val) / **99.5%** (independent reload+eval) |
+| CB1–7 TF accuracy | 97.9 → 88.6% monotone — the **frozen Moshi depth-decoder ceiling** (only its I/O layers train); at parity with the pre-scan stack, i.e. no regression from the XLA changes |
+| Text TF accuracy | **99.8%** (CE 0.187); decoded predictions **character-identical** to targets in both TR→HI and HI→TR |
+| Per-component losses | all → ~0 (audio 0.021, text 0.187; all 8 per-CB losses collapsed) |
+| Checkpoint→eval parity | per-CB within 0.1–0.6 pt (CB0–3); CB4–7 1.3–1.7 pt (metric weighting + fp32-CPU vs bf16-TPU precision) |
+| Greedy AR reproduction | **CB0 100.0%**; all-CB match numerically identical to TF accuracy — the AR path reproduces the training-time forward |
+
+**Disclosure:** this gate caught an off-by-one in the *evaluation harness's*
+autoregressive loop (predictions shifted one frame and conditioned on a placeholder
+token). The model and training were never affected, but **AR/ASR-BLEU numbers reported
+for earlier versions (v0.2 included) used the broken decoding and understate AR
+quality**. Fixed in `scripts/eval_checkpoint.py`; all v0.3 release numbers use the
+corrected loop.
+
 ## Status checklist
 
 | Item | Status |
