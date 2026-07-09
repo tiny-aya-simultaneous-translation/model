@@ -28,7 +28,18 @@ import pathlib
 import sys
 
 import pytest
-import torch
+
+# These tests need REAL torch (tensor ops, torch.save). The CI "torch-free"
+# unit-test job has no torch, and test_checkpoint_retention.py injects a
+# MagicMock at sys.modules["torch"] -- which passes importorskip and hasattr
+# checks (MagicMock fabricates any attribute), so verify __version__ is an
+# actual str before importing modules that do `from torch.utils.data import`.
+torch = pytest.importorskip("torch")
+if not isinstance(getattr(torch, "__version__", None), str):
+    pytest.skip(
+        "real torch unavailable (torch-free CI job / stubbed module)",
+        allow_module_level=True,
+    )
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
