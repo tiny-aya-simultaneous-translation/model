@@ -47,8 +47,18 @@ import math
 import os
 import sys
 import time
+import warnings
 from collections import deque
 from pathlib import Path
+
+# Our own code is fully migrated from the deprecated xm.mark_step() to
+# torch_xla.sync() (2026-07-09; identical semantics in torch_xla 2.9). This
+# filter is a safety net for torch_xla-INTERNAL callers (e.g.
+# xm.optimizer_step) that still emit "Use torch_xla.sync instead" on every
+# call -- with 8 micro graph-breaks per macro-step that used to spam hundreds
+# of warning lines per logged step into /tmp/train.log. Filter BEFORE
+# importing torch (torch_xla autoloads via torch's backend entry point).
+warnings.filterwarnings("ignore", message=r"Use torch_xla\.sync instead")
 
 # ruff: noqa: E402,I001
 import soundfile as sf
@@ -704,7 +714,7 @@ def run_validation(
     # Materialised exactly once at the end. ``max_batches`` caps the pass.
     is_tpu = "xla" in str(device)
     if is_tpu:
-        import torch_xla.core.xla_model as _xm
+        import torch_xla
     acc_loss = torch.zeros((), device=device)
     acc_text = torch.zeros((), device=device)
     acc_audio = torch.zeros((), device=device)
@@ -791,7 +801,7 @@ def run_validation(
             # will see.
             if n == 0 and val_debug:
                 if is_tpu:
-                    _xm.mark_step()
+                    torch_xla.sync()
                 fin = lambda t: bool(torch.isfinite(t).all().item())
                 print(
                     "  [val-debug] finite: "
@@ -854,7 +864,7 @@ def run_validation(
         text_total = text_total + m_txt.sum()
         n += 1
         if is_tpu:
-            _xm.mark_step()
+            torch_xla.sync()
 
     if n == 0:
         model.train()
@@ -1873,9 +1883,9 @@ def main():
             return []
         sentinel = torch.cat(chunks)
         if is_tpu:
-            import torch_xla.core.xla_model as _xm
+            import torch_xla
 
-            _xm.mark_step()
+            torch_xla.sync()
         return [float(v) for v in sentinel.cpu().tolist()]
 
     def run_macro_step(
@@ -2018,9 +2028,9 @@ def main():
                     # 14.21G of real buffers). Numerics are identical --
                     # gradients accumulate in .grad across graphs -- and the
                     # 8 identical micro graphs compile once.
-                    import torch_xla.core.xla_model as _xm_micro
+                    import torch_xla
 
-                    _xm_micro.mark_step()
+                    torch_xla.sync()
             else:
                 micro_loss_sum += losses["loss"].item()
                 micro_text += losses["text_loss"].item()
@@ -2049,7 +2059,7 @@ def main():
         # This populates the train/grad_norm wandb metric (was 0.0)
         # and detects exploding gradients, at ~5-15% throughput cost.
         if is_tpu:
-            import torch_xla.core.xla_model as _xm
+            import torch_xla
 
             # iter 23: lever 6 (fused clip) is gated behind a config
             # flag. Both iter 21 (vanilla clip) and iter 22 (clip with
@@ -2098,11 +2108,11 @@ def main():
                             p.grad = torch.zeros_like(p)
                         p.grad.mul_(clip_coef)
                 with trace_ctx("mark_step"):
-                    _xm.mark_step()
+                    torch_xla.sync()
                 grad_norm = total_norm
             else:
                 with trace_ctx("mark_step"):
-                    _xm.mark_step()
+                    torch_xla.sync()
                 grad_norm = torch.tensor(0.0)
         else:
             grad_norm = torch.nn.utils.clip_grad_norm_(
@@ -2235,9 +2245,9 @@ def main():
                 group["lr"] = lr
                 group["weight_decay"] = weight_decay
         reset_optimizer_state()
-        import torch_xla.core.xla_model as _xm
+        import torch_xla
 
-        _xm.mark_step()
+        torch_xla.sync()
         optimizer.zero_grad(set_to_none=False)
         sentinel_after = trainable_weight_sentinel()
         # Tolerance-based drift check. Warmup runs at lr=0 AND wd=0, so a real
@@ -2302,11 +2312,11 @@ def main():
         # ---- logging
         if step % log_every == 0:
             if is_tpu:
-                import torch_xla.core.xla_model as _xm
+                import torch_xla
 
                 # Single materialisation of all losses at log boundary.
                 with trace_ctx("logging_materialize"):
-                    _xm.mark_step()
+                    torch_xla.sync()
                     avg = {
                         "loss": (running_xla["loss"] / log_every).item(),
                         "text": (running_xla["text"] / log_every).item(),

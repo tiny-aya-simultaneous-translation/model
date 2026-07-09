@@ -64,7 +64,9 @@ echo "==> [4/5] running remote helper (NODE_ID=$NODE_ID strategy=$TPU_STRATEGY p
 # to the fresh run. Result: 1-of-4 hosts on the new run; 3-of-4 silently
 # routed to a zombie. Per-launch suffix kills the race entirely.
 LAUNCH_EPOCH="$(date +%s)"
-WANDB_RENDEZVOUS_URI="gs://${BUCKET}/wandb-rendezvous/v4-32-spot-canary-${LAUNCH_EPOCH}.id"
+# Prefix derives from NODE_ID (was hardcoded "v4-32-spot-canary" from the v4
+# era, which made every v6e launch's rendezvous line misleading).
+WANDB_RENDEZVOUS_URI="gs://${BUCKET}/wandb-rendezvous/${NODE_ID}-${LAUNCH_EPOCH}.id"
 echo "==> wandb rendezvous (this launch): $WANDB_RENDEZVOUS_URI"
 # Pass config via env vars in the SSH command (small string, no quoting issue).
 ENV_PREFIX="export GCS_URI='$GCS_URI' REPO_DIR='$REPO_DIR' TPU_STRATEGY='$TPU_STRATEGY' CONFIG_FILE='$CONFIG_FILE' RUN_PROBE_ONLY='$RUN_PROBE_ONLY' WANDB_RENDEZVOUS_URI='$WANDB_RENDEZVOUS_URI';"

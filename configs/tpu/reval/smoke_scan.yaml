@@ -88,12 +88,12 @@ logging:
   val_max_batches: 10
   val_on_tpu: true
   diag_metrics: false
-  save_dir: gs://tinyaya-stage2-eu/checkpoints/stage2-reval-smoke/scan-ta
+  save_dir: gs://tinyaya-stage2-eu/checkpoints/stage2-reval-smoke/scan-ta-sync
   keep_last_n: 1
   keep_local_checkpoints: false
   use_wandb: true
   wandb_project: tinyaya-stage2-tpu
-  wandb_run_name: v03-reval-smoke-ta
+  wandb_run_name: v03-smoke-ta-syncapi
   wandb_group: v03-reval-smoke
 perf:
   enabled: true

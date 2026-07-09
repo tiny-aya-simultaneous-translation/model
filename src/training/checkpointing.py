@@ -146,9 +146,10 @@ def save_checkpoint(
     is_xla = _is_xla_tensor(next(model.parameters(), None))
 
     if is_xla:
+        import torch_xla
         import torch_xla.core.xla_model as xm
 
-        xm.mark_step()
+        torch_xla.sync()
         xm.wait_device_ops()
 
     # model_audio_embed exists only when parallel two-stream is enabled
@@ -346,9 +347,10 @@ def save_checkpoint_canonical_final(
         )
         return
 
+    import torch_xla
     import torch_xla.core.xla_model as xm
 
-    xm.mark_step()
+    torch_xla.sync()
     xm.wait_device_ops()
 
     subs_to_cpu = [

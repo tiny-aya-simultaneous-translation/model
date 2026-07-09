@@ -412,11 +412,12 @@ class TPUBackend(BackendBase):
         - For fsdpv2 / fsdpv2_lora: call optimizer.step() then
           xm.mark_step() to materialise.
         """
+        import torch_xla
         import torch_xla.core.xla_model as xm
 
         if self._strategy in ("fsdpv2", "fsdpv2_lora"):
             optimizer.step()
-            xm.mark_step()
+            torch_xla.sync()
         else:
             xm.optimizer_step(optimizer)
 
