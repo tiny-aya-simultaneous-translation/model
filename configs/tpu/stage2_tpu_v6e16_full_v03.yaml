@@ -110,7 +110,12 @@ logging:
   val_every: 250
   val_max_batches: 25
   val_on_tpu: true
-  diag_metrics: false
+  # Per-group stability dashboard (diag/*): grad/weight norms + RMS, lr*grad
+  # and Adam update sizes, clip_coef. On-device reductions fold into the
+  # log-boundary graph only (one extra compile of that variant, no per-step
+  # cost). Enabled for production 2026-07-10 so grad-norm spikes can be read
+  # against weight scale per group.
+  diag_metrics: true
   save_dir: gs://tinyaya-stage2-eu/checkpoints/stage2-tpu-v6e16-full-v03
   keep_last_n: 0                  # keep ALL checkpoints
   keep_local_checkpoints: false

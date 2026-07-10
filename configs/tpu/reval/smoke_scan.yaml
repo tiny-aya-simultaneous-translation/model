@@ -87,7 +87,10 @@ logging:
   val_every: 40
   val_max_batches: 10
   val_on_tpu: true
-  diag_metrics: false
+  # true = validation vehicle for the per-group diag/* telemetry (weight/grad
+  # RMS + update sizes): the smoke is where the extra log-boundary graph
+  # variant gets its compile checked before production.
+  diag_metrics: true
   save_dir: gs://tinyaya-stage2-eu/checkpoints/stage2-reval-smoke/scan-ta-sync
   keep_last_n: 1
   keep_local_checkpoints: false
