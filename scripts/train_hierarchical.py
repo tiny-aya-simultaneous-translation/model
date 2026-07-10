@@ -334,6 +334,17 @@ DEFAULTS = {
         "depth_chunk_size": 16,
         "precision": "bfloat16",
         "max_grad_norm": 1.0,
+        # One seed drives torch RNG (LoRA init, dropout) AND the bucket
+        # sampler's data order. Change it for replicate probes (noise-floor
+        # measurement); leave at 42 for anything meant to be comparable to
+        # the v0.3 arms.
+        "seed": 42,
+        # Cosine horizon for WarmupCosineScheduler; null -> max_steps. Set it
+        # LONGER than max_steps for probes that must ride an existing run's
+        # exact lr trajectory and merely stop early — round-1 probes were
+        # confounded because max_steps both ended the run and compressed the
+        # schedule.
+        "scheduler_total_steps": None,
         "weight_decay": 0.01,
         "adam_beta1": 0.9,
         "adam_beta2": 0.999,
@@ -1159,7 +1170,7 @@ def main():
         except Exception as e:
             print(f"[profiler] xp.start_server failed: {e}", flush=True)
 
-    torch.manual_seed(42 + int(os.environ.get("LOCAL_RANK", 0)))
+    torch.manual_seed(int(cfg["train"].get("seed", 42)) + int(os.environ.get("LOCAL_RANK", 0)))
 
     if is_main:
         print("\n=== Effective config ===")
@@ -1379,6 +1390,7 @@ def main():
             bucket_frames,
             batch_size=cfg["train"]["batch_size"],
             grad_accum=cfg["train"]["grad_accum"],
+            seed=int(cfg["train"].get("seed", 42)),
             shuffle=True,
             warmup_first=True,
         )
@@ -1471,10 +1483,13 @@ def main():
         betas=(cfg["train"]["adam_beta1"], cfg["train"]["adam_beta2"]),
         eps=cfg["train"]["adam_eps"],
     )
+    # scheduler_total_steps decouples the cosine horizon from run length so a
+    # probe can replay a longer run's exact lr trajectory and stop early
+    # (null -> max_steps, the normal single-knob behaviour).
     scheduler = WarmupCosineScheduler(
         optimizer,
         warmup_steps=cfg["train"]["warmup_steps"],
-        total_steps=cfg["train"]["max_steps"],
+        total_steps=int(cfg["train"].get("scheduler_total_steps") or cfg["train"]["max_steps"]),
         min_lr_ratio=cfg["train"]["min_lr_ratio"],
     )
 

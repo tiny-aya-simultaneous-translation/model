@@ -84,6 +84,20 @@ def test_max_grad_norm_spelling_still_works(tmp_path):
     assert cfg["train"]["max_grad_norm"] == 5.0
 
 
+def test_scheduler_horizon_and_seed_defaults(tmp_path):
+    # scheduler_total_steps decouples cosine horizon from run length (round-2
+    # probe requirement); seed drives torch RNG + bucket-sampler data order.
+    cfg_path = tmp_path / "c.yaml"
+    cfg_path.write_text("train:\n  max_steps: 1500\n  scheduler_total_steps: 5000\n")
+    cfg = _load_config_fn()(str(cfg_path), {})
+    assert int(cfg["train"]["scheduler_total_steps"] or cfg["train"]["max_steps"]) == 5000
+    assert cfg["train"]["seed"] == 42  # default preserves v0.3-arm comparability
+
+    cfg_path.write_text("train:\n  max_steps: 1500\n")
+    cfg = _load_config_fn()(str(cfg_path), {})
+    assert int(cfg["train"].get("scheduler_total_steps") or cfg["train"]["max_steps"]) == 1500
+
+
 # ---- _group_grad_diag: per-group reductions + host RMS derivation ----------
 
 
