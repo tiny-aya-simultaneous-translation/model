@@ -53,3 +53,47 @@ def is_depth_block(name: str) -> bool:
     ``depth_decoder`` segment to avoid matching backbone ``model.layers.*``.
     """
     return "depth_decoder" in name and depth_block_layer_index(name) is not None
+
+
+def classify_param(name: str) -> str:
+    """Optimizer-group name for a full-model parameter name.
+
+    The single source of truth for the name -> LR-group mapping, shared by the
+    live optimizer construction (``get_param_groups`` in train_hierarchical)
+    and offline checkpoint analysis (``scripts/analysis/checkpoint_group_rms.py``),
+    so per-group telemetry and post-hoc norm tables always agree on membership.
+
+    Args
+    ----
+    name:
+        Full-model parameter name as produced by ``model.named_parameters()``
+        (works for both the plain and the scan-wrapped ``layers_list`` layouts).
+
+    Returns
+    -------
+    str
+        One of ``model_audio_embed | projection | depth_blocks | depth |
+        text_embed | lora | full_ft``. Order matters: earlier rules shadow
+        later ones (e.g. a depth-decoder projection is ``depth``, not
+        ``projection``); the final fallback is ``lora`` so PEFT-injected
+        params with unusual names never silently vanish from the optimizer.
+    """
+    if "model_audio_embed" in name:
+        return "model_audio_embed"
+    if "projection" in name and "depth" not in name and "input_proj" not in name:
+        return "projection"
+    if is_depth_block(name):  # Phase C3: depth transformer blocks -> low LR
+        return "depth_blocks"
+    if "depth_decoder" in name:
+        return "depth"
+    if "text_embed" in name and "depth" not in name:
+        return "text_embed"
+    if "lora_" in name or "lora_embedding" in name:
+        return "lora"
+    if ".layers." in name:
+        # An unfrozen backbone transformer-layer base weight (top-N full-FT).
+        # depth/projection/embed/lora are handled above, so any remaining
+        # ".layers." param is a fully-fine-tuned backbone block. Index-
+        # agnostic so it tracks lora.num_full_ft_layers for any N.
+        return "full_ft"
+    return "lora"

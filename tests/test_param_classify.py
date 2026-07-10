@@ -39,6 +39,7 @@ def test_backbone_and_other_params_are_not_depth_blocks():
 
 # ---- depth_block_layer_index (the name-based unfreeze handle) --------------
 
+
 def test_layer_index_full_model_name():
     # full-model name (model.named_parameters())
     assert pc.depth_block_layer_index("depth_decoder.layers.0.self_attn.q_proj.weight") == 0
@@ -55,15 +56,18 @@ def test_layer_index_relative_name():
 def test_layer_index_scan_wrapped_name():
     # TPU run scan-wraps .layers -> blocks live under layers_list.<i>.layer (the
     # real layout the smoke revealed; the original regex missed this)
-    assert pc.depth_block_layer_index(
-        "layers.layers_list.0.layer.self_attn.q_proj.linear.weight") == 0
-    assert pc.depth_block_layer_index(
-        "depth_decoder.layers.layers_list.5.layer.mlp.fc1.weight") == 5
-    assert pc.is_depth_block(
-        "depth_decoder.layers.layers_list.5.layer.mlp.fc1.weight") is True
+    assert (
+        pc.depth_block_layer_index("layers.layers_list.0.layer.self_attn.q_proj.linear.weight") == 0
+    )
+    assert (
+        pc.depth_block_layer_index("depth_decoder.layers.layers_list.5.layer.mlp.fc1.weight") == 5
+    )
+    assert pc.is_depth_block("depth_decoder.layers.layers_list.5.layer.mlp.fc1.weight") is True
     # backbone scan-wrapped block has layers_list but no depth_decoder -> not depth
-    assert pc.is_depth_block(
-        "backbone.model.model.layers.layers_list.3.layer.self_attn.q_proj.weight") is False
+    assert (
+        pc.is_depth_block("backbone.model.model.layers.layers_list.3.layer.self_attn.q_proj.weight")
+        is False
+    )
 
 
 def test_layer_index_none_for_io_and_backbone():
@@ -88,6 +92,42 @@ def test_unfreeze_last_n_selection_matches_block_params():
         "depth_decoder.layers.4.self_attn.q_proj.weight",
         "depth_decoder.layers.5.self_attn.q_proj.weight",
     ]
+
+
+def test_classify_param_covers_all_groups():
+    # One representative full-model name per optimizer group (the same rule
+    # set drives live diag/* telemetry and offline checkpoint_group_rms).
+    cases = {
+        "backbone.model_audio_embed.weight": "model_audio_embed",
+        "projection.0.weight": "projection",
+        "depth_decoder.layers.3.self_attn.q_proj.weight": "depth_blocks",
+        "depth_decoder.input_projections.0.weight": "depth",
+        "backbone.text_embed.weight": "text_embed",
+        "backbone.model.model.layers.0.self_attn.q_proj.lora_A.weight": "lora",
+        "backbone.model.model.embed_tokens.lora_embedding_A": "lora",
+        "backbone.model.model.layers.35.mlp.up_proj.weight": "full_ft",
+    }
+    for name, expect in cases.items():
+        assert pc.classify_param(name) == expect, name
+
+
+def test_classify_param_scan_layout_and_fallback():
+    # scan wraps backbone blocks under layers_list -- still full_ft for base
+    # weights, lora for adapters; audio_heads ride the lora catch-all (same
+    # as live get_param_groups behaviour).
+    assert (
+        pc.classify_param("backbone.model.model.layers.layers_list.2.layer.mlp.gate_proj.weight")
+        == "full_ft"
+    )
+    assert (
+        pc.classify_param(
+            "backbone.model.model.layers.layers_list.2.layer.mlp.gate_proj.lora_B.weight"
+        )
+        == "lora"
+    )
+    assert pc.classify_param("backbone.audio_heads.0.weight") == "lora"
+    # depth-decoder projections must NOT land in the projection group
+    assert pc.classify_param("depth_decoder.input_projections.5.weight") == "depth"
 
 
 if __name__ == "__main__":

@@ -161,9 +161,7 @@ def _patch_attention_mask_for_bf16() -> None:
                     out = out.clamp(min=SAFE_MIN)
                 return out
 
-            _cls._prepare_4d_causal_attention_mask_with_cache_position = staticmethod(
-                _patched_prep
-            )
+            _cls._prepare_4d_causal_attention_mask_with_cache_position = staticmethod(_patched_prep)
             cohere_patched = True
     except Exception as exc:  # pragma: no cover - depends on transformers version
         print(f"[bf16-mask-patch] Cohere2 mask patch skipped: {exc!r}", flush=True)
@@ -196,7 +194,7 @@ from src.training.scheduler import WarmupCosineScheduler
 from src.training.codebook_schedule import codebook_weights
 from src.training.early_stop import early_stop_step
 from src.training.multitask import composite_val_loss, text_weight_at
-from src.training.param_classify import depth_block_layer_index, is_depth_block
+from src.training.param_classify import classify_param, depth_block_layer_index
 from src.training.translation_loss import compute_hierarchical_translation_loss
 
 
@@ -459,6 +457,14 @@ def load_config(path: str | None, overrides: dict) -> dict:
                 break
         else:
             cfg.setdefault("_cli", {})[k] = v
+    # `train.clip_grad_norm` (the spelling every TPU YAML uses) was a DEAD KEY
+    # until 2026-07-10: the clip sites read only `train.max_grad_norm`, whose
+    # DEFAULTS value of 1.0 silently won. Harmless while every config meant
+    # 1.0 — but the clip-10 probes (probe_clip10/probe_b512c10) actually ran
+    # at clip 1.0 because of it. Honor both spellings here, in one place,
+    # with `clip_grad_norm` taking precedence when present.
+    if "clip_grad_norm" in cfg["train"]:
+        cfg["train"]["max_grad_norm"] = float(cfg["train"]["clip_grad_norm"])
     return cfg
 
 
@@ -488,10 +494,7 @@ def freeze_depth_internals(model, unfreeze_last_n_blocks: int = 0):
         # `.layers` reported 0M, while this named_parameters() enumeration -- the
         # same one the freeze loop above uses -- correctly sees the 617M of block
         # params. Find the layer count, then unfreeze the last N layer indices.
-        idxs = {
-            depth_block_layer_index(name)
-            for name, _ in model.depth_decoder.named_parameters()
-        }
+        idxs = {depth_block_layer_index(name) for name, _ in model.depth_decoder.named_parameters()}
         idxs.discard(None)
         if not idxs:
             print("  [depth-unfreeze] WARNING: no depth transformer-block params found; skipping")
@@ -511,8 +514,10 @@ def freeze_depth_internals(model, unfreeze_last_n_blocks: int = 0):
                 f"depth-unfreeze matched 0 params for last {n}/{n_layers} blocks; "
                 "check depth-decoder naming (param_classify.depth_block_layer_index)"
             )
-            print(f"  [depth-unfreeze] unfroze last {n}/{n_layers} depth blocks "
-                  f"({uf / 1e6:.0f}M) -> low-LR depth_blocks group")
+            print(
+                f"  [depth-unfreeze] unfroze last {n}/{n_layers} depth blocks "
+                f"({uf / 1e6:.0f}M) -> low-LR depth_blocks group"
+            )
 
 
 def get_param_groups(model, optim_cfg):
@@ -523,33 +528,23 @@ def get_param_groups(model, optim_cfg):
         "depth": {"params": [], "lr": optim_cfg["lr_depth"]},
         # Phase C3: unfrozen depth-decoder transformer blocks at a LOW LR
         # (default lr_depth x 0.1). Empty -> dropped unless lora.depth_unfreeze_blocks>0.
-        "depth_blocks": {"params": [], "lr": optim_cfg.get("lr_depth_blocks", optim_cfg["lr_depth"] * 0.1)},
+        "depth_blocks": {
+            "params": [],
+            "lr": optim_cfg.get("lr_depth_blocks", optim_cfg["lr_depth"] * 0.1),
+        },
         "text_embed": {"params": [], "lr": optim_cfg["lr_text_embed"]},
-        "model_audio_embed": {"params": [], "lr": optim_cfg.get("lr_model_audio_embed", optim_cfg["lr_audio_embed"])},
+        "model_audio_embed": {
+            "params": [],
+            "lr": optim_cfg.get("lr_model_audio_embed", optim_cfg["lr_audio_embed"]),
+        },
     }
+    # Name -> group rules live in param_classify.classify_param (torch-free,
+    # shared with the offline checkpoint_group_rms analysis) so live telemetry
+    # and post-hoc norm tables can never disagree on membership.
     for name, param in model.named_parameters():
         if not param.requires_grad:
             continue
-        if "model_audio_embed" in name:
-            groups["model_audio_embed"]["params"].append(param)
-        elif "projection" in name and "depth" not in name and "input_proj" not in name:
-            groups["projection"]["params"].append(param)
-        elif is_depth_block(name):  # Phase C3: depth transformer blocks -> low LR
-            groups["depth_blocks"]["params"].append(param)
-        elif "depth_decoder" in name:
-            groups["depth"]["params"].append(param)
-        elif "text_embed" in name and "depth" not in name:
-            groups["text_embed"]["params"].append(param)
-        elif "lora_" in name or "lora_embedding" in name:
-            groups["lora"]["params"].append(param)
-        elif ".layers." in name:
-            # An unfrozen backbone transformer-layer base weight (top-N
-            # full-FT). depth/projection/embed/lora are handled above, so any
-            # remaining ".layers." param is a fully-fine-tuned backbone block.
-            # Index-agnostic so it tracks lora.num_full_ft_layers for any N.
-            groups["full_ft"]["params"].append(param)
-        else:
-            groups["lora"]["params"].append(param)
+        groups[classify_param(name)]["params"].append(param)
     result = [g | {"name": n} for n, g in groups.items() if g["params"]]
     print("\n=== Parameter Groups ===")
     for g in result:
@@ -563,11 +558,23 @@ def _group_grad_diag(optimizer, device):
 
     Returns ``(names, values)`` where ``values`` is a 1-D tensor of per-group
     scalars: grad L2 norm, param L2 norm, mean Adam 2nd-moment (``exp_avg_sq``),
-    and count of non-finite grad elements. Call ONLY at a log boundary and
-    BEFORE ``zero_grad`` (grads must be live). Pure XLA ops, so the whole
-    bundle materialises in ONE host transfer at log time (no per-step sync) --
-    same discipline as the loss logging. Update-to-weight ratio, spike ratios
-    and Adam-v drift are derived host-side from these at log time.
+    count of non-finite grad elements, and Adam-update L2 norm. Call ONLY at a
+    log boundary and BEFORE ``zero_grad`` (grads must be live). Pure XLA ops,
+    so the whole bundle materialises in ONE host transfer at log time (no
+    per-step sync) -- same discipline as the loss logging. Update-to-weight
+    ratio, RMS variants (norm / sqrt(numel); numel is host-static), spike
+    ratios and Adam-v drift are derived host-side from these at log time.
+
+    Notes
+    -----
+    TPU note: this runs AFTER the fused in-place clip and BEFORE
+    ``optimizer.step``, so grad norms here are the CLIPPED gradients (what the
+    optimizer will actually consume), while ``train/grad_norm`` stays pre-clip.
+    ``adam_update_norm`` uses ``exp_avg / (sqrt(exp_avg_sq) + eps)`` from the
+    optimizer state, which at this point is one step STALE (moments from the
+    previous ``step()``) and skips bias correction — good enough to see
+    whether Adam's normalizer absorbs raw grad-norm spikes, not for exact
+    bookkeeping of this step's Δθ.
     """
     names: list[str] = []
     vals: list[torch.Tensor] = []
@@ -579,6 +586,7 @@ def _group_grad_diag(optimizer, device):
         psq = torch.zeros((), device=device)
         vsum = torch.zeros((), device=device)
         nonfin = torch.zeros((), device=device)
+        usq = torch.zeros((), device=device)
         vcnt = 0
         for p in pg["params"]:
             if not p.requires_grad:
@@ -593,13 +601,19 @@ def _group_grad_diag(optimizer, device):
             if st is not None and "exp_avg_sq" in st:
                 vsum = vsum + st["exp_avg_sq"].float().sum()
                 vcnt += int(st["exp_avg_sq"].numel())
+                if "exp_avg" in st:
+                    # Adam's per-element step direction m/(sqrt(v)+eps); the
+                    # host multiplies by the group lr to get the update norm.
+                    ua = st["exp_avg"].float() / (st["exp_avg_sq"].float().sqrt() + 1e-8)
+                    usq = usq + (ua * ua).sum()
         names += [
             f"grad_norm/{gname}",
             f"param_norm/{gname}",
             f"adam_v_mean/{gname}",
             f"nonfinite_grads/{gname}",
+            f"adam_update_norm/{gname}",
         ]
-        vals += [gsq.sqrt(), psq.sqrt(), vsum / max(vcnt, 1), nonfin]
+        vals += [gsq.sqrt(), psq.sqrt(), vsum / max(vcnt, 1), nonfin, usq.sqrt()]
     if not vals:
         return [], torch.zeros(0, device=device)
     return names, torch.stack(vals)
@@ -770,11 +784,17 @@ def run_validation(
                 audio_codes=user_cb0 if model_cb0 is not None else cb0,
                 model_audio_codes=model_cb0,
                 attention_mask=mask,
-                full_audio_codes=full_model_codes[:, :num_codebooks, :] if full_model_codes is not None else all_codes[:, :num_codebooks, :],
+                full_audio_codes=full_model_codes[:, :num_codebooks, :]
+                if full_model_codes is not None
+                else all_codes[:, :num_codebooks, :],
                 depth_chunk_size=depth_chunk_size,
             )
             text_logits, audio_logits, hidden = output[0], output[1], output[2]
-            audio_targets = full_model_codes[:, :num_codebooks, :] if full_model_codes is not None else all_codes[:, :num_codebooks, :]
+            audio_targets = (
+                full_model_codes[:, :num_codebooks, :]
+                if full_model_codes is not None
+                else all_codes[:, :num_codebooks, :]
+            )
             losses = compute_hierarchical_translation_loss(
                 text_logits,
                 audio_logits,
@@ -848,9 +868,9 @@ def run_validation(
         # boolean indexing). [B,CB,T-1] preds vs targets, masked, summed -> [CB].
         preds_cb = audio_logits[:, :, :-1].argmax(dim=-1)  # [B, CB, T-1]
         tgts_cb = audio_targets[:, :num_codebooks, 1:]
-        cb_correct = cb_correct + (
-            (preds_cb == tgts_cb).to(m.dtype) * m.unsqueeze(1)
-        ).sum(dim=(0, 2))
+        cb_correct = cb_correct + ((preds_cb == tgts_cb).to(m.dtype) * m.unsqueeze(1)).sum(
+            dim=(0, 2)
+        )
         # Text teacher-forced next-token acc (same shift convention as the
         # text loss). Static-shape masked reduction like cb0 above. Mask =
         # target span AND real text tokens only: the interleaver fills most
@@ -906,7 +926,8 @@ def run_validation(
         # Phase D: composite of the RAW stream losses (audio-heavier) — the metric
         # for best_by_val + early stopping, so neither stream can be sacrificed.
         "val/composite": composite_val_loss(
-            _vt, _va,
+            _vt,
+            _va,
             float(loss_cfg.get("composite_text_w", 0.4)),
             float(loss_cfg.get("composite_audio_w", 0.6)),
         ),
@@ -974,35 +995,58 @@ def build_parser():
     # Generic ones (lr_lora/lr_depth -> optim, text_weight -> loss,
     # weight_decay -> train, val_on_tpu -> logging) map through load_config by
     # name; lora_r/lora_alpha_mult need the explicit r/alpha handling in main().
-    p.add_argument("--sweep", action="store_true",
-                   help="W&B sweep run: log sweep/text_ok health flag")
+    p.add_argument(
+        "--sweep", action="store_true", help="W&B sweep run: log sweep/text_ok health flag"
+    )
     p.add_argument("--lr_lora", type=float, default=None)
     p.add_argument("--lr_depth", type=float, default=None)
     p.add_argument("--text_weight", type=float, default=None)
     p.add_argument("--weight_decay", type=float, default=None)
     p.add_argument("--val_on_tpu", type=lambda s: s.lower() in ("1", "true", "yes"), default=None)
     p.add_argument("--lora_r", type=int, default=None)
-    p.add_argument("--lora_alpha_mult", type=int, default=None,
-                   help="lora.alpha = lora_alpha_mult * lora_r")
-    p.add_argument("--lora_dropout", type=float, default=None,
-                   help="lora.dropout (Phase E sweep knob)")
+    p.add_argument(
+        "--lora_alpha_mult", type=int, default=None, help="lora.alpha = lora_alpha_mult * lora_r"
+    )
+    p.add_argument(
+        "--lora_dropout", type=float, default=None, help="lora.dropout (Phase E sweep knob)"
+    )
     # Capacity-sweep knobs (scale phase): structural axes for the v0.3-scale sweep.
-    p.add_argument("--lora_exclude_top", type=int, default=None,
-                   help="lora.lora_exclude_top (# top layers left frozen; sweep knob)")
-    p.add_argument("--use_rslora", type=lambda s: s.lower() in ("1", "true", "yes"),
-                   default=None, help="lora.use_rslora (alpha/sqrt(r) rank-stable scaling)")
-    p.add_argument("--target_modules", type=str, default=None,
-                   help='lora.target_modules as a JSON list or comma/space-separated '
-                        'string (W&B sweep categorical, e.g. \'["q_proj","v_proj"]\')')
+    p.add_argument(
+        "--lora_exclude_top",
+        type=int,
+        default=None,
+        help="lora.lora_exclude_top (# top layers left frozen; sweep knob)",
+    )
+    p.add_argument(
+        "--use_rslora",
+        type=lambda s: s.lower() in ("1", "true", "yes"),
+        default=None,
+        help="lora.use_rslora (alpha/sqrt(r) rank-stable scaling)",
+    )
+    p.add_argument(
+        "--target_modules",
+        type=str,
+        default=None,
+        help="lora.target_modules as a JSON list or comma/space-separated "
+        'string (W&B sweep categorical, e.g. \'["q_proj","v_proj"]\')',
+    )
     # Depth-path capacity knobs (v0.3 reval arm F). Unlike lora_r/alpha these need
     # no explicit mapping: the names match cfg["lora"].depth_unfreeze_blocks and
     # cfg["optim"].lr_depth_blocks, so load_config's section-matcher routes them.
-    p.add_argument("--depth_unfreeze_blocks", type=int, default=None,
-                   help="lora.depth_unfreeze_blocks: unfreeze last N Moshi depth "
-                        "blocks (adds CB1-7 capacity; watch HBM). 0 = frozen (default).")
-    p.add_argument("--lr_depth_blocks", type=float, default=None,
-                   help="optim.lr_depth_blocks: low LR for the unfrozen depth blocks "
-                        "(only used when depth_unfreeze_blocks > 0).")
+    p.add_argument(
+        "--depth_unfreeze_blocks",
+        type=int,
+        default=None,
+        help="lora.depth_unfreeze_blocks: unfreeze last N Moshi depth "
+        "blocks (adds CB1-7 capacity; watch HBM). 0 = frozen (default).",
+    )
+    p.add_argument(
+        "--lr_depth_blocks",
+        type=float,
+        default=None,
+        help="optim.lr_depth_blocks: low LR for the unfrozen depth blocks "
+        "(only used when depth_unfreeze_blocks > 0).",
+    )
     return p
 
 
@@ -1034,9 +1078,20 @@ def main():
         # lora_r/lora_alpha_mult map to lora.r/lora.alpha (name mismatch) and
         # `sweep` is a control flag -- all handled explicitly below. The capacity
         # knobs (lora_exclude_top/use_rslora/target_modules) also map under `lora`.
-        if k not in ("config", "dataset_mode", "data_dir", "resume",
-                     "sweep", "lora_r", "lora_alpha_mult", "lora_dropout",
-                     "lora_exclude_top", "use_rslora", "target_modules")
+        if k
+        not in (
+            "config",
+            "dataset_mode",
+            "data_dir",
+            "resume",
+            "sweep",
+            "lora_r",
+            "lora_alpha_mult",
+            "lora_dropout",
+            "lora_exclude_top",
+            "use_rslora",
+            "target_modules",
+        )
     }
     cfg = load_config(args.config, overrides)
 
@@ -1059,12 +1114,14 @@ def main():
     if args.target_modules is not None:
         cfg.setdefault("lora", {})["target_modules"] = _parse_target_modules(args.target_modules)
     if args.sweep:
-        print(f"[sweep] overrides -> lr_lora={cfg['optim'].get('lr_lora')} "
-              f"lr_depth={cfg['optim'].get('lr_depth')} "
-              f"lora={cfg.get('lora')} text_weight={cfg['loss'].get('text_weight')} "
-              f"warmup={cfg['train'].get('warmup_steps')} "
-              f"wd={cfg['train'].get('weight_decay')} max_steps={cfg['train'].get('max_steps')}",
-              flush=True)
+        print(
+            f"[sweep] overrides -> lr_lora={cfg['optim'].get('lr_lora')} "
+            f"lr_depth={cfg['optim'].get('lr_depth')} "
+            f"lora={cfg.get('lora')} text_weight={cfg['loss'].get('text_weight')} "
+            f"warmup={cfg['train'].get('warmup_steps')} "
+            f"wd={cfg['train'].get('weight_decay')} max_steps={cfg['train'].get('max_steps')}",
+            flush=True,
+        )
 
     # ---- distributed init (GPU or TPU)
     backend_type = cfg.get("backend", "auto")
@@ -1200,7 +1257,11 @@ def main():
         _apply_fsdpv2_backward_barriers(model)
     if hasattr(backend, "diagnose"):
         backend.diagnose("post-wrap")
-    unwrapped = model._fsdp_wrapped_module if hasattr(model, "_fsdp_wrapped_module") else (model.module if hasattr(model, "module") else model)
+    unwrapped = (
+        model._fsdp_wrapped_module
+        if hasattr(model, "_fsdp_wrapped_module")
+        else (model.module if hasattr(model, "module") else model)
+    )
     fsdp_model = model  # keep reference to FSDP wrapper for save_checkpoint
 
     total = sum(p.numel() for p in unwrapped.parameters())
@@ -1241,12 +1302,16 @@ def main():
     # Phase E: a SEPARATE train collator carries SpecAugment (input-stream masking);
     # the shared `collator` above stays clean for validation. No-op when disabled.
     _sa_cfg = cfg.get("spec_augment")
-    train_collator = InterleavedCollator(
-        pad_to=pad_to,
-        batch_pad_to=batch_pad_to,
-        expected_num_codebooks=expected_codebooks,
-        spec_augment=_sa_cfg,
-    ) if (_sa_cfg and _sa_cfg.get("enabled")) else collator
+    train_collator = (
+        InterleavedCollator(
+            pad_to=pad_to,
+            batch_pad_to=batch_pad_to,
+            expected_num_codebooks=expected_codebooks,
+            spec_augment=_sa_cfg,
+        )
+        if (_sa_cfg and _sa_cfg.get("enabled"))
+        else collator
+    )
     if _sa_cfg and _sa_cfg.get("enabled") and is_main:
         print(f"  [spec-augment] ON (train only): {_sa_cfg}", flush=True)
     if args.dataset_mode == "streaming":
@@ -1420,14 +1485,13 @@ def main():
             full_osd = torch.load(opt_p, map_location="cpu", weights_only=True)
             try:
                 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
+
                 _is_fsdp = any(isinstance(m, FSDP) for m in fsdp_model.modules())
             except ImportError:
                 _is_fsdp = False
             if _is_fsdp:
                 # Reshard the full optimizer state for FSDP
-                osd_to_load = FSDP.optim_state_dict_to_load(
-                    fsdp_model, optimizer, full_osd
-                )
+                osd_to_load = FSDP.optim_state_dict_to_load(fsdp_model, optimizer, full_osd)
                 optimizer.load_state_dict(osd_to_load)
             else:
                 optimizer.load_state_dict(full_osd)
@@ -1517,7 +1581,13 @@ def main():
 
         assert not _has_secret(_run_config), "secret-like content in wandb config; aborting publish"
 
-        _wandb_tags = ["stage2", "tr-hi", "speech-to-speech", "v6e-8" if is_tpu else "cpu", "release"]
+        _wandb_tags = [
+            "stage2",
+            "tr-hi",
+            "speech-to-speech",
+            "v6e-8" if is_tpu else "cpu",
+            "release",
+        ]
         _wandb_notes = (
             "TinyAya Stage 2 TR<->HI speech-to-speech translation. "
             f"git={os.environ.get('GIT_SHA', 'unknown')[:12]}. "
@@ -1591,9 +1661,9 @@ def main():
                 # resume="allow" whenever an id is pinned (resumed OR coordinator's
                 # deterministic WANDB_RUN_ID) so a RELAUNCH of a killed sweep trial
                 # re-attaches to the same run instead of erroring on a duplicate id.
-                resume=("allow"
-                        if (resume_wandb_run_id or os.environ.get("WANDB_RUN_ID"))
-                        else None),
+                resume=(
+                    "allow" if (resume_wandb_run_id or os.environ.get("WANDB_RUN_ID")) else None
+                ),
                 config=_run_config,
                 tags=_wandb_tags,
                 notes=_wandb_notes,
@@ -1626,6 +1696,10 @@ def main():
             wandb.define_metric("audio/*", step_metric="global_step")
             wandb.define_metric("mem/*", step_metric="global_step")
             wandb.define_metric("tpu/*", step_metric="global_step")
+            # Stability dashboard (per-group grad/weight/update norms + RMS,
+            # clip_coef, spike ratios). Was missing, so diag/* charted against
+            # wall-clock _step instead of the training step.
+            wandb.define_metric("diag/*", step_metric="global_step")
             if is_tpu:
                 run_id = wandb.run.id
                 try:
@@ -1761,6 +1835,7 @@ def main():
         if not _tw_enabled:
             return text_w
         return text_weight_at(s, max_steps, _tw_start, _tw_end, _tw_frac, _tw_quantum)
+
     if _tw_enabled:
         print(
             f"  [text-curriculum] text_weight {_tw_start}->{_tw_end} over first "
@@ -1776,7 +1851,7 @@ def main():
     _cb_unmask_frac = float(cfg["loss"].get("progressive_unmask_fraction", 0.0))
     _cb_unmask_k0 = int(cfg["loss"].get("unmask_k0", 1))
     _cb_enabled = _cb_multipliers is not None or _cb_unmask_frac > 0
-    _cb_cache: dict[tuple, "torch.Tensor"] = {}
+    _cb_cache: dict[tuple, torch.Tensor] = {}
 
     def _cb_weights_for(s: int):
         """Device [CB] weight tensor for step ``s`` (cached by value), or None."""
@@ -1792,6 +1867,7 @@ def main():
             t = torch.tensor(key, device=device, dtype=torch.float32)
             _cb_cache[key] = t
         return t
+
     perf_cfg = cfg.get("perf", {})
     perf_enabled = bool(perf_cfg.get("enabled", False))
     perf_warmup_skip_steps = int(perf_cfg.get("warmup_skip_steps", 50))
@@ -1992,11 +2068,17 @@ def main():
                             audio_codes=user_cb0 if model_cb0 is not None else cb0,
                             model_audio_codes=model_cb0,
                             attention_mask=mask,
-                            full_audio_codes=full_model_codes[:, :num_codebooks, :] if full_model_codes is not None else all_codes[:, :num_codebooks, :],
+                            full_audio_codes=full_model_codes[:, :num_codebooks, :]
+                            if full_model_codes is not None
+                            else all_codes[:, :num_codebooks, :],
                             depth_chunk_size=depth_chunk,
                         )
                         text_logits, audio_logits, _ = output
-                        audio_targets = full_model_codes[:, :num_codebooks, :] if full_model_codes is not None else all_codes[:, :num_codebooks, :]
+                        audio_targets = (
+                            full_model_codes[:, :num_codebooks, :]
+                            if full_model_codes is not None
+                            else all_codes[:, :num_codebooks, :]
+                        )
                         losses = compute_hierarchical_translation_loss(
                             text_logits,
                             audio_logits,
@@ -2087,6 +2169,10 @@ def main():
             # iter-18c-stable behaviour (grad_norm hardwired to 0).
             log_grad_norm = bool(cfg["train"].get("log_grad_norm", True))
             if enable_clip or log_grad_norm:
+                # max_grad_norm is the normalized value: load_config() copies
+                # train.clip_grad_norm (the YAML spelling) over it, so both
+                # keys work and the YAML one wins. Do NOT read clip_grad_norm
+                # here — keep the aliasing in the single load_config() site.
                 max_grad_norm = cfg["train"].get("max_grad_norm", 1.0)
                 total_sq = torch.tensor(0.0, device=device)
                 for p in model.parameters():
@@ -2098,9 +2184,7 @@ def main():
                 total_norm = total_sq.sqrt()
                 if enable_clip:
                     clip_coef = max_grad_norm / (total_norm + 1e-6)
-                    clip_coef = torch.where(
-                        clip_coef < 1.0, clip_coef, torch.ones_like(clip_coef)
-                    )
+                    clip_coef = torch.where(clip_coef < 1.0, clip_coef, torch.ones_like(clip_coef))
                     for p in model.parameters():
                         if not p.requires_grad:
                             continue
@@ -2159,9 +2243,16 @@ def main():
         }
 
     if is_main:
+        # Print the EFFECTIVE clip value (post load_config normalization of
+        # the clip_grad_norm/max_grad_norm alias) so a run log always shows
+        # what the fused clip actually used — the dead-key incident hid a
+        # clip-10 config silently running at 1.0.
+        _clip_on = bool(cfg["train"].get("enable_clip_grad_norm", False))
+        _clip_val = cfg["train"].get("max_grad_norm", 1.0)
         print(
             f"\n=== Training: {max_steps} steps, accum={grad_accum}, "
-            f"batch={cfg['train']['batch_size']} ==="
+            f"batch={cfg['train']['batch_size']}, "
+            f"clip={_clip_val if _clip_on else 'OFF'} ==="
         )
     model.train()
     # iter 22: set_to_none=False keeps every .grad slot allocated as a
@@ -2282,6 +2373,14 @@ def main():
     # per-group on-device reductions (default on; cheap, log-boundary only).
     diag_enabled = bool(cfg["logging"].get("diag_metrics", True))
     _ema = {"loss": None, "grad": None, "v": {}}
+    # Per-group element counts for the RMS variants (RMS = L2 / sqrt(numel)).
+    # Group membership is fixed after setup, so this is host-static — computing
+    # it once here costs nothing at log time and adds ZERO device ops.
+    _numel_by = {
+        g["name"]: sum(p.numel() for p in g["params"] if p.requires_grad)
+        for g in optimizer.param_groups
+        if "name" in g
+    }
 
     while step < max_steps:
         if is_tpu and micro_batches_seen_this_epoch + grad_accum > usable_micro_batches_per_epoch:
@@ -2343,33 +2442,60 @@ def main():
                     pn = gd.get(f"param_norm/{gname}", 0.0)
                     vm = gd.get(f"adam_v_mean/{gname}", 0.0)
                     nf = gd.get(f"nonfinite_grads/{gname}", 0.0)
+                    un = gd.get(f"adam_update_norm/{gname}", 0.0)
                     lr = _lr_by.get(gname, 0.0)
                     diag_log[f"diag/grad_norm/{gname}"] = gn
                     diag_log[f"diag/param_norm/{gname}"] = pn
                     diag_log[f"diag/update_weight_ratio/{gname}"] = (lr * gn) / (pn + 1e-12)
                     diag_log[f"diag/adam_v_mean/{gname}"] = vm
                     diag_log[f"diag/nonfinite_grads/{gname}"] = nf
+                    # RMS variants: sqrt(mean(x^2)) = L2 / sqrt(numel). Weight
+                    # RMS answers "how big are this group's weights"; grad RMS
+                    # is the POST-clip gradient scale; update_rms_est is the
+                    # SGD-style lr*grad estimate; update_rms_adam is the true
+                    # Adam step size lr*||m/(sqrt(v)+eps)||_rms (one step
+                    # stale, no bias correction — see _group_grad_diag notes).
+                    _rt = math.sqrt(_numel_by.get(gname, 0) or 1)
+                    diag_log[f"diag/weight_rms/{gname}"] = pn / _rt
+                    diag_log[f"diag/grad_rms/{gname}"] = gn / _rt
+                    diag_log[f"diag/update_rms_est/{gname}"] = lr * gn / _rt
+                    diag_log[f"diag/update_rms_adam/{gname}"] = lr * un / _rt
                     _pv = _ema["v"].get(gname)
                     if _pv:
                         diag_log[f"diag/adam_v_drift/{gname}"] = vm / (_pv + 1e-12)
                     _ema["v"][gname] = vm if _pv is None else 0.9 * _pv + 0.1 * vm
                     if nf > 0 and is_main:
-                        print(f"  [ALERT] {nf:.0f} non-finite grad elems in group "
-                              f"'{gname}' (step {step})", flush=True)
+                        print(
+                            f"  [ALERT] {nf:.0f} non-finite grad elems in group "
+                            f"'{gname}' (step {step})",
+                            flush=True,
+                        )
             # loss / grad spike ratios + non-finite guard (host EMA at log cadence)
             _lval = avg["loss"]
             _gval = float(grad_norm.item()) if hasattr(grad_norm, "item") else float(grad_norm)
+            # Effective clip coefficient this step (train/grad_norm is the
+            # PRE-clip global norm; the per-group diag norms are POST-clip, so
+            # pre-clip group norms reconstruct as grad_rms / clip_coef).
+            if bool(cfg["train"].get("enable_clip_grad_norm", False)) and _gval > 0:
+                _mgn = float(cfg["train"].get("max_grad_norm", 1.0))
+                diag_log["diag/clip_coef"] = min(1.0, _mgn / (_gval + 1e-6))
             if _ema["loss"] is not None:
                 _ls = (_lval - _ema["loss"]) / (abs(_ema["loss"]) + 1e-9)
                 _gs = _gval / (_ema["grad"] + 1e-9)
                 diag_log["diag/loss_spike_ratio"] = _ls
                 diag_log["diag/grad_spike_ratio"] = _gs
                 if is_main and _ls > 0.10:
-                    print(f"  [ALERT] loss spike {_ls * 100:.0f}% (loss {_lval:.3f} "
-                          f"vs EMA {_ema['loss']:.3f}) step {step}", flush=True)
+                    print(
+                        f"  [ALERT] loss spike {_ls * 100:.0f}% (loss {_lval:.3f} "
+                        f"vs EMA {_ema['loss']:.3f}) step {step}",
+                        flush=True,
+                    )
                 if is_main and _gs > 3.0:
-                    print(f"  [ALERT] grad spike {_gs:.1f}x (grad {_gval:.2f} "
-                          f"vs EMA {_ema['grad']:.2f}) step {step}", flush=True)
+                    print(
+                        f"  [ALERT] grad spike {_gs:.1f}x (grad {_gval:.2f} "
+                        f"vs EMA {_ema['grad']:.2f}) step {step}",
+                        flush=True,
+                    )
             if is_main and not math.isfinite(_lval):
                 print(f"  [ALERT] non-finite train loss at step {step}", flush=True)
             _ema["loss"] = _lval if _ema["loss"] is None else 0.9 * _ema["loss"] + 0.1 * _lval
@@ -2425,8 +2551,7 @@ def main():
                         if k.startswith("diag/grad_norm/")
                     )
                     _nf = sum(
-                        v for k, v in diag_log.items()
-                        if k.startswith("diag/nonfinite_grads/")
+                        v for k, v in diag_log.items() if k.startswith("diag/nonfinite_grads/")
                     )
                     print(
                         f"  [diag] gradnorm {_gn} | "
@@ -2495,7 +2620,13 @@ def main():
         # qualitative sanity check, not a training requirement;
         # generate samples post-training on a GPU instead.
         is_distributed = int(os.environ.get("WORLD_SIZE", "1")) > 1
-        if audio_every and step % audio_every == 0 and is_main and not is_tpu and not is_distributed:
+        if (
+            audio_every
+            and step % audio_every == 0
+            and is_main
+            and not is_tpu
+            and not is_distributed
+        ):
             try:
                 r = generate_audio_sample(
                     unwrapped,
@@ -2588,17 +2719,24 @@ def main():
                 # fall back to raw val/loss if composite is absent (older configs).
                 _stop_metric = val.get("val/composite", val.get("val/loss"))
                 _dec = early_stop_step(
-                    _stop_metric, best_val, _patience_left,
-                    early_stop_patience, early_stop_min_delta,
+                    _stop_metric,
+                    best_val,
+                    _patience_left,
+                    early_stop_patience,
+                    early_stop_min_delta,
                 )
                 _improved, best_val, _patience_left = (
-                    _dec.improved, _dec.best_val, _dec.patience_left,
+                    _dec.improved,
+                    _dec.best_val,
+                    _dec.patience_left,
                 )
                 if _dec.should_stop:
                     _early_stop = True
                 if not _improved and early_stop_patience > 0 and is_main:
-                    _tag = "STOPPING" if _dec.should_stop else (
-                        f"patience {max(_patience_left, 0)}/{early_stop_patience}"
+                    _tag = (
+                        "STOPPING"
+                        if _dec.should_stop
+                        else (f"patience {max(_patience_left, 0)}/{early_stop_patience}")
                     )
                     print(
                         f"  [early-stop] no val improvement (>{early_stop_min_delta}); "
@@ -2621,8 +2759,7 @@ def main():
                     scheduler,
                     step,
                     str(best_dir),
-                    extra_state={"best_val_loss": best_val, "config": cfg,
-                                 "wandb_run_id": run_id},
+                    extra_state={"best_val_loss": best_val, "config": cfg, "wandb_run_id": run_id},
                     is_main=is_main,
                 )
                 if is_main:
