@@ -30,6 +30,38 @@ moved to `.claude/archive/PROGRESS-YYYY-Qn.md` by the
 
 ---
 
+## 2026-07-11T20:27:19Z | feat/v0.3-implementation@522bef2 | done | edit
+created `/home/cataluna84/Workspace/tinyaya-stage2-scale/tests/test_per_chip_batch.py`
+
+
+## 2026-07-11T20:27:00Z | feat/v0.3-implementation@522bef2 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/src/backend/tpu_backend.py`
+
+
+## 2026-07-11T20:26:15Z | feat/v0.3-implementation@522bef2 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/train_hierarchical.py`
+
+
+## 2026-07-11T20:26:13Z | feat/v0.3-implementation@522bef2 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/train_hierarchical.py`
+
+
+## 2026-07-11T20:26:09Z | feat/v0.3-implementation@522bef2 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/train_hierarchical.py`
+
+
+## 2026-07-11T20:25:56Z | feat/v0.3-implementation@522bef2 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/train_hierarchical.py`
+
+
+## 2026-07-11T20:25:48Z | feat/v0.3-implementation@522bef2 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/train_hierarchical.py`
+
+
+## 2026-07-11T20:24:19Z | feat/v0.3-implementation@522bef2 | done | exec
+git add src/training/scheduler.py scripts/train_hierarchical.py tests/test_wsd_scheduler.py .claude/PROGRESS.md && git commit -q -m "feat(sched): WSDScheduler (warmup-stable-decay) + train.schedule selector
+
+
 ## 2026-07-11T20:23:22Z | feat/v0.3-implementation@c2a708f | done | edit
 created `/home/cataluna84/Workspace/tinyaya-stage2-scale/tests/test_wsd_scheduler.py`
 

@@ -345,6 +345,12 @@ DEFAULTS = {
         # confounded because max_steps both ended the run and compressed the
         # schedule.
         "scheduler_total_steps": None,
+        # TPU-SPMD batch sizing (P0 audit 2026-07-12): the LOGICAL global
+        # batch is the loader tensor's batch dim -- chips do NOT multiply
+        # data. per_chip_batch makes the intent explicit: the loader batch
+        # resolves to per_chip_batch x chips (single-host only). When null,
+        # batch_size is used as-is (legacy: batch_size IS the global batch).
+        "per_chip_batch": None,
         # LR schedule shape: "cosine" (validated default) or "wsd"
         # (warmup-stable-decay -- peak plateau + short linear anneal; the
         # early-stop-friendly shape for the long-horizon run). WSD anneal
@@ -403,6 +409,36 @@ DEFAULTS = {
         "xprof_trace_labels": False,
     },
 }
+
+
+def resolve_loader_batch(train_cfg: dict, n_chips: int, n_hosts: int) -> int:
+    """Resolve the per-host DataLoader batch size under TPU SPMD.
+
+    The P0 batch-semantics audit (2026-07-12, scripts/tpu/spmd_batch_truth.py
+    on a live v6e-8 mesh) proved the LOGICAL global batch is exactly the
+    loader tensor's batch dim: ``mark_sharding`` distributes those rows
+    across chips, it does not multiply them. So ``train.per_chip_batch``
+    resolves the loader batch to ``per_chip_batch x n_chips`` -- every chip
+    carries that many real rows and the banner's global batch is true.
+
+    Multi-host is refused: each host's DataLoader draws different rows, and
+    feeding host-inconsistent data to a replicated-input SPMD program is
+    undefined behavior (only host 0's rows survive). Multi-host needs the
+    MpDeviceLoader ``minibatch=True`` input pipeline first.
+
+    Returns ``batch_size`` unchanged when ``per_chip_batch`` is unset
+    (legacy semantics: batch_size IS the global batch).
+    """
+    pcb = train_cfg.get("per_chip_batch")
+    if not pcb:
+        return int(train_cfg["batch_size"])
+    if n_hosts > 1:
+        raise ValueError(
+            f"train.per_chip_batch={pcb} on a {n_hosts}-host slice: host-"
+            f"inconsistent SPMD inputs are undefined behavior. Use a single-"
+            f"host slice or build the minibatch input pipeline first."
+        )
+    return int(pcb) * int(n_chips)
 
 
 def _percentile(values: list[float], q: float) -> float | None:
@@ -1185,6 +1221,24 @@ def main():
             print(f"[profiler] xp.start_server failed: {e}", flush=True)
 
     torch.manual_seed(int(cfg["train"].get("seed", 42)) + int(os.environ.get("LOCAL_RANK", 0)))
+
+    # Resolve per_chip_batch -> loader batch ONCE, before any consumer
+    # (collator batch_pad_to, DataLoader, static-shape asserts, banner) --
+    # they all read cfg["train"]["batch_size"] and inherit the resolution.
+    if cfg["train"].get("per_chip_batch"):
+        if cfg.get("backend", "auto") != "tpu":
+            raise ValueError("train.per_chip_batch is TPU-SPMD-only; set batch_size on GPU")
+        _n_hosts = int(getattr(backend, "host_count", lambda: 1)())
+        cfg["train"]["batch_size"] = resolve_loader_batch(
+            cfg["train"], backend.world_size(), _n_hosts
+        )
+        if is_main:
+            print(
+                f"[batch] per_chip_batch={cfg['train']['per_chip_batch']} x "
+                f"{backend.world_size()} chips -> loader/global batch "
+                f"{cfg['train']['batch_size']}",
+                flush=True,
+            )
 
     if is_main:
         print("\n=== Effective config ===")
@@ -1982,7 +2036,12 @@ def main():
     _sharding_logged: list[bool] = []
     perf_warmup_skip_steps = int(perf_cfg.get("warmup_skip_steps", 50))
     perf_step_times: list[float] = []
-    effective_batch = cfg["train"]["batch_size"] * grad_accum * max(1, backend.world_size())
+    # SPMD: the LOGICAL global batch is the loader batch (P0 audit 2026-07-12,
+    # spmd_batch_truth.py) -- chips do not multiply data, so no world factor.
+    # DDP (GPU): each rank loads its own rows, so the world multiplier is real.
+    effective_batch = cfg["train"]["batch_size"] * grad_accum * (
+        1 if is_tpu else max(1, backend.world_size())
+    )
     frame_tokens_per_step = effective_batch * max_frames
 
     xprof_trace = None
@@ -2377,6 +2436,7 @@ def main():
         print(
             f"\n=== Training: {max_steps} steps, accum={grad_accum}, "
             f"batch={cfg['train']['batch_size']}, "
+            f"global_batch={effective_batch}, "
             f"clip={_clip_val if _clip_on else 'OFF'} ==="
         )
     model.train()

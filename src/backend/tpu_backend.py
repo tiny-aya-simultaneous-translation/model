@@ -809,6 +809,17 @@ class TPUBackend(BackendBase):
 
         xs.mark_sharding(tensor, self._mesh, partition_spec)
 
+    def host_count(self) -> int:
+        """Number of host processes on this slice (v6e-8 = 1, v6e-16 = 4).
+
+        Used by the per_chip_batch resolution to REFUSE multi-host slices:
+        each host's DataLoader draws different rows, and host-inconsistent
+        inputs to a replicated-input SPMD program are undefined behavior.
+        """
+        import torch_xla.runtime as xr
+
+        return int(xr.process_count())
+
     def get_sharding_spec(self, tensor: torch.Tensor) -> str:
         """Return the XLA sharding annotation string for ``tensor``.
 
