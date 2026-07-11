@@ -1636,6 +1636,14 @@ def main():
                 optimizer.load_state_dict(osd_to_load)
             else:
                 optimizer.load_state_dict(full_osd)
+            del full_osd
+            # Materialize the restored moments NOW, in their own graph. Without
+            # this the CPU->XLA state transfer fuses into the FIRST post-resume
+            # macro-step graph, whose transient buffers then overflow HBM on
+            # configs near the ceiling (P0 resume drill, 2026-07-12: fresh b4
+            # ran at 26.6/31.25GB; the resume of the SAME config OOM'd at step
+            # 61 needing 14.9G with 14.5G free).
+            backend.sync()
             if is_main:
                 print(f"Restored optimizer state from {resume_dir}")
         # NOTE: scheduler state is intentionally NOT restored from the

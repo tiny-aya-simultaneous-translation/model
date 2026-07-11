@@ -30,6 +30,77 @@ moved to `.claude/archive/PROGRESS-YYYY-Qn.md` by the
 
 ---
 
+## 2026-07-11T23:19:55Z | feat/v0.3-implementation@497bd12 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/train_hierarchical.py`
+
+
+## 2026-07-11T23:13:48Z | feat/v0.3-implementation@497bd12 | fail | verify
+verify: 11 passed, 1 failed out of 12 on Stop
+
+FAIL [1] # the TPU↔GPU seam holds: torch_xla must NOT leak into shared model/data code
+    src/model/scan_utils.py:479:    from torch_xla.experimental.scan_layers import (
+
+
+## 2026-07-11T23:13:16Z | feat/v0.3-implementation@497bd12 | done | exec
+for i in $(seq 1 48); do
+
+
+## 2026-07-11T23:12:55Z | feat/v0.3-implementation@497bd12 | done | exec
+gcloud compute tpus queued-resources list --zone=europe-west4-a --format="table(name.basename(),state.state)" 2>/dev/null
+
+
+## 2026-07-11T23:11:53Z | feat/v0.3-implementation@497bd12 | done | exec
+python3 - <<'EOF'
+
+
+## 2026-07-11T22:49:26Z | feat/v0.3-implementation@4ea99f2 | fail | verify
+verify: 11 passed, 1 failed out of 12 on Stop
+
+FAIL [1] # the TPU↔GPU seam holds: torch_xla must NOT leak into shared model/data code
+    src/model/scan_utils.py:479:    from torch_xla.experimental.scan_layers import (
+
+
+## 2026-07-11T22:48:21Z | feat/v0.3-implementation@4ea99f2 | done | exec
+set -a; source .env 2>/dev/null; set +a; uv run --with wandb python - <<'EOF'
+
+
+## 2026-07-11T21:54:22Z | feat/v0.3-implementation@4ea99f2 | fail | verify
+verify: 11 passed, 1 failed out of 12 on Stop
+
+FAIL [1] # the TPU↔GPU seam holds: torch_xla must NOT leak into shared model/data code
+    src/model/scan_utils.py:479:    from torch_xla.experimental.scan_layers import (
+
+
+## 2026-07-11T21:43:54Z | feat/v0.3-implementation@4ea99f2 | fail | verify
+verify: 11 passed, 1 failed out of 12 on Stop
+
+FAIL [1] # the TPU↔GPU seam holds: torch_xla must NOT leak into shared model/data code
+    src/model/scan_utils.py:479:    from torch_xla.experimental.scan_layers import (
+
+
+## 2026-07-11T21:43:28Z | feat/v0.3-implementation@4ea99f2 | done | exec
+for i in $(seq 1 40); do
+
+
+## 2026-07-11T21:43:15Z | feat/v0.3-implementation@4ea99f2 | done | exec
+timeout 300 gcloud compute tpus tpu-vm ssh tinyaya-probe2-r3 --zone=europe-west4-a --worker=0 --command='
+
+
+## 2026-07-11T21:42:07Z | feat/v0.3-implementation@4ea99f2 | done | exec
+timeout 300 gcloud compute tpus tpu-vm ssh tinyaya-probe2-r1 --zone=europe-west4-a --worker=0 --command='
+
+
+## 2026-07-11T20:31:15Z | feat/v0.3-implementation@4ea99f2 | fail | verify
+verify: 11 passed, 1 failed out of 12 on Stop
+
+FAIL [1] # the TPU↔GPU seam holds: torch_xla must NOT leak into shared model/data code
+    src/model/scan_utils.py:479:    from torch_xla.experimental.scan_layers import (
+
+
+## 2026-07-11T20:30:21Z | feat/v0.3-implementation@4ea99f2 | done | exec
+git add -A && git commit -q -m "feat(release): scripts/average_checkpoints.py — LAWA uniform averaging
+
+
 ## 2026-07-11T20:30:07Z | feat/v0.3-implementation@8911be7 | done | exec
 sed -i 's/from src.training.checkpointing import (  # noqa: E402\n    find_latest_checkpoint,/from src.training.checkpointing import (  # noqa: E402/' scripts/average_checkpoints.py; python3 - <<'EOF'
 
