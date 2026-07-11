@@ -190,7 +190,7 @@ from src.training.checkpointing import (
     push_checkpoint_to_hub,
     save_checkpoint,
 )
-from src.training.scheduler import WarmupCosineScheduler
+from src.training.scheduler import WarmupCosineScheduler, WSDScheduler
 from src.training.codebook_schedule import codebook_weights
 from src.training.early_stop import early_stop_step
 from src.training.multitask import composite_val_loss, text_weight_at
@@ -345,6 +345,13 @@ DEFAULTS = {
         # confounded because max_steps both ended the run and compressed the
         # schedule.
         "scheduler_total_steps": None,
+        # LR schedule shape: "cosine" (validated default) or "wsd"
+        # (warmup-stable-decay -- peak plateau + short linear anneal; the
+        # early-stop-friendly shape for the long-horizon run). WSD anneal
+        # length: wsd_anneal_steps wins, else wsd_anneal_frac of the horizon.
+        "schedule": "cosine",
+        "wsd_anneal_steps": None,
+        "wsd_anneal_frac": 0.1,
         "weight_decay": 0.01,
         "adam_beta1": 0.9,
         "adam_beta2": 0.999,
@@ -1511,15 +1518,33 @@ def main():
         betas=(cfg["train"]["adam_beta1"], cfg["train"]["adam_beta2"]),
         eps=cfg["train"]["adam_eps"],
     )
-    # scheduler_total_steps decouples the cosine horizon from run length so a
+    # scheduler_total_steps decouples the schedule horizon from run length so a
     # probe can replay a longer run's exact lr trajectory and stop early
     # (null -> max_steps, the normal single-knob behaviour).
-    scheduler = WarmupCosineScheduler(
-        optimizer,
-        warmup_steps=cfg["train"]["warmup_steps"],
-        total_steps=int(cfg["train"].get("scheduler_total_steps") or cfg["train"]["max_steps"]),
-        min_lr_ratio=cfg["train"]["min_lr_ratio"],
-    )
+    _sched_total = int(cfg["train"].get("scheduler_total_steps") or cfg["train"]["max_steps"])
+    _schedule = str(cfg["train"].get("schedule", "cosine")).lower()
+    if _schedule == "wsd":
+        # Warmup-stable-decay: peak-LR plateau + short linear anneal, so every
+        # plateau checkpoint is schedule-equivalent (early-stop friendly). For
+        # an anneal-from-checkpoint run, resume the chosen plateau ckpt with
+        # scheduler_total_steps = start_step + wsd_anneal_steps.
+        scheduler = WSDScheduler(
+            optimizer,
+            warmup_steps=cfg["train"]["warmup_steps"],
+            total_steps=_sched_total,
+            anneal_steps=cfg["train"].get("wsd_anneal_steps"),
+            anneal_frac=float(cfg["train"].get("wsd_anneal_frac", 0.1)),
+            min_lr_ratio=cfg["train"]["min_lr_ratio"],
+        )
+    elif _schedule == "cosine":
+        scheduler = WarmupCosineScheduler(
+            optimizer,
+            warmup_steps=cfg["train"]["warmup_steps"],
+            total_steps=_sched_total,
+            min_lr_ratio=cfg["train"]["min_lr_ratio"],
+        )
+    else:
+        raise ValueError(f"unknown train.schedule {_schedule!r} (want cosine|wsd)")
 
     # Resume optimizer + scheduler state (AFTER FSDP wrap + optimizer creation).
     # fetch_checkpoint_file resolves GCS dirs to a local file -- the previous

@@ -30,6 +30,115 @@ moved to `.claude/archive/PROGRESS-YYYY-Qn.md` by the
 
 ---
 
+## 2026-07-11T20:23:22Z | feat/v0.3-implementation@c2a708f | done | edit
+created `/home/cataluna84/Workspace/tinyaya-stage2-scale/tests/test_wsd_scheduler.py`
+
+
+## 2026-07-11T20:22:55Z | feat/v0.3-implementation@c2a708f | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/train_hierarchical.py`
+
+
+## 2026-07-11T20:22:46Z | feat/v0.3-implementation@c2a708f | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/train_hierarchical.py`
+
+
+## 2026-07-11T20:22:44Z | feat/v0.3-implementation@c2a708f | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/train_hierarchical.py`
+
+
+## 2026-07-11T20:22:21Z | feat/v0.3-implementation@c2a708f | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/src/training/scheduler.py`
+
+
+## 2026-07-11T20:22:00Z | feat/v0.3-implementation@c2a708f | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/src/training/scheduler.py`
+
+
+## 2026-07-11T20:21:25Z | feat/v0.3-implementation@c2a708f | done | exec
+for i in $(seq 1 40); do
+
+
+## 2026-07-11T20:20:01Z | feat/v0.3-implementation@c2a708f | fail | verify
+verify: 11 passed, 1 failed out of 12 on Stop
+
+FAIL [1] # the TPU↔GPU seam holds: torch_xla must NOT leak into shared model/data code
+    src/model/scan_utils.py:479:    from torch_xla.experimental.scan_layers import (
+
+
+## 2026-07-11T20:19:26Z | feat/v0.3-implementation@c2a708f | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/.claude/PROGRESS.md`
+
+
+## 2026-07-11T20:19:04Z | feat/v0.3-implementation@c2a708f | done | verify
+P0 batch-semantics audit CONFIRMED on real v6e-8 mesh: real global batch = batch_size × grad_accum; the ×world_size in effective_batch is a DDP-era fiction.
+
+Evidence (scripts/tpu/spmd_batch_truth.py on tinyaya-probe2-r1, code c2a708f):
+mark_sharding on the batch-4 input keeps logical shape (4,16) under spec
+{devices=[8,1]0,1,2,3,4,5,6,7}, and the 8-chip gradient is bit-identical
+(max delta 1.2e-7) to a single-device CPU run on the SAME 4 rows — the mesh
+adds no data. Consequences: arms/probes ran at REAL batch 32, staged
+production (accum 4) at 16 (= HALF the validated batch), "3 epochs / 14,532
+steps" ≈ 0.2 real epochs. All relative sweep/probe rankings survive (shared
+semantics). Corroborating smokes p0-shard-b4 (b4×accum8) vs p0-shard-b32
+(b32×accum1, same claimed "256") running on reused r1/r3 slices
+(user-authorized takeover); resume drill next. Phase-1 resume hardening
+landed at df8cde0: GCS resume NEVER restored optimizer state
+(os.path.exists on gs:// always False) → fetch_checkpoint_file + hard-fail;
+metadata.json uploads LAST (atomic-complete gate); best_val/patience persist;
+scheduler.step(start_step+1) priming kills the peak-LR first step; rng.pt.
+
+## 2026-07-11T20:18:36Z | feat/v0.3-implementation@c2a708f | done | exec
+for i in $(seq 1 30); do
+
+
+## 2026-07-11T20:17:36Z | feat/v0.3-implementation@c2a708f | done | exec
+timeout 500 gcloud compute tpus tpu-vm ssh tinyaya-probe2-r3 --zone=europe-west4-a --worker=0 --command='
+
+
+## 2026-07-11T20:16:44Z | feat/v0.3-implementation@c2a708f | done | exec
+timeout 500 gcloud compute tpus tpu-vm ssh tinyaya-probe2-r3 --zone=europe-west4-a --worker=0 --command='
+
+
+## 2026-07-11T20:16:06Z | feat/v0.3-implementation@c2a708f | done | exec
+timeout 400 gcloud compute tpus tpu-vm ssh tinyaya-probe2-r1 --zone=europe-west4-a --worker=0 --command='
+
+
+## 2026-07-11T20:15:10Z | feat/v0.3-implementation@c2a708f | done | exec
+timeout 500 gcloud compute tpus tpu-vm ssh tinyaya-probe2-r1 --zone=europe-west4-a --worker=0 --command='
+
+
+## 2026-07-11T20:13:06Z | feat/v0.3-implementation@c2a708f | done | exec
+timeout 500 gcloud compute tpus tpu-vm ssh tinyaya-probe2-r1 --zone=europe-west4-a --worker=0 --command='
+
+
+## 2026-07-11T20:11:51Z | feat/v0.3-implementation@c2a708f | done | exec
+timeout 500 gcloud compute tpus tpu-vm ssh tinyaya-probe2-r1 --zone=europe-west4-a --worker=0 --command='
+
+
+## 2026-07-11T20:11:00Z | feat/v0.3-implementation@c2a708f | done | exec
+sed -n 200,300p scripts/tpu/startup_script.sh
+
+
+## 2026-07-11T20:07:22Z | feat/v0.3-implementation@c2a708f | done | exec
+set -a; source .env 2>/dev/null; set +a; uv run --with wandb python - <<'EOF'
+
+
+## 2026-07-11T20:04:15Z | feat/v0.3-implementation@c2a708f | done | exec
+git add configs/tpu/reval/p0_shard_b4.yaml configs/tpu/reval/p0_shard_b32.yaml && git commit -q -m "config(p0): shard-audit smokes b4x8 vs b32x1 (same claimed 256, opposite predictions)
+
+
+## 2026-07-11T20:03:26Z | feat/v0.3-implementation@df8cde0 | done | exec
+python3 - <<'EOF'
+
+
+## 2026-07-11T20:01:50Z | feat/v0.3-implementation@df8cde0 | done | exec
+set -a; source .env 2>/dev/null; set +a; uv run --with wandb python - <<'EOF'
+
+
+## 2026-07-11T20:01:27Z | feat/v0.3-implementation@df8cde0 | done | exec
+set -a; source .env 2>/dev/null; set +a; uv run --with wandb python - <<'EOF'
+
+
 ## 2026-07-11T19:56:56Z | feat/v0.3-implementation@b641487 | done | edit
 edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/tests/test_resume_roundtrip.py`
 
