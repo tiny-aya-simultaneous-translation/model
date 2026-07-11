@@ -30,6 +30,30 @@ moved to `.claude/archive/PROGRESS-YYYY-Qn.md` by the
 
 ---
 
+## 2026-07-11T20:30:07Z | feat/v0.3-implementation@8911be7 | done | exec
+sed -i 's/from src.training.checkpointing import (  # noqa: E402\n    find_latest_checkpoint,/from src.training.checkpointing import (  # noqa: E402/' scripts/average_checkpoints.py; python3 - <<'EOF'
+
+
+## 2026-07-11T20:29:51Z | feat/v0.3-implementation@8911be7 | done | edit
+created `/home/cataluna84/Workspace/tinyaya-stage2-scale/tests/test_average_checkpoints.py`
+
+
+## 2026-07-11T20:29:25Z | feat/v0.3-implementation@8911be7 | done | edit
+created `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/average_checkpoints.py`
+
+
+## 2026-07-11T20:28:32Z | feat/v0.3-implementation@8911be7 | done | exec
+sed -n 60,120p scripts/analysis/checkpoint_group_rms.py
+
+
+## 2026-07-11T20:28:25Z | feat/v0.3-implementation@8911be7 | done | exec
+sed -n 1,60p scripts/analysis/checkpoint_group_rms.py
+
+
+## 2026-07-11T20:27:55Z | feat/v0.3-implementation@8911be7 | done | exec
+git add -A && git commit -q -m "feat(batch): per_chip_batch knob + true SPMD global-batch accounting
+
+
 ## 2026-07-11T20:27:19Z | feat/v0.3-implementation@522bef2 | done | edit
 created `/home/cataluna84/Workspace/tinyaya-stage2-scale/tests/test_per_chip_batch.py`
 
