@@ -809,6 +809,18 @@ class TPUBackend(BackendBase):
 
         xs.mark_sharding(tensor, self._mesh, partition_spec)
 
+    def get_sharding_spec(self, tensor: torch.Tensor) -> str:
+        """Return the XLA sharding annotation string for ``tensor``.
+
+        Pure graph metadata (e.g. ``{devices=[8,1]0,1,...}``) -- reading it
+        does NOT materialize the tensor or cut the traced graph, so it is
+        safe inside the macro-step. Used by the P0 batch-semantics audit to
+        show how the batch dim is really distributed across the mesh.
+        """
+        import torch_xla
+
+        return torch_xla._XLAC._get_xla_sharding_spec(tensor)
+
     def diagnose(self, tag: str = "diagnose") -> None:
         """Print mesh layout + per-chip HBM. Cheap; safe every N steps.
 

@@ -349,12 +349,19 @@ DEFAULTS = {
         "adam_beta1": 0.9,
         "adam_beta2": 0.999,
         "adam_eps": 1e-8,
+        # Resume with a MISSING optimizer.pt is a hard error by default: a
+        # long run must never silently continue on fresh Adam moments. Flip
+        # to true only for a deliberate weights-only warm start.
+        "allow_fresh_optimizer": False,
         # TPU-only flags. Both safe to leave True on GPU: the
         # scan proxy falls back to a plain loop, and the grad
         # checkpoint shim falls back to a direct call.
         "use_scan_layers": False,
         "xla_grad_checkpoint": False,
         "compile_warmup_steps": 0,
+        # One-shot print of the first input batch's XLA sharding annotation
+        # (P0 batch-semantics audit). Metadata-only; no per-step cost.
+        "debug_input_sharding": False,
     },
     "loss": {"text_weight": 0.1, "audio_weight": 1.0},
     "optim": {
@@ -371,10 +378,10 @@ DEFAULTS = {
         "audio_every": 1000,
         "val_every": 1000,
         "val_max_batches": 50,
-        # Inline validation on TPU is opt-in: the rewritten run_validation is
-        # TPU-safe + throughput-neutral, but the val forward currently yields
-        # a non-finite loss on TPU (under investigation). Release quality
-        # comes from the GPU eval (eval_release.py). On GPU, val always runs.
+        # Inline validation on TPU is opt-in and WORKS (verified live on the
+        # v0.3 reval arms + round-2 probes via XLA_NO_SPECIAL_SCALARS=1 +
+        # nan_to_num). Default stays off so bare smoke configs skip the extra
+        # compile; production/probe configs set true. On GPU, val always runs.
         "val_on_tpu": False,
         "save_dir": "checkpoints/stage2_scale",
         "wandb_project": "tinyaya-s2s",
@@ -1217,6 +1224,7 @@ def main():
     # the correctly-initialized params. Optimizer state is NOT restored (Adam
     # momentum restarts) but model weights are correct.
     from src.training.checkpointing import (
+        fetch_checkpoint_file,
         find_latest_checkpoint,
         load_checkpoint,
         read_checkpoint_metadata,
@@ -1224,14 +1232,34 @@ def main():
 
     start_step = 0
     resume_wandb_run_id = None
+    resume_meta: dict = {}
     resume_dir = args.resume
     if resume_dir == "auto":
         resume_dir = find_latest_checkpoint(cfg["logging"]["save_dir"])
     if resume_dir:
         start_step = load_checkpoint(model, None, None, resume_dir)
         # Recover the original W&B run id so a preempted run continues the SAME
-        # dashboard run on restart instead of fragmenting into a new run.
-        resume_wandb_run_id = read_checkpoint_metadata(resume_dir).get("wandb_run_id")
+        # dashboard run on restart instead of fragmenting into a new run. The
+        # same metadata carries best_val / patience_left (restored at loop
+        # setup) so a resume cannot overwrite best_by_val with a worse ckpt.
+        resume_meta = read_checkpoint_metadata(resume_dir)
+        resume_wandb_run_id = resume_meta.get("wandb_run_id")
+        # Host RNG restore (best-effort): keeps the dropout stream and any
+        # host-side shuffle RNG from replaying the fresh-start sequence.
+        rng_p = fetch_checkpoint_file(resume_dir, "rng.pt") if start_step > 0 else None
+        if rng_p is not None:
+            try:
+                _rng = torch.load(rng_p, map_location="cpu", weights_only=True)
+                torch.set_rng_state(_rng["torch"])
+                if cfg.get("backend", "auto") == "tpu" and "xla" in _rng:
+                    import torch_xla.core.xla_model as _xm  # noqa: PLC0415
+
+                    _xm.set_rng_state(int(_rng["xla"]))
+                if is_main:
+                    print(f"Restored host RNG state from {resume_dir}")
+            except Exception as e:  # noqa: BLE001 - best-effort, never blocks resume
+                if is_main:
+                    print(f"[resume] WARNING: rng restore failed ({e}); continuing")
         if is_main:
             _msg = f"Loaded model weights from {resume_dir} (step {start_step})"
             if resume_wandb_run_id:
@@ -1493,10 +1521,29 @@ def main():
         min_lr_ratio=cfg["train"]["min_lr_ratio"],
     )
 
-    # Resume optimizer + scheduler state (AFTER FSDP wrap + optimizer creation)
+    # Resume optimizer + scheduler state (AFTER FSDP wrap + optimizer creation).
+    # fetch_checkpoint_file resolves GCS dirs to a local file -- the previous
+    # os.path.exists(os.path.join("gs://...", "optimizer.pt")) check was ALWAYS
+    # False for GCS resume, so every spot-preemption resume silently restarted
+    # Adam moments from zero. Missing state is now a hard error: a long
+    # production run must never quietly continue on a fresh optimizer
+    # (train.allow_fresh_optimizer=true is the deliberate escape hatch).
     if start_step > 0 and resume_dir:
-        opt_p = os.path.join(resume_dir, "optimizer.pt")
-        if os.path.exists(opt_p):
+        opt_p = fetch_checkpoint_file(resume_dir, "optimizer.pt")
+        if opt_p is None:
+            if not bool(cfg["train"].get("allow_fresh_optimizer", False)):
+                raise RuntimeError(
+                    f"[resume] optimizer.pt missing under {resume_dir} -- refusing to "
+                    f"resume step {start_step} with a fresh optimizer. Set "
+                    f"train.allow_fresh_optimizer: true to override deliberately."
+                )
+            if is_main:
+                print(
+                    f"[resume] WARNING: optimizer.pt missing under {resume_dir}; "
+                    f"continuing with a FRESH optimizer (allow_fresh_optimizer=true).",
+                    flush=True,
+                )
+        else:
             full_osd = torch.load(opt_p, map_location="cpu", weights_only=True)
             try:
                 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
@@ -1524,6 +1571,14 @@ def main():
         # restored behavior on a same-config resume anyway.
         if is_main:
             print(f"Resuming training from step {start_step}")
+
+    # Set the LR for the FIRST optimizer step. The loop only advances the
+    # scheduler AFTER each optimizer step (scheduler.step(step + 1)), and
+    # construction leaves the param groups at base (peak) LR -- without this
+    # priming, the first step of every fresh start ran at peak LR instead of
+    # warmup LR, and every resume applied one peak-LR update before the
+    # schedule caught up.
+    scheduler.step(start_step + 1)
 
     # ---- wandb
     # On a multi-host TPU pod (v4-32 = 4 hosts) every host calls this
@@ -1785,7 +1840,6 @@ def main():
     running = {"loss": 0.0, "text": 0.0, "audio": 0.0, "per_cb": torch.zeros(num_codebooks)}
     t0 = time.time()
     t_last = t0
-    best_val = float("inf")
     # Phase A early stopping: stop if val/loss hasn't improved by > min_delta for
     # `early_stop_patience` consecutive val cycles. patience=0 disables it.
     # NOTE: best_by_val is saved on every improvement regardless of patience, so
@@ -1793,7 +1847,18 @@ def main():
     # longer patience can catch a late second-descent from the cosine LR decay).
     early_stop_patience = int(cfg["train"].get("early_stop_patience", 0))
     early_stop_min_delta = float(cfg["train"].get("early_stop_min_delta", 0.0))
-    _patience_left = early_stop_patience
+    # best_val / patience survive a resume via the periodic checkpoint's
+    # metadata -- otherwise the first post-preemption val would overwrite
+    # best_by_val even when WORSE than the pre-preemption best, and the
+    # early-stop countdown would silently reset.
+    best_val = float(resume_meta.get("best_val", float("inf")))
+    _patience_left = int(resume_meta.get("patience_left", early_stop_patience))
+    if start_step > 0 and is_main and best_val != float("inf"):
+        print(
+            f"[resume] restored best_val={best_val:.4f}, "
+            f"patience_left={_patience_left}",
+            flush=True,
+        )
     _early_stop = False
 
     grad_accum = cfg["train"]["grad_accum"]
@@ -1885,6 +1950,11 @@ def main():
 
     perf_cfg = cfg.get("perf", {})
     perf_enabled = bool(perf_cfg.get("enabled", False))
+    # P0 batch-semantics audit: print the actual XLA sharding annotation of the
+    # first input batch once, so a smoke run shows what the mesh REALLY does to
+    # the batch dim (list is a mutable one-shot latch for the closure below).
+    debug_input_sharding = bool(cfg["train"].get("debug_input_sharding", False))
+    _sharding_logged: list[bool] = []
     perf_warmup_skip_steps = int(perf_cfg.get("warmup_skip_steps", 50))
     perf_step_times: list[float] = []
     effective_batch = cfg["train"]["batch_size"] * grad_accum * max(1, backend.world_size())
@@ -2075,6 +2145,21 @@ def main():
                         backend.mark_sharding(all_codes, ("fsdp", None, None))
                         backend.mark_sharding(mask, ("fsdp", None))
                         backend.mark_sharding(loss_mask, ("fsdp", None))
+                        # One-shot sharding-truth print (P0 batch-semantics
+                        # audit): the annotation string is graph METADATA, so
+                        # reading it does not materialize the tensor.
+                        if (
+                            debug_input_sharding
+                            and not _sharding_logged
+                            and hasattr(backend, "get_sharding_spec")
+                        ):
+                            _sharding_logged.append(True)
+                            print(
+                                f"[sharding] text_ids logical shape="
+                                f"{tuple(text_ids.shape)} "
+                                f"spec={backend.get_sharding_spec(text_ids)}",
+                                flush=True,
+                            )
 
                 with trace_ctx("forward_loss"):
                     with backend.autocast_context(dtype=torch.bfloat16):
@@ -2802,7 +2887,14 @@ def main():
                 scheduler,
                 step,
                 str(d),
-                extra_state={"config": cfg, "wandb_run_id": run_id},
+                # best_val / patience_left ride every periodic checkpoint so a
+                # resume restores the early-stop state (see loop setup).
+                extra_state={
+                    "config": cfg,
+                    "wandb_run_id": run_id,
+                    "best_val": best_val,
+                    "patience_left": _patience_left,
+                },
                 is_main=is_main,
                 keep_local_dir=keep_local_dir,
             )
@@ -2838,7 +2930,13 @@ def main():
             scheduler,
             step,
             str(d),
-            extra_state={"config": cfg, "final": True, "wandb_run_id": run_id},
+            extra_state={
+                "config": cfg,
+                "final": True,
+                "wandb_run_id": run_id,
+                "best_val": best_val,
+                "patience_left": _patience_left,
+            },
             is_main=is_main,
             keep_local_dir=keep_local_dir,
         )

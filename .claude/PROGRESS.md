@@ -30,6 +30,760 @@ moved to `.claude/archive/PROGRESS-YYYY-Qn.md` by the
 
 ---
 
+## 2026-07-11T19:56:56Z | feat/v0.3-implementation@b641487 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/tests/test_resume_roundtrip.py`
+
+
+## 2026-07-11T19:56:54Z | feat/v0.3-implementation@b641487 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/tests/test_resume_roundtrip.py`
+
+
+## 2026-07-11T19:56:52Z | feat/v0.3-implementation@b641487 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/tests/test_resume_roundtrip.py`
+
+
+## 2026-07-11T19:56:41Z | feat/v0.3-implementation@b641487 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/tests/test_resume_roundtrip.py`
+
+
+## 2026-07-11T19:56:38Z | feat/v0.3-implementation@b641487 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/tests/test_resume_roundtrip.py`
+
+
+## 2026-07-11T19:55:49Z | feat/v0.3-implementation@b641487 | done | edit
+created `/home/cataluna84/Workspace/tinyaya-stage2-scale/tests/test_resume_roundtrip.py`
+
+
+## 2026-07-11T19:54:46Z | feat/v0.3-implementation@b641487 | done | exec
+sed -n 1,80p tests/test_group_diag.py
+
+
+## 2026-07-11T19:53:25Z | feat/v0.3-implementation@b641487 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/src/backend/tpu_backend.py`
+
+
+## 2026-07-11T19:53:06Z | feat/v0.3-implementation@b641487 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/train_hierarchical.py`
+
+
+## 2026-07-11T19:52:58Z | feat/v0.3-implementation@b641487 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/train_hierarchical.py`
+
+
+## 2026-07-11T19:52:54Z | feat/v0.3-implementation@b641487 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/train_hierarchical.py`
+
+
+## 2026-07-11T19:52:24Z | feat/v0.3-implementation@b641487 | done | edit
+created `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/tpu/spmd_batch_truth.py`
+
+
+## 2026-07-11T19:51:31Z | feat/v0.3-implementation@b641487 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/train_hierarchical.py`
+
+
+## 2026-07-11T19:51:27Z | feat/v0.3-implementation@b641487 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/train_hierarchical.py`
+
+
+## 2026-07-11T19:51:02Z | feat/v0.3-implementation@b641487 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/train_hierarchical.py`
+
+
+## 2026-07-11T19:50:59Z | feat/v0.3-implementation@b641487 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/train_hierarchical.py`
+
+
+## 2026-07-11T19:50:45Z | feat/v0.3-implementation@b641487 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/train_hierarchical.py`
+
+
+## 2026-07-11T19:50:31Z | feat/v0.3-implementation@b641487 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/train_hierarchical.py`
+
+
+## 2026-07-11T19:50:15Z | feat/v0.3-implementation@b641487 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/train_hierarchical.py`
+
+
+## 2026-07-11T19:49:56Z | feat/v0.3-implementation@b641487 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/train_hierarchical.py`
+
+
+## 2026-07-11T19:49:32Z | feat/v0.3-implementation@b641487 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/train_hierarchical.py`
+
+
+## 2026-07-11T19:49:08Z | feat/v0.3-implementation@b641487 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/src/training/checkpointing.py`
+
+
+## 2026-07-11T19:48:47Z | feat/v0.3-implementation@b641487 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/src/training/checkpointing.py`
+
+
+## 2026-07-11T19:48:32Z | feat/v0.3-implementation@b641487 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/src/training/checkpointing.py`
+
+
+## 2026-07-11T19:48:08Z | feat/v0.3-implementation@b641487 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/src/training/checkpointing.py`
+
+
+## 2026-07-11T19:43:57Z | feat/v0.3-implementation@b641487 | done | edit
+edited `/home/cataluna84/.claude/plans/fix-the-sweep-startegy-linear-flask.md`
+
+
+## 2026-07-11T19:40:18Z | feat/v0.3-implementation@b641487 | info | session
+SessionEnd (resume): 6 item(s) carried forward
+
+Next steps:
+- 6 reval arms (A–F, text_weight 0.2, group `v03-5k-reval-ta`) reach 5,000 steps;
+- v0.3 production run completes (14,532 steps / 3 epochs, text+audio + scan recipe)
+- Release eval with the loader-fixed path: per-codebook accuracy (teacher-forced),
+- v0.3 HF repo published (card + all checkpoints); dataset card documents the
+- Code repos opened; `THIRD_PARTY_NOTICES.md` covers the synthetic sources.
+- Blog updated to the text+audio result + the honest misdiagnosis arc; leaked tokens
+
+
+## 2026-07-11T18:54:06Z | feat/v0.3-implementation@b641487 | info | session
+SessionEnd (other): 6 item(s) carried forward
+
+Next steps:
+- 6 reval arms (A–F, text_weight 0.2, group `v03-5k-reval-ta`) reach 5,000 steps;
+- v0.3 production run completes (14,532 steps / 3 epochs, text+audio + scan recipe)
+- Release eval with the loader-fixed path: per-codebook accuracy (teacher-forced),
+- v0.3 HF repo published (card + all checkpoints); dataset card documents the
+- Code repos opened; `THIRD_PARTY_NOTICES.md` covers the synthetic sources.
+- Blog updated to the text+audio result + the honest misdiagnosis arc; leaked tokens
+
+
+## 2026-07-11T18:53:46Z | feat/v0.3-implementation@b641487 | fail | verify
+verify: 11 passed, 1 failed out of 12 on Stop
+
+FAIL [1] # the TPU↔GPU seam holds: torch_xla must NOT leak into shared model/data code
+    src/model/scan_utils.py:479:    from torch_xla.experimental.scan_layers import (
+
+
+## 2026-07-11T18:50:23Z | feat/v0.3-implementation@b641487 | done | edit
+created `/home/cataluna84/.claude/plans/fix-the-sweep-startegy-linear-flask.md`
+
+
+## 2026-07-11T18:32:59Z | feat/v0.3-implementation@b641487 | fail | verify
+verify: 11 passed, 1 failed out of 12 on Stop
+
+FAIL [1] # the TPU↔GPU seam holds: torch_xla must NOT leak into shared model/data code
+    src/model/scan_utils.py:479:    from torch_xla.experimental.scan_layers import (
+
+
+## 2026-07-11T18:30:19Z | feat/v0.3-implementation@b641487 | done | exec
+cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-11T18:29:18Z | feat/v0.3-implementation@b641487 | fail | verify
+verify: 11 passed, 1 failed out of 12 on Stop
+
+FAIL [1] # the TPU↔GPU seam holds: torch_xla must NOT leak into shared model/data code
+    src/model/scan_utils.py:479:    from torch_xla.experimental.scan_layers import (
+
+
+## 2026-07-11T18:28:42Z | feat/v0.3-implementation@b641487 | done | exec
+cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-11T18:28:26Z | feat/v0.3-implementation@b641487 | done | exec
+cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-11T18:28:23Z | feat/v0.3-implementation@b641487 | done | exec
+cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-11T18:24:18Z | feat/v0.3-implementation@b641487 | info | session
+SessionEnd (resume): 6 item(s) carried forward
+
+Next steps:
+- 6 reval arms (A–F, text_weight 0.2, group `v03-5k-reval-ta`) reach 5,000 steps;
+- v0.3 production run completes (14,532 steps / 3 epochs, text+audio + scan recipe)
+- Release eval with the loader-fixed path: per-codebook accuracy (teacher-forced),
+- v0.3 HF repo published (card + all checkpoints); dataset card documents the
+- Code repos opened; `THIRD_PARTY_NOTICES.md` covers the synthetic sources.
+- Blog updated to the text+audio result + the honest misdiagnosis arc; leaked tokens
+
+
+## 2026-07-11T17:31:03Z | feat/v0.3-implementation@b641487 | info | session
+SessionEnd (other): 6 item(s) carried forward
+
+Next steps:
+- 6 reval arms (A–F, text_weight 0.2, group `v03-5k-reval-ta`) reach 5,000 steps;
+- v0.3 production run completes (14,532 steps / 3 epochs, text+audio + scan recipe)
+- Release eval with the loader-fixed path: per-codebook accuracy (teacher-forced),
+- v0.3 HF repo published (card + all checkpoints); dataset card documents the
+- Code repos opened; `THIRD_PARTY_NOTICES.md` covers the synthetic sources.
+- Blog updated to the text+audio result + the honest misdiagnosis arc; leaked tokens
+
+
+## 2026-07-11T17:28:30Z | feat/v0.3-implementation@b641487 | info | session
+PreCompact (manual): 6 unchecked PLAN items
+
+Top open items:
+- 6 reval arms (A–F, text_weight 0.2, group `v03-5k-reval-ta`) reach 5,000 steps;
+- v0.3 production run completes (14,532 steps / 3 epochs, text+audio + scan recipe)
+- Release eval with the loader-fixed path: per-codebook accuracy (teacher-forced),
+- v0.3 HF repo published (card + all checkpoints); dataset card documents the
+- Code repos opened; `THIRD_PARTY_NOTICES.md` covers the synthetic sources.
+- Blog updated to the text+audio result + the honest misdiagnosis arc; leaked tokens
+
+
+## 2026-07-11T17:28:25Z | feat/v0.3-implementation@b641487 | info | session
+SessionEnd (resume): 6 item(s) carried forward
+
+Next steps:
+- 6 reval arms (A–F, text_weight 0.2, group `v03-5k-reval-ta`) reach 5,000 steps;
+- v0.3 production run completes (14,532 steps / 3 epochs, text+audio + scan recipe)
+- Release eval with the loader-fixed path: per-codebook accuracy (teacher-forced),
+- v0.3 HF repo published (card + all checkpoints); dataset card documents the
+- Code repos opened; `THIRD_PARTY_NOTICES.md` covers the synthetic sources.
+- Blog updated to the text+audio result + the honest misdiagnosis arc; leaked tokens
+
+
+## 2026-07-11T10:44:29Z | feat/v0.3-implementation@b641487 | info | session
+SessionEnd (other): 6 item(s) carried forward
+
+Next steps:
+- 6 reval arms (A–F, text_weight 0.2, group `v03-5k-reval-ta`) reach 5,000 steps;
+- v0.3 production run completes (14,532 steps / 3 epochs, text+audio + scan recipe)
+- Release eval with the loader-fixed path: per-codebook accuracy (teacher-forced),
+- v0.3 HF repo published (card + all checkpoints); dataset card documents the
+- Code repos opened; `THIRD_PARTY_NOTICES.md` covers the synthetic sources.
+- Blog updated to the text+audio result + the honest misdiagnosis arc; leaked tokens
+
+
+## 2026-07-11T10:33:46Z | feat/v0.3-implementation@b641487 | fail | verify
+verify: 11 passed, 1 failed out of 12 on Stop
+
+FAIL [1] # the TPU↔GPU seam holds: torch_xla must NOT leak into shared model/data code
+    src/model/scan_utils.py:479:    from torch_xla.experimental.scan_layers import (
+
+
+## 2026-07-11T10:33:19Z | feat/v0.3-implementation@b641487 | done | edit
+edited `/home/cataluna84/.claude/projects/-home-cataluna84-Workspace-tinyaya-stage2-scale/memory/MEMORY.md`
+
+
+## 2026-07-11T10:32:50Z | feat/v0.3-implementation@b641487 | done | edit
+edited `/home/cataluna84/.claude/projects/-home-cataluna84-Workspace-tinyaya-stage2-scale/memory/v03-reval-sweep-launch.md`
+
+
+## 2026-07-11T10:32:01Z | feat/v0.3-implementation@b641487 | done | exec
+git add docs/v0.3-reval-report.md && git commit --quiet -m "docs(report): round-2 probe verdict — clip 1.0 @ 256 positively confirmed
+
+
+## 2026-07-11T10:31:48Z | feat/v0.3-implementation@255c4f5 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/docs/v0.3-reval-report.md`
+
+
+## 2026-07-11T10:31:20Z | feat/v0.3-implementation@255c4f5 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/docs/v0.3-reval-report.md`
+
+
+## 2026-07-11T10:28:59Z | feat/v0.3-implementation@255c4f5 | done | exec
+gcloud compute tpus queued-resources list --project=ml-pipelines-315702 --zone=europe-west4-a --format="table(name.basename(),state.state)" 2>&1
+
+
+## 2026-07-11T10:28:38Z | feat/v0.3-implementation@255c4f5 | info | session
+SessionEnd (resume): 6 item(s) carried forward
+
+Next steps:
+- 6 reval arms (A–F, text_weight 0.2, group `v03-5k-reval-ta`) reach 5,000 steps;
+- v0.3 production run completes (14,532 steps / 3 epochs, text+audio + scan recipe)
+- Release eval with the loader-fixed path: per-codebook accuracy (teacher-forced),
+- v0.3 HF repo published (card + all checkpoints); dataset card documents the
+- Code repos opened; `THIRD_PARTY_NOTICES.md` covers the synthetic sources.
+- Blog updated to the text+audio result + the honest misdiagnosis arc; leaked tokens
+
+
+## 2026-07-11T04:47:02Z | feat/v0.3-implementation@255c4f5 | info | session
+SessionEnd (other): 6 item(s) carried forward
+
+Next steps:
+- 6 reval arms (A–F, text_weight 0.2, group `v03-5k-reval-ta`) reach 5,000 steps;
+- v0.3 production run completes (14,532 steps / 3 epochs, text+audio + scan recipe)
+- Release eval with the loader-fixed path: per-codebook accuracy (teacher-forced),
+- v0.3 HF repo published (card + all checkpoints); dataset card documents the
+- Code repos opened; `THIRD_PARTY_NOTICES.md` covers the synthetic sources.
+- Blog updated to the text+audio result + the honest misdiagnosis arc; leaked tokens
+
+
+## 2026-07-11T04:46:23Z | feat/v0.3-implementation@255c4f5 | fail | verify
+verify: 11 passed, 1 failed out of 12 on Stop
+
+FAIL [1] # the TPU↔GPU seam holds: torch_xla must NOT leak into shared model/data code
+    src/model/scan_utils.py:479:    from torch_xla.experimental.scan_layers import (
+
+
+## 2026-07-11T04:45:44Z | feat/v0.3-implementation@255c4f5 | done | exec
+gcloud compute tpus queued-resources list --project=ml-pipelines-315702 --zone=europe-west4-a --format="table(name.basename(),state.state)" 2>&1
+
+
+## 2026-07-11T03:46:43Z | feat/v0.3-implementation@255c4f5 | fail | verify
+verify: 11 passed, 1 failed out of 12 on Stop
+
+FAIL [1] # the TPU↔GPU seam holds: torch_xla must NOT leak into shared model/data code
+    src/model/scan_utils.py:479:    from torch_xla.experimental.scan_layers import (
+
+
+## 2026-07-11T03:37:27Z | feat/v0.3-implementation@255c4f5 | fail | verify
+verify: 11 passed, 1 failed out of 12 on Stop
+
+FAIL [1] # the TPU↔GPU seam holds: torch_xla must NOT leak into shared model/data code
+    src/model/scan_utils.py:479:    from torch_xla.experimental.scan_layers import (
+
+
+## 2026-07-11T03:37:16Z | feat/v0.3-implementation@255c4f5 | done | exec
+for i in 1 3; do
+
+
+## 2026-07-11T03:27:33Z | feat/v0.3-implementation@255c4f5 | fail | verify
+verify: 11 passed, 1 failed out of 12 on Stop
+
+FAIL [1] # the TPU↔GPU seam holds: torch_xla must NOT leak into shared model/data code
+    src/model/scan_utils.py:479:    from torch_xla.experimental.scan_layers import (
+
+
+## 2026-07-11T02:51:47Z | feat/v0.3-implementation@255c4f5 | fail | verify
+verify: 11 passed, 1 failed out of 12 on Stop
+
+FAIL [1] # the TPU↔GPU seam holds: torch_xla must NOT leak into shared model/data code
+    src/model/scan_utils.py:479:    from torch_xla.experimental.scan_layers import (
+
+
+## 2026-07-11T02:46:07Z | feat/v0.3-implementation@255c4f5 | fail | verify
+verify: 11 passed, 1 failed out of 12 on Stop
+
+FAIL [1] # the TPU↔GPU seam holds: torch_xla must NOT leak into shared model/data code
+    src/model/scan_utils.py:479:    from torch_xla.experimental.scan_layers import (
+
+
+## 2026-07-11T02:45:34Z | feat/v0.3-implementation@255c4f5 | done | edit
+created `/tmp/claude-1000/-home-cataluna84-Workspace-tinyaya-stage2-scale/524d2fd7-f932-4210-8406-5dbf2ee8d8aa/scratchpad/probe_retry_loop.sh`
+
+
+## 2026-07-10T23:25:31Z | feat/v0.3-implementation@255c4f5 | fail | verify
+verify: 11 passed, 1 failed out of 12 on Stop
+
+FAIL [1] # the TPU↔GPU seam holds: torch_xla must NOT leak into shared model/data code
+    src/model/scan_utils.py:479:    from torch_xla.experimental.scan_layers import (
+
+
+## 2026-07-10T23:22:45Z | feat/v0.3-implementation@255c4f5 | done | exec
+gcloud compute tpus queued-resources list --project=ml-pipelines-315702 --zone=europe-west4-a --format="table(name.basename(),state.state)" 2>&1
+
+
+## 2026-07-10T21:13:16Z | feat/v0.3-implementation@255c4f5 | fail | verify
+verify: 11 passed, 1 failed out of 12 on Stop
+
+FAIL [1] # the TPU↔GPU seam holds: torch_xla must NOT leak into shared model/data code
+    src/model/scan_utils.py:479:    from torch_xla.experimental.scan_layers import (
+
+
+## 2026-07-10T21:12:54Z | feat/v0.3-implementation@255c4f5 | done | exec
+TRC_PROFILE=v6e-8-eu \
+
+
+## 2026-07-10T21:11:01Z | feat/v0.3-implementation@255c4f5 | fail | verify
+verify: 11 passed, 1 failed out of 12 on Stop
+
+FAIL [1] # the TPU↔GPU seam holds: torch_xla must NOT leak into shared model/data code
+    src/model/scan_utils.py:479:    from torch_xla.experimental.scan_layers import (
+
+
+## 2026-07-10T21:10:41Z | feat/v0.3-implementation@255c4f5 | done | exec
+for qr in tinyaya-probe2-r1-qr tinyaya-probe2-r3-qr; do gcloud compute tpus queued-resources describe $qr --project=ml-pipelines-315702 --zone=europe-west4-a --format="value(state.state,state.stateInitiator)" 2>/dev/null; done
+
+
+## 2026-07-10T21:09:42Z | feat/v0.3-implementation@255c4f5 | done | exec
+gcloud compute tpus queued-resources list --project=ml-pipelines-315702 --zone=europe-west4-a --format="table(name.basename(),state.state)" 2>&1
+
+
+## 2026-07-10T21:09:12Z | feat/v0.3-implementation@255c4f5 | info | session
+SessionEnd (resume): 6 item(s) carried forward
+
+Next steps:
+- 6 reval arms (A–F, text_weight 0.2, group `v03-5k-reval-ta`) reach 5,000 steps;
+- v0.3 production run completes (14,532 steps / 3 epochs, text+audio + scan recipe)
+- Release eval with the loader-fixed path: per-codebook accuracy (teacher-forced),
+- v0.3 HF repo published (card + all checkpoints); dataset card documents the
+- Code repos opened; `THIRD_PARTY_NOTICES.md` covers the synthetic sources.
+- Blog updated to the text+audio result + the honest misdiagnosis arc; leaked tokens
+
+
+## 2026-07-10T18:17:20Z | feat/v0.3-implementation@255c4f5 | info | session
+SessionEnd (other): 6 item(s) carried forward
+
+Next steps:
+- 6 reval arms (A–F, text_weight 0.2, group `v03-5k-reval-ta`) reach 5,000 steps;
+- v0.3 production run completes (14,532 steps / 3 epochs, text+audio + scan recipe)
+- Release eval with the loader-fixed path: per-codebook accuracy (teacher-forced),
+- v0.3 HF repo published (card + all checkpoints); dataset card documents the
+- Code repos opened; `THIRD_PARTY_NOTICES.md` covers the synthetic sources.
+- Blog updated to the text+audio result + the honest misdiagnosis arc; leaked tokens
+
+
+## 2026-07-10T18:11:06Z | feat/v0.3-implementation@255c4f5 | fail | verify
+verify: 11 passed, 1 failed out of 12 on Stop
+
+FAIL [1] # the TPU↔GPU seam holds: torch_xla must NOT leak into shared model/data code
+    src/model/scan_utils.py:479:    from torch_xla.experimental.scan_layers import (
+
+
+## 2026-07-10T18:09:36Z | feat/v0.3-implementation@255c4f5 | done | exec
+gcloud compute tpus queued-resources list --project=ml-pipelines-315702 --zone=europe-west4-a --format="table(name.basename(),state.state)" 2>&1
+
+
+## 2026-07-10T17:15:26Z | feat/v0.3-implementation@255c4f5 | fail | verify
+verify: 11 passed, 1 failed out of 12 on Stop
+
+FAIL [1] # the TPU↔GPU seam holds: torch_xla must NOT leak into shared model/data code
+    src/model/scan_utils.py:479:    from torch_xla.experimental.scan_layers import (
+
+
+## 2026-07-10T17:15:03Z | feat/v0.3-implementation@255c4f5 | done | exec
+gcloud compute tpus queued-resources list --project=ml-pipelines-315702 --zone=europe-west4-a --format="table(name.basename(),state.state)" 2>&1
+
+
+## 2026-07-10T17:12:38Z | feat/v0.3-implementation@255c4f5 | done | exec
+gcloud compute tpus queued-resources list --project=ml-pipelines-315702 --zone=europe-west4-a --format="table(name.basename(),state.state)" 2>&1
+
+
+## 2026-07-10T17:03:45Z | feat/v0.3-implementation@255c4f5 | fail | verify
+verify: 11 passed, 1 failed out of 12 on Stop
+
+FAIL [1] # the TPU↔GPU seam holds: torch_xla must NOT leak into shared model/data code
+    src/model/scan_utils.py:479:    from torch_xla.experimental.scan_layers import (
+
+
+## 2026-07-10T16:55:48Z | feat/v0.3-implementation@255c4f5 | fail | verify
+verify: 11 passed, 1 failed out of 12 on Stop
+
+FAIL [1] # the TPU↔GPU seam holds: torch_xla must NOT leak into shared model/data code
+    src/model/scan_utils.py:479:    from torch_xla.experimental.scan_layers import (
+
+
+## 2026-07-10T16:29:37Z | feat/v0.3-implementation@255c4f5 | fail | verify
+verify: 11 passed, 1 failed out of 12 on Stop
+
+FAIL [1] # the TPU↔GPU seam holds: torch_xla must NOT leak into shared model/data code
+    src/model/scan_utils.py:479:    from torch_xla.experimental.scan_layers import (
+
+
+## 2026-07-10T16:28:51Z | feat/v0.3-implementation@255c4f5 | done | exec
+for i in 0 1 2 3; do
+
+
+## 2026-07-10T16:26:02Z | feat/v0.3-implementation@255c4f5 | done | exec
+sed -n '130,160p' /home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/tpu/launch_reval_arms.sh
+
+
+## 2026-07-10T16:25:53Z | feat/v0.3-implementation@255c4f5 | done | exec
+sed -n '60,130p' /home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/tpu/launch_reval_arms.sh
+
+
+## 2026-07-10T16:25:43Z | feat/v0.3-implementation@255c4f5 | done | exec
+sed -n '1,60p' /home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/tpu/launch_reval_arms.sh
+
+
+## 2026-07-10T16:25:33Z | feat/v0.3-implementation@255c4f5 | done | exec
+git add scripts/train_hierarchical.py tests/test_group_diag.py configs/tpu/reval/probe2_*.yaml && git commit --quiet -m "feat(probes): round-2 probe configs R0-R3 + scheduler_total_steps/seed knobs
+
+
+## 2026-07-10T16:24:55Z | feat/v0.3-implementation@7de41ca | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/tests/test_group_diag.py`
+
+
+## 2026-07-10T16:24:40Z | feat/v0.3-implementation@7de41ca | done | exec
+.venv/bin/python - <<'EOF'
+
+
+## 2026-07-10T16:23:56Z | feat/v0.3-implementation@7de41ca | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/train_hierarchical.py`
+
+
+## 2026-07-10T16:23:53Z | feat/v0.3-implementation@7de41ca | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/train_hierarchical.py`
+
+
+## 2026-07-10T16:23:49Z | feat/v0.3-implementation@7de41ca | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/train_hierarchical.py`
+
+
+## 2026-07-10T16:23:47Z | feat/v0.3-implementation@7de41ca | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/train_hierarchical.py`
+
+
+## 2026-07-10T16:18:29Z | feat/v0.3-implementation@7de41ca | fail | verify
+verify: 11 passed, 1 failed out of 12 on Stop
+
+FAIL [1] # the TPU↔GPU seam holds: torch_xla must NOT leak into shared model/data code
+    src/model/scan_utils.py:479:    from torch_xla.experimental.scan_layers import (
+
+
+## 2026-07-10T16:14:38Z | feat/v0.3-implementation@7de41ca | fail | verify
+verify: 11 passed, 1 failed out of 12 on Stop
+
+FAIL [1] # the TPU↔GPU seam holds: torch_xla must NOT leak into shared model/data code
+    src/model/scan_utils.py:479:    from torch_xla.experimental.scan_layers import (
+
+
+## 2026-07-10T16:14:02Z | feat/v0.3-implementation@7de41ca | done | exec
+gh run list --branch feat/v0.3-implementation --limit 3 --json displayTitle,status,conclusion --jq '.[] | "\(.status) \(.conclusion // "-") \(.displayTitle)"'
+
+
+## 2026-07-10T16:10:16Z | feat/v0.3-implementation@7de41ca | done | edit
+edited `/home/cataluna84/.claude/projects/-home-cataluna84-Workspace-tinyaya-stage2-scale/memory/v03-reval-sweep-launch.md`
+
+
+## 2026-07-10T16:10:01Z | feat/v0.3-implementation@7de41ca | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/.claude/PROGRESS.md`
+
+
+## 2026-07-10T16:12:00Z | feat/v0.3-implementation@7de41ca | done | decide
+DEAD-KEY DISCLOSURE: train.clip_grad_norm was never read (code reads max_grad_norm, default 1.0) — probes P1/P3 ran at clip 1.0, so clip 10 is UNTESTED (not rejected). P1 ⇒ pure cosine-schedule ablation, bounds run noise ≈0.6%; P3 ⇒ genuine batch-512@clip-1 rejection (+1.1%, cb0 −6pt). Verdict unchanged: production clip 1.0 @ 256 (pre-registered keep-validated rule). Fixed via load_config normalization (31894fc) + per-group diag/* telemetry (weight/grad RMS, lr×grad + Adam update sizes, clip_coef) enabled for production/smoke (9b1fa89); scripts/analysis/checkpoint_group_rms.py for finished runs (27e9f81); report/PR comment corrected (7de41ca). No sweep arm affected (all intended clip 1.0 = default).
+
+## 2026-07-10T16:07:01Z | feat/v0.3-implementation@7de41ca | done | exec
+git add scripts/train_hierarchical.py src/training/param_classify.py tests/test_group_diag.py tests/test_param_classify.py && git commit --quiet -m "fix(train): honor train.clip_grad_norm (dead key) + per-group weight/update RMS telemetry
+
+
+## 2026-07-10T16:05:31Z | feat/v0.3-implementation@35c50eb | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/docs/v0.3-reval-report.md`
+
+
+## 2026-07-10T16:03:47Z | feat/v0.3-implementation@35c50eb | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/analysis/checkpoint_group_rms.py`
+
+
+## 2026-07-10T16:03:43Z | feat/v0.3-implementation@35c50eb | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/analysis/checkpoint_group_rms.py`
+
+
+## 2026-07-10T16:01:08Z | feat/v0.3-implementation@35c50eb | done | exec
+.venv/bin/python - <<'EOF'
+
+
+## 2026-07-10T15:56:42Z | feat/v0.3-implementation@35c50eb | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/tests/test_param_classify.py`
+
+
+## 2026-07-10T15:56:06Z | feat/v0.3-implementation@35c50eb | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/tests/test_param_classify.py`
+
+
+## 2026-07-10T15:55:43Z | feat/v0.3-implementation@35c50eb | done | edit
+created `/home/cataluna84/Workspace/tinyaya-stage2-scale/tests/test_group_diag.py`
+
+
+## 2026-07-10T15:54:38Z | feat/v0.3-implementation@35c50eb | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/analysis/checkpoint_group_rms.py`
+
+
+## 2026-07-10T15:54:22Z | feat/v0.3-implementation@35c50eb | done | edit
+created `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/analysis/checkpoint_group_rms.py`
+
+
+## 2026-07-10T15:50:44Z | feat/v0.3-implementation@35c50eb | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/train_hierarchical.py`
+
+
+## 2026-07-10T15:50:25Z | feat/v0.3-implementation@35c50eb | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/train_hierarchical.py`
+
+
+## 2026-07-10T15:50:19Z | feat/v0.3-implementation@35c50eb | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/train_hierarchical.py`
+
+
+## 2026-07-10T15:50:05Z | feat/v0.3-implementation@35c50eb | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/src/training/param_classify.py`
+
+
+## 2026-07-10T15:49:28Z | feat/v0.3-implementation@35c50eb | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/configs/tpu/reval/smoke_scan.yaml`
+
+
+## 2026-07-10T15:49:03Z | feat/v0.3-implementation@35c50eb | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/configs/tpu/stage2_tpu_v6e16_full_v03.yaml`
+
+
+## 2026-07-10T15:48:39Z | feat/v0.3-implementation@35c50eb | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/train_hierarchical.py`
+
+
+## 2026-07-10T15:48:23Z | feat/v0.3-implementation@35c50eb | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/train_hierarchical.py`
+
+
+## 2026-07-10T15:48:09Z | feat/v0.3-implementation@35c50eb | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/train_hierarchical.py`
+
+
+## 2026-07-10T15:47:53Z | feat/v0.3-implementation@35c50eb | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/train_hierarchical.py`
+
+
+## 2026-07-10T15:47:22Z | feat/v0.3-implementation@35c50eb | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/train_hierarchical.py`
+
+
+## 2026-07-10T15:47:08Z | feat/v0.3-implementation@35c50eb | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/train_hierarchical.py`
+
+
+## 2026-07-10T15:46:48Z | feat/v0.3-implementation@35c50eb | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/train_hierarchical.py`
+
+
+## 2026-07-10T15:46:23Z | feat/v0.3-implementation@35c50eb | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/train_hierarchical.py`
+
+
+## 2026-07-10T15:46:14Z | feat/v0.3-implementation@35c50eb | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/train_hierarchical.py`
+
+
+## 2026-07-10T15:31:23Z | feat/v0.3-implementation@35c50eb | done | edit
+edited `/home/cataluna84/.claude/plans/fix-the-sweep-startegy-linear-flask.md`
+
+
+## 2026-07-10T15:31:13Z | feat/v0.3-implementation@35c50eb | done | edit
+edited `/home/cataluna84/.claude/plans/fix-the-sweep-startegy-linear-flask.md`
+
+
+## 2026-07-10T15:27:15Z | feat/v0.3-implementation@35c50eb | done | edit
+created `/home/cataluna84/.claude/plans/fix-the-sweep-startegy-linear-flask.md`
+
+
+## 2026-07-10T15:15:44Z | feat/v0.3-implementation@35c50eb | info | session
+SessionEnd (resume): 6 item(s) carried forward
+
+Next steps:
+- 6 reval arms (A–F, text_weight 0.2, group `v03-5k-reval-ta`) reach 5,000 steps;
+- v0.3 production run completes (14,532 steps / 3 epochs, text+audio + scan recipe)
+- Release eval with the loader-fixed path: per-codebook accuracy (teacher-forced),
+- v0.3 HF repo published (card + all checkpoints); dataset card documents the
+- Code repos opened; `THIRD_PARTY_NOTICES.md` covers the synthetic sources.
+- Blog updated to the text+audio result + the honest misdiagnosis arc; leaked tokens
+
+
+## 2026-07-10T04:50:47Z | feat/v0.3-implementation@35c50eb | info | session
+SessionEnd (other): 6 item(s) carried forward
+
+Next steps:
+- 6 reval arms (A–F, text_weight 0.2, group `v03-5k-reval-ta`) reach 5,000 steps;
+- v0.3 production run completes (14,532 steps / 3 epochs, text+audio + scan recipe)
+- Release eval with the loader-fixed path: per-codebook accuracy (teacher-forced),
+- v0.3 HF repo published (card + all checkpoints); dataset card documents the
+- Code repos opened; `THIRD_PARTY_NOTICES.md` covers the synthetic sources.
+- Blog updated to the text+audio result + the honest misdiagnosis arc; leaked tokens
+
+
+## 2026-07-10T04:48:14Z | feat/v0.3-implementation@35c50eb | fail | verify
+verify: 11 passed, 1 failed out of 12 on Stop
+
+FAIL [1] # the TPU↔GPU seam holds: torch_xla must NOT leak into shared model/data code
+    src/model/scan_utils.py:479:    from torch_xla.experimental.scan_layers import (
+
+
+## 2026-07-10T04:47:36Z | feat/v0.3-implementation@35c50eb | done | exec
+git add docs/v0.3-reval-report.md && git commit --quiet -m "docs(report): real W&B run links for probes P1/P3 (8jchq4yu, x198ay7a)
+
+
+## 2026-07-10T04:47:24Z | feat/v0.3-implementation@0e3f5fd | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/docs/v0.3-reval-report.md`
+
+
+## 2026-07-10T04:42:09Z | feat/v0.3-implementation@0e3f5fd | fail | verify
+verify: 11 passed, 1 failed out of 12 on Stop
+
+FAIL [1] # the TPU↔GPU seam holds: torch_xla must NOT leak into shared model/data code
+    src/model/scan_utils.py:479:    from torch_xla.experimental.scan_layers import (
+
+
+## 2026-07-10T04:41:43Z | feat/v0.3-implementation@0e3f5fd | done | exec
+git add docs/v0.3-reval-report.md && git commit -m "docs(report): correct appendix — production NOT launched, rolled back pending team sign-off
+
+
+## 2026-07-10T04:40:48Z | feat/v0.3-implementation@5561ff4 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/docs/v0.3-reval-report.md`
+
+
+## 2026-07-10T04:37:58Z | feat/v0.3-implementation@5561ff4 | fail | verify
+verify: 11 passed, 1 failed out of 12 on Stop
+
+FAIL [1] # the TPU↔GPU seam holds: torch_xla must NOT leak into shared model/data code
+    src/model/scan_utils.py:479:    from torch_xla.experimental.scan_layers import (
+
+
+## 2026-07-10T04:37:27Z | feat/v0.3-implementation@5561ff4 | done | edit
+edited `/home/cataluna84/.claude/projects/-home-cataluna84-Workspace-tinyaya-stage2-scale/memory/MEMORY.md`
+
+
+## 2026-07-10T04:37:12Z | feat/v0.3-implementation@5561ff4 | done | edit
+edited `/home/cataluna84/.claude/projects/-home-cataluna84-Workspace-tinyaya-stage2-scale/memory/v03-reval-sweep-launch.md`
+
+
+## 2026-07-10T04:34:21Z | feat/v0.3-implementation@5561ff4 | done | exec
+gcloud compute tpus queued-resources list --project=ml-pipelines-315702 --zone=europe-west4-a --format="table(name.basename(),state.state)" 2>&1
+
+
+## 2026-07-10T04:33:48Z | feat/v0.3-implementation@5561ff4 | info | session
+SessionEnd (resume): 6 item(s) carried forward
+
+Next steps:
+- 6 reval arms (A–F, text_weight 0.2, group `v03-5k-reval-ta`) reach 5,000 steps;
+- v0.3 production run completes (14,532 steps / 3 epochs, text+audio + scan recipe)
+- Release eval with the loader-fixed path: per-codebook accuracy (teacher-forced),
+- v0.3 HF repo published (card + all checkpoints); dataset card documents the
+- Code repos opened; `THIRD_PARTY_NOTICES.md` covers the synthetic sources.
+- Blog updated to the text+audio result + the honest misdiagnosis arc; leaked tokens
+
+
+## 2026-07-10T04:32:56Z | feat/v0.3-implementation@5561ff4 | info | session
+SessionEnd (other): 6 item(s) carried forward
+
+Next steps:
+- 6 reval arms (A–F, text_weight 0.2, group `v03-5k-reval-ta`) reach 5,000 steps;
+- v0.3 production run completes (14,532 steps / 3 epochs, text+audio + scan recipe)
+- Release eval with the loader-fixed path: per-codebook accuracy (teacher-forced),
+- v0.3 HF repo published (card + all checkpoints); dataset card documents the
+- Code repos opened; `THIRD_PARTY_NOTICES.md` covers the synthetic sources.
+- Blog updated to the text+audio result + the honest misdiagnosis arc; leaked tokens
+
+
+## 2026-07-10T04:25:35Z | feat/v0.3-implementation@5561ff4 | info | session
+PreCompact (manual): 6 unchecked PLAN items
+
+Top open items:
+- 6 reval arms (A–F, text_weight 0.2, group `v03-5k-reval-ta`) reach 5,000 steps;
+- v0.3 production run completes (14,532 steps / 3 epochs, text+audio + scan recipe)
+- Release eval with the loader-fixed path: per-codebook accuracy (teacher-forced),
+- v0.3 HF repo published (card + all checkpoints); dataset card documents the
+- Code repos opened; `THIRD_PARTY_NOTICES.md` covers the synthetic sources.
+- Blog updated to the text+audio result + the honest misdiagnosis arc; leaked tokens
+
+
+## 2026-07-10T04:21:54Z | feat/v0.3-implementation@5561ff4 | fail | verify
+verify: 11 passed, 1 failed out of 12 on Stop
+
+FAIL [1] # the TPU↔GPU seam holds: torch_xla must NOT leak into shared model/data code
+    src/model/scan_utils.py:479:    from torch_xla.experimental.scan_layers import (
+
+
+## 2026-07-10T04:06:47Z | feat/v0.3-implementation@5561ff4 | fail | verify
+verify: 11 passed, 1 failed out of 12 on Stop
+
+FAIL [1] # the TPU↔GPU seam holds: torch_xla must NOT leak into shared model/data code
+    src/model/scan_utils.py:479:    from torch_xla.experimental.scan_layers import (
+
+
 ## 2026-07-10T04:02:48Z | feat/v0.3-implementation@7d2858a | info | session
 SessionEnd (resume): 6 item(s) carried forward
 

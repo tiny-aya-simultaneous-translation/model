@@ -76,8 +76,8 @@ def _normalize_gcs_dest(save_dir: str) -> str | None:
     return None
 
 
-def _gsutil_cp_into(src_dir: str, gcs_dest: str, attempts: int = 4) -> None:
-    """Copy the *contents* of ``src_dir`` into ``gcs_dest`` via gsutil.
+def _gsutil_with_retry(args: list[str], desc: str, attempts: int = 4) -> None:
+    """Run one gsutil command with exponential-backoff retries.
 
     Retries with backoff: the checkpoint bundle includes the (large, frozen)
     depth-decoder tensor, and a single transient network blip on that multi-GB
@@ -86,28 +86,73 @@ def _gsutil_cp_into(src_dir: str, gcs_dest: str, attempts: int = 4) -> None:
     stuck on a STALE (pre-crash) metric that a sweep coordinator would then
     rank on. gsutil's own "Resuming upload" retries a broken TCP stream but
     still surfaces the operation as failed if the retry budget runs out; wrap
-    the whole multi-file copy again one level up.
+    the whole copy again one level up.
     """
     import subprocess
     import time
 
-    print(f"[ckpt] uploading {src_dir}/* -> {gcs_dest}", flush=True)
     last_err = None
     for attempt in range(1, attempts + 1):
-        result = subprocess.run(
-            ["gsutil", "-m", "cp", "-r", src_dir.rstrip("/") + "/.", gcs_dest],
-            capture_output=True,
-            text=True,
-        )
+        result = subprocess.run(args, capture_output=True, text=True)
         if result.returncode == 0:
-            print(f"[ckpt] upload complete: {gcs_dest}", flush=True)
             return
         last_err = result.stderr
-        print(f"[ckpt] upload attempt {attempt}/{attempts} failed (rc={result.returncode}); "
+        print(f"[ckpt] {desc} attempt {attempt}/{attempts} failed (rc={result.returncode}); "
               f"stderr tail: {(result.stderr or '')[-500:]}", flush=True)
         if attempt < attempts:
             time.sleep(min(10 * 2 ** (attempt - 1), 120))
-    raise RuntimeError(f"gsutil upload failed after {attempts} attempts: {last_err}")
+    raise RuntimeError(f"gsutil {desc} failed after {attempts} attempts: {last_err}")
+
+
+def _gsutil_cp_into(src_dir: str, gcs_dest: str, attempts: int = 4) -> None:
+    """Copy the *contents* of ``src_dir`` into ``gcs_dest`` via gsutil."""
+    print(f"[ckpt] uploading {src_dir}/* -> {gcs_dest}", flush=True)
+    _gsutil_with_retry(
+        ["gsutil", "-m", "cp", "-r", src_dir.rstrip("/") + "/.", gcs_dest],
+        desc="upload",
+        attempts=attempts,
+    )
+    print(f"[ckpt] upload complete: {gcs_dest}", flush=True)
+
+
+def _gsutil_cp_file(src_file: str, gcs_dest_dir: str, attempts: int = 4) -> None:
+    """Upload one local file into ``gcs_dest_dir`` (used for the metadata gate)."""
+    _gsutil_with_retry(
+        ["gsutil", "cp", src_file, gcs_dest_dir.rstrip("/") + "/"],
+        desc=f"upload {os.path.basename(src_file)}",
+        attempts=attempts,
+    )
+
+
+def fetch_checkpoint_file(ckpt_dir: str, fname: str) -> str | None:
+    """Return a LOCAL path for ``<ckpt_dir>/<fname>``, downloading from GCS if needed.
+
+    ``load_checkpoint`` downloads GCS checkpoints into a private temp dir and
+    returns only the step, so callers that later need a single component (the
+    trainer restores ``optimizer.pt`` separately, AFTER wrap + optimizer
+    creation) cannot ``os.path.exists()`` the original ``gs://`` dir -- that is
+    always False on a local filesystem check. This helper is the supported way
+    to reach one checkpoint file regardless of where the checkpoint lives.
+    Returns None when the file does not exist (locally or remotely).
+    """
+    gcs_src = _normalize_gcs_dest(ckpt_dir)
+    if gcs_src is None:
+        p = os.path.join(ckpt_dir, fname)
+        return p if os.path.exists(p) else None
+
+    import subprocess
+    import tempfile
+
+    local_dir = tempfile.mkdtemp(prefix="ckpt_fetch_")
+    local_path = os.path.join(local_dir, fname)
+    result = subprocess.run(
+        ["gsutil", "cp", gcs_src.rstrip("/") + "/" + fname, local_path],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        return None
+    return local_path
 
 
 def save_checkpoint(
@@ -275,16 +320,42 @@ def save_checkpoint(
     if sched_state is not None:
         torch.save(sched_state, os.path.join(write_dir, "scheduler.pt"))
 
+    # Host RNG snapshot (best-effort). Restoring it on resume keeps the dropout
+    # stream and any host-side shuffling from replaying the fresh-start
+    # sequence. Data ORDER is still at-least-once (no dataloader cursor).
+    rng_state: dict = {"torch": torch.get_rng_state()}
+    if is_xla:
+        try:
+            import torch_xla.core.xla_model as xm
+
+            rng_state["xla"] = xm.get_rng_state()
+        except Exception as e:  # noqa: BLE001 - telemetry, never blocks a save
+            print(f"[ckpt] WARNING: xla rng snapshot failed: {e}", flush=True)
+    torch.save(rng_state, os.path.join(write_dir, "rng.pt"))
+
     meta = {"step": step}
     if extra_state:
         meta.update(extra_state)
-    with open(os.path.join(write_dir, "metadata.json"), "w") as f:
+    meta_path = os.path.join(write_dir, "metadata.json")
+    with open(meta_path, "w") as f:
         json.dump(meta, f, indent=2)
 
     if gcs_dest is not None:
         import shutil
 
+        # metadata.json is the resume gate: find_latest_checkpoint /
+        # load_checkpoint only trust dirs that have it. ``gsutil -m`` uploads
+        # files in arbitrary parallel order, so a preemption mid-upload could
+        # otherwise land metadata.json BEFORE optimizer.pt -- and a resume
+        # from that dir would silently continue with a fresh optimizer. Move
+        # metadata aside, bulk-upload the payload, then upload metadata alone
+        # LAST so its presence in GCS implies a complete checkpoint. Staged as
+        # a SIBLING of write_dir so the bulk copy cannot pick it up.
+        staged_meta = write_dir.rstrip("/") + ".metadata.gate"
+        os.replace(meta_path, staged_meta)
         _gsutil_cp_into(write_dir, gcs_dest)
+        os.replace(staged_meta, meta_path)
+        _gsutil_cp_file(meta_path, gcs_dest)
         if keep_local:
             print(f"[ckpt] retained local mirror: {write_dir}", flush=True)
         else:
@@ -652,12 +723,21 @@ def _step_of(path: str) -> int:
 
 
 def get_checkpoint_dirs(base_dir: str) -> list[str]:
-    """List the periodic ``step_*`` checkpoint dirs, sorted ascending by step.
+    """List the COMPLETE periodic ``step_*`` checkpoint dirs, ascending by step.
 
     save_checkpoint writes ``<save_dir>/step_NNNNNN`` (zero-padded). This finds
     exactly those, EXCLUDING non-step dirs like ``best_by_val`` so resume always
     picks the latest periodic checkpoint. Supports local and GCS (gsutil, matching
     the rest of this module -- no gcsfs dependency).
+
+    Two completeness filters guard resume:
+    * dirs whose name does not parse as ``step_<int>`` are dropped -- the
+      canonical-final ``step_NNNNNN_final`` dir (weights-only, no optimizer)
+      must never be a resume target;
+    * dirs without ``metadata.json`` are dropped -- metadata is uploaded LAST
+      (see save_checkpoint), so its absence means a preemption interrupted the
+      upload and resume should fall back to the previous complete checkpoint
+      instead of starting fresh.
     """
     if is_gcs_path(base_dir):
         import subprocess
@@ -674,6 +754,19 @@ def get_checkpoint_dirs(base_dir: str) -> list[str]:
             for ln in listing.stdout.splitlines()
             if ln.rstrip("/").rsplit("/", 1)[-1].startswith("step_")
         ]
+        dirs = [d for d in dirs if _step_of(d) >= 0]
+        if not dirs:
+            return []
+        # One batched existence check for all metadata gates (avoids N
+        # round-trips): gsutil ls on an explicit list prints only the
+        # objects that exist and warns about the rest.
+        gates = subprocess.run(
+            ["gsutil", "ls"] + [d + "/metadata.json" for d in dirs],
+            capture_output=True,
+            text=True,
+        )
+        present = set(ln.strip() for ln in gates.stdout.splitlines())
+        dirs = [d for d in dirs if d + "/metadata.json" in present]
         return sorted(dirs, key=_step_of)
 
     if not os.path.exists(base_dir):
@@ -682,6 +775,11 @@ def get_checkpoint_dirs(base_dir: str) -> list[str]:
         os.path.join(base_dir, d)
         for d in os.listdir(base_dir)
         if d.startswith("step_") and os.path.isdir(os.path.join(base_dir, d))
+    ]
+    dirs = [
+        d
+        for d in dirs
+        if _step_of(d) >= 0 and os.path.exists(os.path.join(d, "metadata.json"))
     ]
     return sorted(dirs, key=_step_of)
 
