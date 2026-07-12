@@ -1,0 +1,104 @@
+# P0 multi-host input-semantics smoke for v6e-64 (us-east1-d, 16 hosts x 4
+# chips). v6e HBM (32GB) fits the replicated model, so unlike v5e-64 this
+# smoke should TRAIN — demonstrating live that a 64-chip v6e slice still
+# consumes only ONE host's rows (logical batch 16) under legacy semantics.
+backend: tpu
+data:
+  encoded_dir: /mnt/data/encoded
+  train_split: /mnt/data/splits/train.jsonl
+  val_split: /mnt/data/splits/val.jsonl
+  max_frames: 300
+  audio_frame_rate: 12.5
+  num_workers: 32
+  pin_memory: false
+train:
+  weight_decay: 0.01
+  num_codebooks: 8
+  batch_size: 16
+  grad_accum: 2
+  max_steps: 40
+  warmup_steps: 5
+  min_lr_ratio: 0.0
+  early_stop_patience: 0
+  compile_warmup_steps: 1
+  enable_clip_grad_norm: true
+  clip_grad_norm: 1.0
+  log_grad_norm: true
+  fsdp_barrier_hook: false
+  # Graph break per micro-batch + fewer/larger depth chunks: both target the
+  # 82.5% HBM fragmentation seen when 8 micros x 19 depth chunks trace into
+  # one program (81.08G "used" over 14.21G of real buffers).
+  micro_mark_step: true
+  depth_chunk_size: 100
+  precision: bfloat16
+  use_scan_layers: true
+  xla_grad_checkpoint: true
+  final_canonical_save: false
+  debug_input_sharding: true
+loss:
+  text_weight: 0.2
+  audio_weight: 1.0
+  text_weight_curriculum_frac: 0.0
+  composite_text_w: 0.4
+  composite_audio_w: 0.6
+  text_padding_weight: 0.01
+  zero_padding_weight: 0.0
+  label_smoothing: 0.1
+  per_codebook_multipliers:
+  - 1.0
+  - 1.0
+  - 1.5
+  - 1.5
+  - 2.0
+  - 2.0
+  - 2.0
+  - 2.0
+  progressive_unmask_fraction: 0.1
+  unmask_k0: 1
+lora:
+  r: 32
+  alpha: 64
+  dropout: 0.05
+  use_rslora: true
+  target_modules:
+  - q_proj
+  - k_proj
+  - v_proj
+  - o_proj
+  - gate_proj
+  - up_proj
+  - down_proj
+  - embed_tokens
+  lora_exclude_top: 2
+  num_full_ft_layers: 0
+  depth_unfreeze_blocks: 0
+optim:
+  lr_lora: 0.0001716
+  lr_full_ft: 5.0e-05
+  lr_projection: 0.0005
+  lr_depth: 0.0001
+  lr_depth_blocks: 1.0e-05
+  lr_audio_embed: 0.0005
+  lr_text_embed: 0.0005
+logging:
+  log_every: 5
+  save_every: 100000
+  audio_every: 1000000
+  val_every: 100000
+  val_max_batches: 10
+  val_on_tpu: true
+  # true = validation vehicle for the per-group diag/* telemetry (weight/grad
+  # RMS + update sizes): the smoke is where the extra log-boundary graph
+  # variant gets its compile checked before production.
+  diag_metrics: true
+  save_dir: gs://tinyaya-stage2-eu/checkpoints/p0-shard-audit/b16-v6e64-us
+  keep_last_n: 0
+  keep_local_checkpoints: false
+  use_wandb: true
+  wandb_project: tinyaya-stage2-tpu
+  wandb_run_name: p0-shard-b16-v6e64-us
+  wandb_group: v03-p0-shard-audit
+perf:
+  enabled: true
+  warmup_skip_steps: 25
+  xprof_trace_labels: false
