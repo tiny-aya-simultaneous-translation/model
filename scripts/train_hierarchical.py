@@ -397,6 +397,14 @@ DEFAULTS = {
         # compile; production/probe configs set true. On GPU, val always runs.
         "val_on_tpu": False,
         "save_dir": "checkpoints/stage2_scale",
+        # Log-spaced early checkpoints for the public mech-interp suite (in
+        # ADDITION to save_every). log_spaced_saves auto-adds {1,2,4,...,512};
+        # save_at_steps is an explicit extra list. Empty/false => save_every only.
+        "log_spaced_saves": False,
+        "save_at_steps": None,
+        # Background the periodic-save GCS upload so keep-all saves don't stall
+        # training (best_by_val/final stay synchronous). Drained before final save.
+        "async_checkpoint_upload": False,
         "wandb_project": "tinyaya-s2s",
         "wandb_run_name": "stage2_scale",
         "use_wandb": False,
@@ -2026,6 +2034,16 @@ def main():
     max_steps = cfg["train"]["max_steps"]
     log_every = cfg["logging"]["log_every"]
     save_every = cfg["logging"]["save_every"]
+    # Log-spaced early checkpoints for the public mechanistic-interp suite
+    # (Pythia convention: dense sampling of the fast early dynamics). Union of
+    # an auto {1,2,4,...,512} schedule (logging.log_spaced_saves) and any
+    # explicit logging.save_at_steps list. Saved IN ADDITION to save_every.
+    save_at_steps = set(int(s) for s in (cfg["logging"].get("save_at_steps") or []))
+    if cfg["logging"].get("log_spaced_saves", False):
+        _p = 1
+        while _p <= 512:
+            save_at_steps.add(_p)
+            _p *= 2
     # Checkpoint retention. keep_last_n<=0 => UNLIMITED (no rotation). When
     # keep_local_checkpoints is set, periodic + final checkpoints are also
     # mirrored to local_checkpoint_dir on the VM (disk-guarded in save_checkpoint).
@@ -2035,6 +2053,10 @@ def main():
         if cfg["logging"].get("keep_local_checkpoints", False)
         else None
     )
+    # Background the multi-GB periodic-save upload so keep-all saves don't stall
+    # the loop (best_by_val + final + canonical stay synchronous). Drained before
+    # the final save so a released run never exits mid-upload.
+    async_ckpt = bool(cfg["logging"].get("async_checkpoint_upload", False))
     audio_every = cfg["logging"]["audio_every"]
     val_every = cfg["logging"]["val_every"]
     text_w = cfg["loss"]["text_weight"]
@@ -3061,8 +3083,8 @@ def main():
                             print(f"  hub push failed: {e}")
             backend.barrier()
 
-        # ---- periodic save + prune
-        if save_every and step % save_every == 0:
+        # ---- periodic save + prune (save_every cadence UNION log-spaced early)
+        if (save_every and step % save_every == 0) or (step in save_at_steps):
             d = _ckpt_subpath(f"step_{step:06d}")
             # Patch 16/17: ALL hosts enter save_checkpoint to participate
             # in the SPMD .cpu() gather; only host-0 actually writes.
@@ -3082,6 +3104,7 @@ def main():
                 },
                 is_main=is_main,
                 keep_local_dir=keep_local_dir,
+                async_upload=async_ckpt,
             )
             if is_main:
                 # keep_last_n<=0 => prune_checkpoints no-ops (unlimited retention).
@@ -3097,6 +3120,13 @@ def main():
 
         if _early_stop:
             break  # Phase A early stopping -> fall through to the final save below
+
+    # Drain any in-flight async periodic-save uploads before the final/canonical
+    # saves so the released run never exits with an incomplete upload in GCS.
+    if async_ckpt:
+        from src.training.checkpointing import wait_for_uploads
+
+        wait_for_uploads()
 
     # ---- final save (multi-host SPMD-safe; see patch 16/17)
     # patch 18b: respect save_every=0 escape hatch -- skip the final save

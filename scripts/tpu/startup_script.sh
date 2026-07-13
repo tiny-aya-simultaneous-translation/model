@@ -62,6 +62,10 @@ IS_SPOT="$(read_meta is-spot 0)"
 # of the full corpus from HF. Both empty for a normal training run.
 SWEEP_ID="$(read_meta sweep-id '')"
 SWEEP_DATA_GS_URI="$(read_meta sweep-data-gs-uri '')"
+# Flash attention: OFF historically (v4 correctness). Opt-in on v6e via the
+# `flash-attention` metadata flag; Phase E validates speed/HBM/correctness.
+if [ "$(read_meta flash-attention 0)" = "1" ]; then _FA=true; else _FA=false; fi
+LIBTPU_ARGS="--megascale_grpc_enable_xor_tracer=false --xla_tpu_enable_flash_attention=${_FA}"
 echo "[startup] CONFIG_FILE=$CONFIG_FILE"
 echo "[startup] SWEEP_ID=${SWEEP_ID:-<unset>} SWEEP_DATA_GS_URI=${SWEEP_DATA_GS_URI:-<unset>}"
 echo "[startup] OVERLAY_GS_URI=${OVERLAY_GS_URI:-<unset>}"
@@ -305,7 +309,7 @@ if [ -n "$SWEEP_ID" ]; then
         echo \"[\$(date -Is)] launching wandb agent $SWEEP_ID\" | tee -a /tmp/train.log
         export DEVICE_BACKEND=tpu PJRT_DEVICE=TPU
         export XLA_USE_BF16=0 XLA_DOWNCAST_BF16=0 XLA_DISABLE_FUNCTIONALIZATION=0 XLA_NO_SPECIAL_SCALARS=1
-        export LIBTPU_INIT_ARGS='--megascale_grpc_enable_xor_tracer=false --xla_tpu_enable_flash_attention=false'
+        export LIBTPU_INIT_ARGS='$LIBTPU_ARGS'
         export TPU_STRATEGY='$TPU_STRATEGY_META'
         export LD_LIBRARY_PATH='$LIBPYTHON_DIR:\${LD_LIBRARY_PATH:-}'
         export HF_TOKEN='$HF_TOKEN' WANDB_API_KEY='${WANDB_API_KEY:-}'
@@ -324,7 +328,7 @@ else
         XLA_DOWNCAST_BF16=0 \
         XLA_DISABLE_FUNCTIONALIZATION=0 \
         XLA_NO_SPECIAL_SCALARS=1 \
-        LIBTPU_INIT_ARGS='--megascale_grpc_enable_xor_tracer=false --xla_tpu_enable_flash_attention=false' \
+        LIBTPU_INIT_ARGS='$LIBTPU_ARGS' \
         PT_XLA_DEBUG_LEVEL=1 \
         XLA_PROFILER_PORT=9012 \
         TPU_STRATEGY='$TPU_STRATEGY_META' \

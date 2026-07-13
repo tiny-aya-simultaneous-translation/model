@@ -124,6 +124,46 @@ def _gsutil_cp_file(src_file: str, gcs_dest_dir: str, attempts: int = 4) -> None
     )
 
 
+# Background checkpoint uploader (opt-in via logging.async_checkpoint_upload).
+# Single worker so uploads serialize (no bandwidth contention / pileup); each
+# task is the full metadata-last atomic-gate upload closure from save_checkpoint.
+_UPLOAD_EXECUTOR = None
+_UPLOAD_FUTURES: list = []
+
+
+def _submit_upload(fn) -> None:
+    """Run ``fn`` (a checkpoint upload closure) on the background uploader."""
+    global _UPLOAD_EXECUTOR
+    if _UPLOAD_EXECUTOR is None:
+        from concurrent.futures import ThreadPoolExecutor
+
+        _UPLOAD_EXECUTOR = ThreadPoolExecutor(max_workers=1, thread_name_prefix="ckpt-upload")
+
+    def _guarded():
+        try:
+            fn()
+        except Exception as e:  # noqa: BLE001 - a failed async upload must not kill training
+            print(f"[ckpt] WARNING: async upload failed: {e}", flush=True)
+
+    _UPLOAD_FUTURES.append(_UPLOAD_EXECUTOR.submit(_guarded))
+
+
+def wait_for_uploads(timeout: float | None = None) -> None:
+    """Block until all queued background checkpoint uploads finish.
+
+    Called before the final/canonical save (and at run end) so a released run
+    never exits with an in-flight upload. No-op when async upload was unused.
+    """
+    global _UPLOAD_FUTURES
+    if not _UPLOAD_FUTURES:
+        return
+    from concurrent.futures import wait
+
+    print(f"[ckpt] draining {len(_UPLOAD_FUTURES)} background upload(s)...", flush=True)
+    wait(_UPLOAD_FUTURES, timeout=timeout)
+    _UPLOAD_FUTURES = [f for f in _UPLOAD_FUTURES if not f.done()]
+
+
 def fetch_checkpoint_file(ckpt_dir: str, fname: str) -> str | None:
     """Return a LOCAL path for ``<ckpt_dir>/<fname>``, downloading from GCS if needed.
 
@@ -165,6 +205,7 @@ def save_checkpoint(
     *,
     is_main: bool = True,
     keep_local_dir: str | None = None,
+    async_upload: bool = False,
 ):
     """Save a multi-component checkpoint, multi-host SPMD-safe.
 
@@ -341,25 +382,38 @@ def save_checkpoint(
         json.dump(meta, f, indent=2)
 
     if gcs_dest is not None:
-        import shutil
+        # The upload (metadata-last atomic gate) is factored into a closure so
+        # it can run either inline or on the background uploader (async_upload).
+        def _do_upload():
+            import shutil
 
-        # metadata.json is the resume gate: find_latest_checkpoint /
-        # load_checkpoint only trust dirs that have it. ``gsutil -m`` uploads
-        # files in arbitrary parallel order, so a preemption mid-upload could
-        # otherwise land metadata.json BEFORE optimizer.pt -- and a resume
-        # from that dir would silently continue with a fresh optimizer. Move
-        # metadata aside, bulk-upload the payload, then upload metadata alone
-        # LAST so its presence in GCS implies a complete checkpoint. Staged as
-        # a SIBLING of write_dir so the bulk copy cannot pick it up.
-        staged_meta = write_dir.rstrip("/") + ".metadata.gate"
-        os.replace(meta_path, staged_meta)
-        _gsutil_cp_into(write_dir, gcs_dest)
-        os.replace(staged_meta, meta_path)
-        _gsutil_cp_file(meta_path, gcs_dest)
-        if keep_local:
-            print(f"[ckpt] retained local mirror: {write_dir}", flush=True)
+            # metadata.json is the resume gate: find_latest_checkpoint /
+            # load_checkpoint only trust dirs that have it. ``gsutil -m`` uploads
+            # files in arbitrary parallel order, so a preemption mid-upload could
+            # otherwise land metadata.json BEFORE optimizer.pt -- and a resume
+            # from that dir would silently continue with a fresh optimizer. Move
+            # metadata aside, bulk-upload the payload, then upload metadata alone
+            # LAST so its presence in GCS implies a complete checkpoint. Staged
+            # as a SIBLING of write_dir so the bulk copy cannot pick it up.
+            staged_meta = write_dir.rstrip("/") + ".metadata.gate"
+            os.replace(meta_path, staged_meta)
+            _gsutil_cp_into(write_dir, gcs_dest)
+            os.replace(staged_meta, meta_path)
+            _gsutil_cp_file(meta_path, gcs_dest)
+            if keep_local:
+                print(f"[ckpt] retained local mirror: {write_dir}", flush=True)
+            else:
+                shutil.rmtree(write_dir, ignore_errors=True)
+
+        if async_upload:
+            # Background the multi-GB upload so keep-all periodic saves don't
+            # stall the training loop. Serialized (max_workers=1) to avoid
+            # bandwidth contention / pileup; a mid-flight upload interrupted by
+            # preemption just leaves an un-gated (metadata-less) dir that resume
+            # skips. Drain with wait_for_uploads() before the final save.
+            _submit_upload(_do_upload)
         else:
-            shutil.rmtree(write_dir, ignore_errors=True)
+            _do_upload()
 
 
 def save_checkpoint_canonical_final(
@@ -642,15 +696,27 @@ def load_checkpoint(model, optimizer, scheduler, load_dir: str) -> int:
 
 
 def push_checkpoint_to_hub(
-    local_dir: str, repo_id: str, commit_message: str = "checkpoint", token: str | None = None
+    local_dir: str,
+    repo_id: str,
+    commit_message: str = "checkpoint",
+    token: str | None = None,
+    revision: str | None = None,
 ):
-    """Upload model weights (no optimizer/scheduler) to a HuggingFace Hub repo."""
+    """Upload model weights (no optimizer/scheduler) to a HuggingFace Hub repo.
+
+    ``revision`` puts this checkpoint on its own branch (e.g. ``step-12000``) so
+    the whole training trajectory lives in ONE repo, Pythia-style, for the
+    public mechanistic-interp suite. The branch is created off ``main`` if new.
+    Optimizer/scheduler/rng blobs are skipped -- released weights only.
+    """
     from huggingface_hub import HfApi
 
     api = HfApi(token=token)
     api.create_repo(repo_id, repo_type="model", exist_ok=True, private=False)
+    if revision:
+        api.create_branch(repo_id, branch=revision, repo_type="model", exist_ok=True)
 
-    skip = {"optimizer.pt", "scheduler.pt"}
+    skip = {"optimizer.pt", "scheduler.pt", "rng.pt"}
     for root, _dirs, files in os.walk(local_dir):
         for fname in files:
             if fname in skip:
@@ -663,8 +729,10 @@ def push_checkpoint_to_hub(
                 repo_id=repo_id,
                 repo_type="model",
                 commit_message=commit_message,
+                revision=revision,
             )
-    print(f"  pushed to https://huggingface.co/{repo_id}")
+    _where = f"{repo_id}@{revision}" if revision else repo_id
+    print(f"  pushed to https://huggingface.co/{_where}")
 
 
 def prune_checkpoints(save_dir: str, keep_last: int = 5, keep_best: str | None = "best_by_val"):

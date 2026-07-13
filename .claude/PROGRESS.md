@@ -30,6 +30,162 @@ moved to `.claude/archive/PROGRESS-YYYY-Qn.md` by the
 
 ---
 
+## 2026-07-13T07:06:45Z | feat/v0.3-implementation@adafae2 | done | exec
+cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-13T07:06:04Z | feat/v0.3-implementation@adafae2 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/tests/test_checkpoint_suite.py`
+
+
+## 2026-07-13T07:05:54Z | feat/v0.3-implementation@adafae2 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/train_hierarchical.py`
+
+
+## 2026-07-13T07:05:48Z | feat/v0.3-implementation@adafae2 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/train_hierarchical.py`
+
+
+## 2026-07-13T07:05:33Z | feat/v0.3-implementation@adafae2 | done | exec
+cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-13T07:05:23Z | feat/v0.3-implementation@adafae2 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/train_hierarchical.py`
+
+
+## 2026-07-13T07:05:14Z | feat/v0.3-implementation@adafae2 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/train_hierarchical.py`
+
+
+## 2026-07-13T07:04:59Z | feat/v0.3-implementation@adafae2 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/src/training/checkpointing.py`
+
+
+## 2026-07-13T07:04:49Z | feat/v0.3-implementation@adafae2 | done | exec
+cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-13T07:04:39Z | feat/v0.3-implementation@adafae2 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/src/training/checkpointing.py`
+
+
+## 2026-07-13T07:04:16Z | feat/v0.3-implementation@adafae2 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/src/training/checkpointing.py`
+
+
+## 2026-07-13T07:03:35Z | feat/v0.3-implementation@adafae2 | done | exec
+cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-13T07:03:26Z | feat/v0.3-implementation@adafae2 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/tpu/startup_script.sh`
+
+
+## 2026-07-13T07:02:06Z | feat/v0.3-implementation@adafae2 | done | exec
+cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-13T07:01:17Z | feat/v0.3-implementation@adafae2 | done | exec
+cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-13T07:01:05Z | feat/v0.3-implementation@adafae2 | done | edit
+created `/home/cataluna84/Workspace/tinyaya-stage2-scale/tests/test_checkpoint_suite.py`
+
+
+## 2026-07-13T07:00:45Z | feat/v0.3-implementation@adafae2 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/publish_checkpoint_suite.py`
+
+
+## 2026-07-13T07:00:37Z | feat/v0.3-implementation@adafae2 | done | edit
+created `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/publish_checkpoint_suite.py`
+
+
+## 2026-07-13T07:00:11Z | feat/v0.3-implementation@adafae2 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/src/training/checkpointing.py`
+
+
+## 2026-07-13T06:59:43Z | feat/v0.3-implementation@adafae2 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/train_hierarchical.py`
+
+
+## 2026-07-13T06:59:29Z | feat/v0.3-implementation@adafae2 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/train_hierarchical.py`
+
+
+## 2026-07-13T06:59:21Z | feat/v0.3-implementation@adafae2 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/train_hierarchical.py`
+
+
+## 2026-07-13T06:59:06Z | feat/v0.3-implementation@adafae2 | done | exec
+cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-13T06:58:38Z | feat/v0.3-implementation@adafae2 | done | exec
+cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-13T06:58:18Z | feat/v0.3-implementation@978d9e9 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/tpu/launch_qr.sh`
+
+
+## 2026-07-13T06:58:11Z | feat/v0.3-implementation@978d9e9 | done | exec
+cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-13T06:57:56Z | feat/v0.3-implementation@978d9e9 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/tpu/startup_script.sh`
+
+
+## 2026-07-13T06:57:07Z | feat/v0.3-implementation@978d9e9 | done | exec
+cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-13T06:56:56Z | feat/v0.3-implementation@978d9e9 | done | exec
+bash /tmp/claude-1000/-home-cataluna84-Workspace-tinyaya-stage2-scale/303d4ee8-09e6-4c43-833e-8a74d8a483d4/scratchpad/mh_smoke_v2.sh
+
+
+## 2026-07-13T06:56:50Z | feat/v0.3-implementation@978d9e9 | done | edit
+created `/tmp/claude-1000/-home-cataluna84-Workspace-tinyaya-stage2-scale/303d4ee8-09e6-4c43-833e-8a74d8a483d4/scratchpad/mh_smoke_v2.sh`
+
+
+## 2026-07-13T06:56:10Z | feat/v0.3-implementation@978d9e9 | done | exec
+cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-13T06:55:24Z | feat/v0.3-implementation@978d9e9 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/tpu/startup_script.sh`
+
+
+## 2026-07-13T06:55:11Z | feat/v0.3-implementation@978d9e9 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/tpu/startup_script.sh`
+
+
+## 2026-07-13T06:54:19Z | feat/v0.3-implementation@978d9e9 | done | exec
+cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-13T06:52:44Z | feat/v0.3-implementation@978d9e9 | done | exec
+bash /tmp/claude-1000/-home-cataluna84-Workspace-tinyaya-stage2-scale/303d4ee8-09e6-4c43-833e-8a74d8a483d4/scratchpad/mh_smoke.sh
+
+
+## 2026-07-13T06:52:35Z | feat/v0.3-implementation@978d9e9 | done | edit
+created `/tmp/claude-1000/-home-cataluna84-Workspace-tinyaya-stage2-scale/303d4ee8-09e6-4c43-833e-8a74d8a483d4/scratchpad/mh_smoke.sh`
+
+
+## 2026-07-13T06:51:56Z | feat/v0.3-implementation@978d9e9 | done | exec
+cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-13T06:51:30Z | feat/v0.3-implementation@4d6aa6a | done | exec
+cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-13T06:51:02Z | feat/v0.3-implementation@4d6aa6a | done | exec
+cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+
+
 ## 2026-07-13T06:50:24Z | feat/v0.3-implementation@b7dfb12 | done | exec
 cd /home/cataluna84/Workspace/tinyaya-stage2-scale
 
