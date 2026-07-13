@@ -49,7 +49,6 @@ values, each mapping to a single row above:
 | `TRC_PROFILE` | TPU type passed to `gcloud` | Zone | Notes |
 |---|---|---|---|
 | `v6e-8-eu` | `v6e-8` | `europe-west4-a` | Single-host 8-chip slice for smoke / overfit / eval; avoids multi-host rendezvous. |
-| `v6e-16-eu` | `v6e-16` | `europe-west4-a` | **Current production** — 4-host 16-chip mesh (v0.3 run). |
 | `v4-32-uc2b` | `v4-32` | `us-central2-b` | Same zone as on-demand v4 quota; smallest legacy v4 fallback. |
 | `v5e-64-ew4b` | `v5litepod-64` | `europe-west4-b` | Largest v5e slice; matches v5litepod-* canary tuning. |
 | `v5e-64-uc1a` | `v5litepod-64` | `us-central1-a` | Same chip family as `v5e-64-ew4b`, US zone. |

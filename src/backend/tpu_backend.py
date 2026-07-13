@@ -175,6 +175,12 @@ class TPUBackend(BackendBase):
             mesh_shape=(num_devices,),
             axis_names=("fsdp",),
         )
+        # Register as the process-global mesh so the multi-host minibatch
+        # input pipeline can build ``ShardingSpec``s against it via
+        # ``xs.get_global_mesh()`` without threading the backend everywhere.
+        import torch_xla.distributed.spmd as xs
+
+        xs.set_global_mesh(self._mesh)
         print(
             f"[tpu_backend] SPMD initialized: {num_devices} devices, "
             f"mesh_shape={self._mesh.mesh_shape}, axis=fsdp"
@@ -810,15 +816,64 @@ class TPUBackend(BackendBase):
         xs.mark_sharding(tensor, self._mesh, partition_spec)
 
     def host_count(self) -> int:
-        """Number of host processes on this slice (v6e-8 = 1, v6e-16 = 4).
-
-        Used by the per_chip_batch resolution to REFUSE multi-host slices:
-        each host's DataLoader draws different rows, and host-inconsistent
-        inputs to a replicated-input SPMD program are undefined behavior.
-        """
+        """Number of host processes on this slice (v6e-8 = 1, v6e-16 = 4)."""
         import torch_xla.runtime as xr
 
         return int(xr.process_count())
+
+    def process_index(self) -> int:
+        """This host's rank in ``[0, host_count())`` -- the DistributedSampler
+        rank that makes each host draw DISTINCT rows for the multi-host
+        minibatch input pipeline."""
+        import torch_xla.runtime as xr
+
+        return int(xr.process_index())
+
+    def local_chip_count(self) -> int:
+        """Chips physically addressable by THIS host (v6e-16 = 4).
+
+        The minibatch pipeline requires the per-host batch to be divisible by
+        this (``xla_model.send_cpu_data_to_device``). Equals
+        ``world_size() // host_count()`` on a homogeneous slice.
+        """
+        import torch_xla.runtime as xr
+
+        return int(xr.addressable_runtime_device_count())
+
+    @property
+    def mesh(self):
+        """The process-global 1-D ``fsdp`` mesh spanning all chips.
+
+        Needed to build ``ShardingSpec``s for the multi-host minibatch
+        ``MpDeviceLoader``. Also registered via ``xs.set_global_mesh`` in
+        ``init_distributed`` so ``xs.get_global_mesh()`` returns it.
+        """
+        return self._mesh
+
+    def shard_to_device(self, cpu_tensor: torch.Tensor, partition_spec: tuple) -> torch.Tensor:
+        """Move a PER-HOST cpu batch to device as a shard of the GLOBAL batch.
+
+        The multi-host data-parallel primitive. Each host passes its own
+        ``per_host_batch`` rows (from a ``DistributedSampler``); the
+        ``minibatch=True`` ``ShardingSpec`` spans the global mesh, so XLA
+        places this host's rows on its local chips and assembles the global
+        ``per_host_batch x host_count`` logical tensor across hosts. Replaces
+        the single-host ``.to(device)`` + ``mark_sharding`` path (which has no
+        minibatch semantics and would treat each host's rows as the whole
+        global batch -- the proven "only host 0 survives" pathology).
+
+        ``partition_spec`` matches tensor rank: ``("fsdp", None)`` for 2-D
+        text/mask, ``("fsdp", None, None)`` for 3-D audio. Per-host batch must
+        be divisible by ``local_chip_count()`` (enforced by torch_xla).
+        """
+        import torch_xla.core.xla_model as xm
+        from torch_xla.distributed.spmd import ShardingSpec
+
+        spec = ShardingSpec(self._mesh, partition_spec, minibatch=True)
+        out = xm.send_cpu_data_to_device(cpu_tensor, self._device, spec)
+        while isinstance(out, (list, tuple)):
+            out = out[0]
+        return out
 
     def get_sharding_spec(self, tensor: torch.Tensor) -> str:
         """Return the XLA sharding annotation string for ``tensor``.

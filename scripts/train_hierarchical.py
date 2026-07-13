@@ -412,33 +412,30 @@ DEFAULTS = {
 
 
 def resolve_loader_batch(train_cfg: dict, n_chips: int, n_hosts: int) -> int:
-    """Resolve the per-host DataLoader batch size under TPU SPMD.
+    """Resolve the PER-HOST DataLoader batch size under TPU SPMD.
 
     The P0 batch-semantics audit (2026-07-12, scripts/tpu/spmd_batch_truth.py
-    on a live v6e-8 mesh) proved the LOGICAL global batch is exactly the
-    loader tensor's batch dim: ``mark_sharding`` distributes those rows
-    across chips, it does not multiply them. So ``train.per_chip_batch``
-    resolves the loader batch to ``per_chip_batch x n_chips`` -- every chip
-    carries that many real rows and the banner's global batch is true.
+    on a live mesh) proved the logical batch is the loader tensor's batch dim
+    (``mark_sharding`` distributes rows, does not multiply them). So the loader
+    each host builds must carry ``per_chip_batch`` rows for each of its LOCAL
+    chips: ``per_chip_batch x (n_chips // n_hosts)``.
 
-    Multi-host is refused: each host's DataLoader draws different rows, and
-    feeding host-inconsistent data to a replicated-input SPMD program is
-    undefined behavior (only host 0's rows survive). Multi-host needs the
-    MpDeviceLoader ``minibatch=True`` input pipeline first.
+    * Single-host (n_hosts=1): per-host == global == ``per_chip x n_chips``
+      (v6e-8: unchanged; the DataLoader tensor IS the global batch).
+    * Multi-host (n_hosts>1): per-host == ``per_chip x local_chips`` (v6e-16:
+      2 x 4 = 8). A ``DistributedSampler`` gives each host DISTINCT rows and
+      ``backend.shard_to_device`` (minibatch=True) assembles the global batch
+      ``per_host x n_hosts`` across hosts. The old multi-host REFUSAL is gone
+      now that the minibatch pipeline exists.
 
-    Returns ``batch_size`` unchanged when ``per_chip_batch`` is unset
-    (legacy semantics: batch_size IS the global batch).
+    Returns ``batch_size`` unchanged when ``per_chip_batch`` is unset (legacy
+    semantics: batch_size IS the per-host/global batch).
     """
     pcb = train_cfg.get("per_chip_batch")
     if not pcb:
         return int(train_cfg["batch_size"])
-    if n_hosts > 1:
-        raise ValueError(
-            f"train.per_chip_batch={pcb} on a {n_hosts}-host slice: host-"
-            f"inconsistent SPMD inputs are undefined behavior. Use a single-"
-            f"host slice or build the minibatch input pipeline first."
-        )
-    return int(pcb) * int(n_chips)
+    local_chips = int(n_chips) // max(1, int(n_hosts))
+    return int(pcb) * local_chips
 
 
 def _percentile(values: list[float], q: float) -> float | None:
@@ -808,31 +805,55 @@ def run_validation(
     for batch in val_loader:
         if max_batches is not None and n >= max_batches:
             break
-        text_ids = batch["text_ids"].to(device)
-        all_codes = batch["audio_codes"].to(device)
-        cb0 = all_codes[:, 0, :]
-        mask = batch["attention_mask"].to(device)
-        loss_mask = batch["loss_mask"].to(device)
-
-        # Mark input sharding for TPU SPMD -- the training forward does this
-        # (mark_sharding at the macro-step); without it under FSDPv2 the
-        # partitioner mishandles the val inputs against the sharded params
-        # and the forward goes non-finite (CPU eager forward is finite).
-        if is_tpu and backend is not None and hasattr(backend, "mark_sharding"):
-            backend.mark_sharding(text_ids, ("fsdp", None))
-            backend.mark_sharding(all_codes, ("fsdp", None, None))
-            backend.mark_sharding(mask, ("fsdp", None))
-            backend.mark_sharding(loss_mask, ("fsdp", None))
-
-        # Parallel streams (Moshi-style)
-        if "user_audio_codes" in batch:
-            user_cb0 = batch["user_audio_codes"][:, 0, :].to(device)
-            model_cb0 = batch["model_audio_codes"][:, 0, :].to(device)
-            full_model_codes = batch["model_audio_codes"].to(device)
+        # Multi-host TPU: mirror the train path -- each host feeds its own
+        # DistributedSampler shard, shard_to_device assembles the global val
+        # batch across hosts (else val collapses to one host's rows too).
+        _mh = (
+            is_tpu
+            and backend is not None
+            and hasattr(backend, "shard_to_device")
+            and int(getattr(backend, "host_count", lambda: 1)()) > 1
+        )
+        if _mh:
+            text_ids = backend.shard_to_device(batch["text_ids"], ("fsdp", None))
+            all_codes = backend.shard_to_device(batch["audio_codes"], ("fsdp", None, None))
+            cb0 = all_codes[:, 0, :]
+            mask = backend.shard_to_device(batch["attention_mask"], ("fsdp", None))
+            loss_mask = backend.shard_to_device(batch["loss_mask"], ("fsdp", None))
+            if "user_audio_codes" in batch:
+                user_cb0 = backend.shard_to_device(batch["user_audio_codes"][:, 0, :], ("fsdp", None))
+                model_cb0 = backend.shard_to_device(batch["model_audio_codes"][:, 0, :], ("fsdp", None))
+                full_model_codes = backend.shard_to_device(batch["model_audio_codes"], ("fsdp", None, None))
+            else:
+                user_cb0 = cb0
+                model_cb0 = None
+                full_model_codes = None
         else:
-            user_cb0 = cb0
-            model_cb0 = None
-            full_model_codes = None
+            text_ids = batch["text_ids"].to(device)
+            all_codes = batch["audio_codes"].to(device)
+            cb0 = all_codes[:, 0, :]
+            mask = batch["attention_mask"].to(device)
+            loss_mask = batch["loss_mask"].to(device)
+
+            # Mark input sharding for TPU SPMD -- the training forward does this
+            # (mark_sharding at the macro-step); without it under FSDPv2 the
+            # partitioner mishandles the val inputs against the sharded params
+            # and the forward goes non-finite (CPU eager forward is finite).
+            if is_tpu and backend is not None and hasattr(backend, "mark_sharding"):
+                backend.mark_sharding(text_ids, ("fsdp", None))
+                backend.mark_sharding(all_codes, ("fsdp", None, None))
+                backend.mark_sharding(mask, ("fsdp", None))
+                backend.mark_sharding(loss_mask, ("fsdp", None))
+
+            # Parallel streams (Moshi-style)
+            if "user_audio_codes" in batch:
+                user_cb0 = batch["user_audio_codes"][:, 0, :].to(device)
+                model_cb0 = batch["model_audio_codes"][:, 0, :].to(device)
+                full_model_codes = batch["model_audio_codes"].to(device)
+            else:
+                user_cb0 = cb0
+                model_cb0 = None
+                full_model_codes = None
 
         autocast = (
             backend.autocast_context(dtype=torch.bfloat16)
@@ -1198,6 +1219,13 @@ def main():
     # multi-host pods would collide on port 9012. Single-host v6e-8
     # has one process so this is unconditional once is_main passes.
     is_tpu_early = cfg.get("backend", "auto") == "tpu"
+    # Multi-host TPU (v6e-16 = 4 hosts): switches on the minibatch
+    # data-parallel input pipeline (DistributedSampler per host +
+    # backend.shard_to_device). host_count() == 1 on v6e-8 -> single-host
+    # path unchanged. Verified live on a 4-host mesh (spmd_minibatch_truth.py:
+    # per-host (8,4) -> global (32,4), all 4 hosts' distinct rows assembled).
+    n_hosts = int(getattr(backend, "host_count", lambda: 1)())
+    multihost = is_tpu_early and n_hosts > 1
     # iter 20 fix: the return value of xp.start_server() must be
     # bound to a long-lived name. Per torch_xla.debug.profiler
     # docstring: "If this object is garbage collected, the profiler
@@ -1220,23 +1248,29 @@ def main():
         except Exception as e:
             print(f"[profiler] xp.start_server failed: {e}", flush=True)
 
+    # Per-host RNG offset. Under PJRT SPMD, LOCAL_RANK is unset (it's a
+    # GPU/torchrun var), so every host shared one seed -- fine for weights
+    # (must match across hosts) but the DistributedSampler needs distinct
+    # per-host shuffling, which it gets from its own rank, not this seed.
     torch.manual_seed(int(cfg["train"].get("seed", 42)) + int(os.environ.get("LOCAL_RANK", 0)))
 
-    # Resolve per_chip_batch -> loader batch ONCE, before any consumer
-    # (collator batch_pad_to, DataLoader, static-shape asserts, banner) --
-    # they all read cfg["train"]["batch_size"] and inherit the resolution.
+    # Resolve per_chip_batch -> PER-HOST loader batch ONCE, before any consumer
+    # (collator batch_pad_to, DataLoader, static-shape asserts) -- they all read
+    # cfg["train"]["batch_size"] (the per-host CPU batch). The GLOBAL batch is
+    # per-host x host_count, assembled on-device by the minibatch pipeline; the
+    # banner (effective_batch) reports it.
     if cfg["train"].get("per_chip_batch"):
         if cfg.get("backend", "auto") != "tpu":
             raise ValueError("train.per_chip_batch is TPU-SPMD-only; set batch_size on GPU")
-        _n_hosts = int(getattr(backend, "host_count", lambda: 1)())
         cfg["train"]["batch_size"] = resolve_loader_batch(
-            cfg["train"], backend.world_size(), _n_hosts
+            cfg["train"], backend.world_size(), n_hosts
         )
         if is_main:
+            _gb = cfg["train"]["batch_size"] * n_hosts
             print(
-                f"[batch] per_chip_batch={cfg['train']['per_chip_batch']} x "
-                f"{backend.world_size()} chips -> loader/global batch "
-                f"{cfg['train']['batch_size']}",
+                f"[batch] per_chip_batch={cfg['train']['per_chip_batch']} -> "
+                f"per_host loader batch {cfg['train']['batch_size']} x {n_hosts} hosts "
+                f"= global {_gb} (before grad_accum)",
                 flush=True,
             )
 
@@ -1496,8 +1530,30 @@ def main():
                 flush=True,
             )
 
-    if is_tpu:
-        # SPMD is single-process -- no distributed sampler
+    if multihost:
+        # Multi-host TPU minibatch DP: each host draws DISTINCT rows (its
+        # DistributedSampler shard); backend.shard_to_device then assembles the
+        # global batch across hosts (verified live: per-host (8,4) -> global
+        # (32,4), all 4 hosts' rows present). drop_last keeps shards even so the
+        # cross-host val reduce stays balanced.
+        if bucket_batch_sampler is not None:
+            raise ValueError(
+                "data.bucket_frames + multi-host TPU is unsupported: "
+                "BucketedMacroBatchSampler is not host-aware. Use the plain path."
+            )
+        _rank = backend.process_index()
+        train_sampler = DistributedSampler(
+            train_ds, num_replicas=n_hosts, rank=_rank, shuffle=True, drop_last=True
+        )
+        val_sampler = (
+            DistributedSampler(
+                val_ds, num_replicas=n_hosts, rank=_rank, shuffle=False, drop_last=True
+            )
+            if val_ds is not None
+            else None
+        )
+    elif is_tpu:
+        # Single-host SPMD: one process, no distributed sampler.
         train_sampler = None
         val_sampler = None
     elif backend.world_size() > 1:
@@ -2044,11 +2100,13 @@ def main():
     _sharding_logged: list[bool] = []
     perf_warmup_skip_steps = int(perf_cfg.get("warmup_skip_steps", 50))
     perf_step_times: list[float] = []
-    # SPMD: the LOGICAL global batch is the loader batch (P0 audit 2026-07-12,
-    # spmd_batch_truth.py) -- chips do not multiply data, so no world factor.
-    # DDP (GPU): each rank loads its own rows, so the world multiplier is real.
+    # Global optimizer batch. Single-host SPMD: the loader tensor IS the global
+    # batch (P0 audit, spmd_batch_truth.py), so no world factor -> host_count=1.
+    # Multi-host SPMD (v6e-16): batch_size is PER-HOST; the minibatch pipeline
+    # assembles per_host x host_count across hosts. DDP (GPU): each rank loads
+    # its own rows, so the world multiplier is real.
     effective_batch = cfg["train"]["batch_size"] * grad_accum * (
-        1 if is_tpu else max(1, backend.world_size())
+        n_hosts if is_tpu else max(1, backend.world_size())
     )
     frame_tokens_per_step = effective_batch * max_frames
 
@@ -2215,43 +2273,72 @@ def main():
                         )
 
                 with trace_ctx("device_transfer"):
-                    text_ids = batch["text_ids"].to(device)
-                    all_codes = batch_audio.to(device)
-                    cb0 = all_codes[:, 0, :]
-                    mask = batch["attention_mask"].to(device)
-                    loss_mask = batch["loss_mask"].to(device)
-
-                    # Parallel streams (Moshi-style)
-                    if "user_audio_codes" in batch:
-                        user_cb0 = batch["user_audio_codes"][:, 0, :].to(device)
-                        model_cb0 = batch["model_audio_codes"][:, 0, :].to(device)
-                        full_model_codes = batch["model_audio_codes"].to(device)
-                    else:
-                        user_cb0 = cb0
-                        model_cb0 = None
-                        full_model_codes = None
-
-                    # Mark input sharding for TPU SPMD.
-                    if hasattr(backend, "mark_sharding"):
-                        backend.mark_sharding(text_ids, ("fsdp", None))
-                        backend.mark_sharding(all_codes, ("fsdp", None, None))
-                        backend.mark_sharding(mask, ("fsdp", None))
-                        backend.mark_sharding(loss_mask, ("fsdp", None))
-                        # One-shot sharding-truth print (P0 batch-semantics
-                        # audit): the annotation string is graph METADATA, so
-                        # reading it does not materialize the tensor.
-                        if (
-                            debug_input_sharding
-                            and not _sharding_logged
-                            and hasattr(backend, "get_sharding_spec")
-                        ):
-                            _sharding_logged.append(True)
-                            print(
-                                f"[sharding] text_ids logical shape="
-                                f"{tuple(text_ids.shape)} "
-                                f"spec={backend.get_sharding_spec(text_ids)}",
-                                flush=True,
+                    if multihost:
+                        # Multi-host DP: shard each PER-HOST cpu tensor into the
+                        # GLOBAL batch across hosts (minibatch=True). This is the
+                        # cross-host assembly the single-host .to()+mark_sharding
+                        # path lacks; slices (cb0, per-stream cb0) are taken on the
+                        # resulting global device tensors.
+                        text_ids = backend.shard_to_device(batch["text_ids"], ("fsdp", None))
+                        all_codes = backend.shard_to_device(batch_audio, ("fsdp", None, None))
+                        cb0 = all_codes[:, 0, :]
+                        mask = backend.shard_to_device(batch["attention_mask"], ("fsdp", None))
+                        loss_mask = backend.shard_to_device(batch["loss_mask"], ("fsdp", None))
+                        if "user_audio_codes" in batch:
+                            user_cb0 = backend.shard_to_device(
+                                batch["user_audio_codes"][:, 0, :], ("fsdp", None)
                             )
+                            model_cb0 = backend.shard_to_device(
+                                batch["model_audio_codes"][:, 0, :], ("fsdp", None)
+                            )
+                            full_model_codes = backend.shard_to_device(
+                                batch["model_audio_codes"], ("fsdp", None, None)
+                            )
+                        else:
+                            user_cb0 = cb0
+                            model_cb0 = None
+                            full_model_codes = None
+                    else:
+                        text_ids = batch["text_ids"].to(device)
+                        all_codes = batch_audio.to(device)
+                        cb0 = all_codes[:, 0, :]
+                        mask = batch["attention_mask"].to(device)
+                        loss_mask = batch["loss_mask"].to(device)
+
+                        # Parallel streams (Moshi-style)
+                        if "user_audio_codes" in batch:
+                            user_cb0 = batch["user_audio_codes"][:, 0, :].to(device)
+                            model_cb0 = batch["model_audio_codes"][:, 0, :].to(device)
+                            full_model_codes = batch["model_audio_codes"].to(device)
+                        else:
+                            user_cb0 = cb0
+                            model_cb0 = None
+                            full_model_codes = None
+
+                        # Single-host input sharding (multi-host is already
+                        # sharded by shard_to_device above).
+                        if hasattr(backend, "mark_sharding"):
+                            backend.mark_sharding(text_ids, ("fsdp", None))
+                            backend.mark_sharding(all_codes, ("fsdp", None, None))
+                            backend.mark_sharding(mask, ("fsdp", None))
+                            backend.mark_sharding(loss_mask, ("fsdp", None))
+
+                    # One-shot sharding-truth print (P0 audit + multi-host
+                    # verification): the annotation string is graph METADATA, so
+                    # reading it does not materialize the tensor. On multi-host it
+                    # shows the GLOBAL logical shape (per_host x host_count).
+                    if (
+                        debug_input_sharding
+                        and not _sharding_logged
+                        and hasattr(backend, "get_sharding_spec")
+                    ):
+                        _sharding_logged.append(True)
+                        print(
+                            f"[sharding] text_ids logical shape="
+                            f"{tuple(text_ids.shape)} "
+                            f"spec={backend.get_sharding_spec(text_ids)}",
+                            flush=True,
+                        )
 
                 with trace_ctx("forward_loss"):
                     with backend.autocast_context(dtype=torch.bfloat16):
@@ -2577,6 +2664,11 @@ def main():
 
     while step < max_steps:
         if is_tpu and micro_batches_seen_this_epoch + grad_accum > usable_micro_batches_per_epoch:
+            # Reshuffle on epoch rollover. All hosts reach the same `step`, so a
+            # DistributedSampler.set_epoch(step) keeps their shards consistent
+            # (divergent epochs would overlap/miss rows across hosts).
+            if train_sampler is not None:
+                train_sampler.set_epoch(step)
             data_iter = iter(train_loader)
             micro_batches_seen_this_epoch = 0
 
