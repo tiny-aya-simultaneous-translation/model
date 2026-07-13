@@ -216,17 +216,70 @@ fi  # end SWEEP_DATA_GS_URI branch
 LIBPYTHON_DIR="$(dirname "$(find "$HOME/.local/share/uv/python" -name 'libpython3.12.so.1.0' -type f 2>/dev/null | head -1)")"
 echo "[startup] LIBPYTHON_DIR=$LIBPYTHON_DIR"
 
-# Persistent XLA compile cache: DISABLED.
-# pytorch/xla #8930 + #9094 (both OPEN as of 2026-05): TPU v4 + torch_xla
-# 2.9 fails with "Failed to deserialize executable: UNIMPLEMENTED" when
-# the cache is enabled. The fix in PR #9759 (Mar 2026) is not yet in a
-# released wheel. Until then we explicitly do NOT set
-# XLA_PERSISTENT_CACHE_PATH; pay the compile cost on every process start.
-# (Hot redeploys via _remote_redeploy.sh do NOT restart the python
-# process for cosmetic edits, so this only hurts on spot preemption.)
-echo "[startup] XLA persistent cache disabled (pytorch/xla #8930)"
+# Persistent XLA compile cache: OPT-IN via `xla-cache-gs-uri` metadata.
+# History: #8930/#9094 (TPU v4 + torch_xla 2.9) fail "deserialize executable:
+# UNIMPLEMENTED" with the cache on. That bug is v4-SPECIFIC; on a long v6e-16
+# SPOT run every preemption reboot otherwise pays a full ~20-min cold recompile
+# of the scan-collapsed graph. So we make it opt-in + GCS-backed so the cache
+# survives the reboot: restore from GCS at boot on ALL hosts (identical SPMD
+# program => identical graph keys), host 0 syncs new entries back every 10 min.
+# Phase E verifies it actually works on v6e before production turns it on.
+XLA_CACHE_GS_URI="$(read_meta xla-cache-gs-uri '')"
+if [ -n "$XLA_CACHE_GS_URI" ]; then
+    _cache_dir="$DATA_DIR/xla_cache"
+    mkdir -p "$_cache_dir"
+    echo "[startup] restoring XLA compile cache from $XLA_CACHE_GS_URI"
+    gsutil -m rsync -r "$XLA_CACHE_GS_URI" "$_cache_dir" 2>/dev/null || true
+    export XLA_PERSISTENT_CACHE_PATH="$_cache_dir"
+    echo "[startup] XLA_PERSISTENT_CACHE_PATH=$_cache_dir (entries: $(find "$_cache_dir" -type f 2>/dev/null | wc -l))"
+    # Only host 0 pushes back (all hosts compile the same graphs, one uploader
+    # avoids GCS write races). Backgrounded; dies with the VM on preemption.
+    if [ "$(hostname | grep -oP 'w-\K[0-9]+' || echo 0)" = "0" ]; then
+        ( while true; do sleep 600; gsutil -m rsync -r "$_cache_dir" "$XLA_CACHE_GS_URI" 2>/dev/null || true; done ) &
+        echo "[startup] host 0 XLA-cache sync-up loop started (600s)"
+    fi
+else
+    echo "[startup] XLA persistent cache disabled (set xla-cache-gs-uri to enable)"
+fi
 
 tmux kill-session -t "$TMUX_SESSION" 2>/dev/null || true
+
+# ----- multi-host rendezvous barrier -----
+# GCP runs this startup script per-host at boot; hosts finish (apt / uv sync /
+# data staging) at DIFFERENT wall-clock times, so torch_xla's SliceBuilder gRPC
+# mesh (:8471) races and every trainer dies unless all launch within a tight
+# window (proven fatal on v5e-64 and re-confirmed on this v6e-16). Gate the
+# trainer launch: each host writes a GCS ready-marker, all wait until NUM_HOSTS
+# markers exist, then launch near-simultaneously. Host count is read from the
+# TPU's own worker endpoint list (topology-truthful for any accelerator); a
+# time-bucketed dir isolates a preemption reboot from the previous boot's stale
+# markers, and per-boot WANDB_RENDEZVOUS_URI avoids a stale shared run-id.
+_endpoints="$(read_meta worker-network-endpoints '')"
+if [ -n "$_endpoints" ]; then
+    NUM_HOSTS=$(printf '%s' "$_endpoints" | tr ',' '\n' | grep -c . || echo 1)
+else
+    NUM_HOSTS="$(read_meta num-hosts 1)"
+fi
+_slice_id="$(hostname | sed 's/-w-[0-9]*$//')"
+_bucket=$(( $(date +%s) / 600 ))
+export WANDB_RENDEZVOUS_URI="gs://tinyaya-stage2-eu/wandb-rendezvous/${_slice_id}-${_bucket}.id"
+if [ "${NUM_HOSTS:-1}" -gt 1 ]; then
+    _wid="$(hostname | grep -oP 'w-\K[0-9]+' || echo 0)"
+    _barrier="gs://tinyaya-stage2-eu/rendezvous/${_slice_id}/${_bucket}"
+    echo "[startup] rendezvous: host ${_wid}/${NUM_HOSTS} barrier=${_barrier}"
+    printf 'ready %s\n' "$(date -Is)" | gsutil -q cp - "${_barrier}/host-${_wid}" || true
+    for _i in $(seq 1 240); do  # up to 20 min for the slowest host's startup
+        _cnt=$(gsutil ls "${_barrier}/" 2>/dev/null | grep -c 'host-' || true)
+        _cnt="${_cnt:-0}"
+        if [ "${_cnt}" -ge "${NUM_HOSTS}" ]; then
+            echo "[startup] rendezvous barrier PASSED (${_cnt}/${NUM_HOSTS} hosts)"
+            break
+        fi
+        [ $(( _i % 6 )) -eq 0 ] && echo "[startup] waiting at barrier: ${_cnt}/${NUM_HOSTS}"
+        sleep 5
+    done
+fi
+
 # Optional pre-flight probe of sharding strategies on the live mesh.
 if [ "$PROBE_FIRST" = "1" ]; then
     echo "[startup] running probe_strategies.py before training"
@@ -278,6 +331,7 @@ else
         LD_LIBRARY_PATH='$LIBPYTHON_DIR:\${LD_LIBRARY_PATH:-}' \
         HF_TOKEN='$HF_TOKEN' \
         WANDB_API_KEY='${WANDB_API_KEY:-}' \
+        WANDB_RENDEZVOUS_URI='${WANDB_RENDEZVOUS_URI:-}' \
         PYTHONUNBUFFERED=1 \
         uv run python -u scripts/train_hierarchical.py \
             --config '$CONFIG_FILE' \

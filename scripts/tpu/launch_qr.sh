@@ -88,6 +88,11 @@ fi
 if [ -n "$SWEEP_DATA_GS_URI" ]; then
     metadata_pairs+=",sweep-data-gs-uri=$SWEEP_DATA_GS_URI"
 fi
+# Opt-in GCS-backed XLA compile cache (survives spot-preemption reboots so the
+# ~20-min recompile is paid once). startup_script.sh restores it at boot.
+if [ -n "${XLA_CACHE_GS_URI:-}" ]; then
+    metadata_pairs+=",xla-cache-gs-uri=$XLA_CACHE_GS_URI"
+fi
 
 echo "==> creating Queued Resource"
 echo "    project:        $PROJECT_ID"
