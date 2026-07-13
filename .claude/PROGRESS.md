@@ -30,6 +30,103 @@ moved to `.claude/archive/PROGRESS-YYYY-Qn.md` by the
 
 ---
 
+## 2026-07-13T07:28:26Z | feat/v0.3-implementation@097aeb2 | done | edit
+MULTI-HOST v6e-16 solution BUILT (user wants long-horizon run on v6e-16, not v6e-8). Full DP pipeline + spot resilience + public suite, 134 tests pass.
+
+Commits: 4d6aa6a Phase A (shard_to_device minibatch + DistributedSampler +
+mesh accessor, gated on host_count>1; v6e-8 path unchanged), adafae2 Phase B
+(GCS rendezvous barrier + wandb URI + opt-in GCS compile cache), 1d8aebd
+Phase C/D (async ckpt + flash-attn toggle + log-spaced saves + HF publisher),
+8bdf01f production config stage2_tpu_v6e16_full_v03_mh.yaml, report Appendix 4.
+Core primitive VERIFIED LIVE on 4-host mesh: per-host (8,4) -> global (32,4),
+all 4 hosts' distinct rows assembled (real DP, not the UB). Recipe = same
+validated real-32, ~2x faster than v6e-8. BLOCKED on healthy co-located hw for
+the end-to-end trainer smoke + Phase-E validation: us v6e-16 degraded (3/4
+hosts SSH-dead), EU v6e-16 FAILED on capacity (code 8). Production launch gated
+on Phase-E verdict + sign-off + explicit user word.
+
+## 2026-07-13T07:28:11Z | feat/v0.3-implementation@097aeb2 | done | edit
+edited `/home/cataluna84/.claude/projects/-home-cataluna84-Workspace-tinyaya-stage2-scale/memory/spmd-batch-semantics.md`
+
+
+## 2026-07-13T07:27:23Z | feat/v0.3-implementation@097aeb2 | done | exec
+cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-13T07:27:06Z | feat/v0.3-implementation@8bdf01f | done | exec
+cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-13T07:26:21Z | feat/v0.3-implementation@8bdf01f | done | exec
+cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-13T07:25:47Z | feat/v0.3-implementation@8bdf01f | done | exec
+cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-13T07:19:14Z | feat/v0.3-implementation@8bdf01f | fail | verify
+verify: 11 passed, 1 failed out of 12 on Stop
+
+FAIL [1] # the TPU↔GPU seam holds: torch_xla must NOT leak into shared model/data code
+    src/model/scan_utils.py:479:    from torch_xla.experimental.scan_layers import (
+
+
+## 2026-07-13T07:18:59Z | feat/v0.3-implementation@8bdf01f | done | exec
+bash /tmp/claude-1000/-home-cataluna84-Workspace-tinyaya-stage2-scale/303d4ee8-09e6-4c43-833e-8a74d8a483d4/scratchpad/mh_smoke_v3.sh
+
+
+## 2026-07-13T07:18:50Z | feat/v0.3-implementation@8bdf01f | done | edit
+created `/tmp/claude-1000/-home-cataluna84-Workspace-tinyaya-stage2-scale/303d4ee8-09e6-4c43-833e-8a74d8a483d4/scratchpad/mh_smoke_v3.sh`
+
+
+## 2026-07-13T07:18:08Z | feat/v0.3-implementation@8bdf01f | done | exec
+cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-13T07:10:33Z | feat/v0.3-implementation@8bdf01f | fail | verify
+verify: 11 passed, 1 failed out of 12 on Stop
+
+FAIL [1] # the TPU↔GPU seam holds: torch_xla must NOT leak into shared model/data code
+    src/model/scan_utils.py:479:    from torch_xla.experimental.scan_layers import (
+
+
+## 2026-07-13T07:09:55Z | feat/v0.3-implementation@8bdf01f | done | exec
+bash /tmp/claude-1000/-home-cataluna84-Workspace-tinyaya-stage2-scale/303d4ee8-09e6-4c43-833e-8a74d8a483d4/scratchpad/mh_smoke_v2.sh
+
+
+## 2026-07-13T07:09:45Z | feat/v0.3-implementation@8bdf01f | done | exec
+cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-13T07:09:31Z | feat/v0.3-implementation@8bdf01f | done | exec
+cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-13T07:09:12Z | feat/v0.3-implementation@8bdf01f | done | exec
+cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-13T07:08:33Z | feat/v0.3-implementation@1d8aebd | done | edit
+created `/home/cataluna84/Workspace/tinyaya-stage2-scale/configs/tpu/stage2_tpu_v6e16_full_v03_mh.yaml`
+
+
+## 2026-07-13T07:08:03Z | feat/v0.3-implementation@1d8aebd | done | exec
+cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-13T07:07:45Z | feat/v0.3-implementation@1d8aebd | done | exec
+cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-13T07:07:19Z | feat/v0.3-implementation@1d8aebd | done | exec
+cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-13T07:07:02Z | feat/v0.3-implementation@1d8aebd | done | exec
+cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+
+
 ## 2026-07-13T07:06:45Z | feat/v0.3-implementation@adafae2 | done | exec
 cd /home/cataluna84/Workspace/tinyaya-stage2-scale
 
