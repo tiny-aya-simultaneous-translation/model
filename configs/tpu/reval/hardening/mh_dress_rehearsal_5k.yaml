@@ -90,7 +90,8 @@ logging:
   save_every: 1000
   log_spaced_saves: true
   async_checkpoint_upload: true
-  audio_every: 1000000
+  audio_every: 1000        # 5 inline TPU audio demos -- measures demo+compile cost live
+  audio_ar_frames: 50
   val_every: 250
   val_max_batches: 25
   val_per_chip_batch: 8
