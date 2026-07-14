@@ -26,6 +26,7 @@ REPO = pathlib.Path(__file__).resolve().parents[1]
 _TRAIN = REPO / "scripts" / "train_hierarchical.py"
 _TRAIN_SRC = _TRAIN.read_text()
 _STARTUP_SRC = (REPO / "scripts" / "tpu" / "startup_script.sh").read_text()
+_STAGE_SRC = (REPO / "scripts" / "tpu" / "stage_dataset.sh").read_text()
 _PREFETCH_SRC = (REPO / "scripts" / "tpu" / "prefetch_backbones.sh").read_text()
 
 
@@ -123,27 +124,40 @@ def test_save_checkpoint_stamps_manifest():
 # ---------------------------------------------------------------------------
 
 
-def test_startup_marker_records_identity():
+def test_stage_marker_records_identity():
     # marker content is read and compared against the requested source
-    assert 'head -n1 "$_marker"' in _STARTUP_SRC
-    assert '[ "$_staged_src" != "$SWEEP_DATA_GS_URI" ]' in _STARTUP_SRC
-    assert '[ "$_staged_src" != "hf:$HF_DATASET" ]' in _STARTUP_SRC
+    assert 'head -n1 "$_marker"' in _STAGE_SRC
+    assert '[ "$_staged_src" != "$SWEEP_DATA_GS_URI" ]' in _STAGE_SRC
+    assert '[ "$_staged_src" != "hf:$HF_DATASET" ]' in _STAGE_SRC
     # mismatch wipes the stale corpus before re-staging
-    assert 'wiping stale corpus' in _STARTUP_SRC
+    assert 'wiping stale corpus' in _STAGE_SRC
     # identity is written INTO the marker (both branches), never a bare touch
-    assert "printf '%s\\nn_pt=%s\\n' \"$SWEEP_DATA_GS_URI\"" in _STARTUP_SRC
-    assert "printf 'hf:%s\\nn_pt=%s\\n' \"$HF_DATASET\"" in _STARTUP_SRC
-    assert 'touch "$DATA_DIR/encoded/.unpacked"' not in _STARTUP_SRC
+    assert "printf '%s\\nn_pt=%s\\n' \"$SWEEP_DATA_GS_URI\"" in _STAGE_SRC
+    assert "printf 'hf:%s\\nn_pt=%s\\n' \"$HF_DATASET\"" in _STAGE_SRC
+    assert 'touch "$DATA_DIR/encoded/.unpacked"' not in _STAGE_SRC
 
 
-def test_startup_preflight_gates():
-    assert 'expected-train-rows' in _STARTUP_SRC
-    assert 'min-text-coverage' in _STARTUP_SRC
+def test_stage_preflight_gates():
+    # gates are env-driven (startup passes the metadata values through)
+    assert 'EXPECTED_TRAIN_ROWS="${EXPECTED_TRAIN_ROWS:-0}"' in _STAGE_SRC
+    assert 'MIN_TEXT_COVERAGE="${MIN_TEXT_COVERAGE:-0}"' in _STAGE_SRC
     # both gates refuse to launch (exit 1), not just warn
-    assert _STARTUP_SRC.count('[preflight] FATAL') == 2
-    # the digest rides the rendezvous ready-marker and diverging hosts refuse
+    assert _STAGE_SRC.count('[preflight] FATAL') == 2
+    # digest written for the rendezvous marker
+    assert '.data_digest' in _STAGE_SRC
+
+
+def test_startup_delegates_staging_and_rides_digest():
+    # startup calls the extracted script with the metadata gates...
+    assert 'bash "$REPO_DIR/scripts/tpu/stage_dataset.sh"' in _STARTUP_SRC
+    assert 'read_meta expected-train-rows 0' in _STARTUP_SRC
+    assert 'read_meta min-text-coverage 0' in _STARTUP_SRC
+    # ...reads the digest and refuses to launch on divergence
+    assert '.data_digest' in _STARTUP_SRC
     assert 'DATA_DIGEST' in _STARTUP_SRC
     assert 'dataset digests DIVERGE' in _STARTUP_SRC
+    # the old inline staging is gone (single source of truth)
+    assert 'tar -xzf /tmp/sweep_subset.tar.gz' not in _STARTUP_SRC
 
 
 def test_startup_hf_offline_gated_on_prefetch():
