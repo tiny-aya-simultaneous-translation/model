@@ -2929,16 +2929,20 @@ def main():
                     import wandb as _wtel
 
                     if _wtel.run is not None:
-                        _chips = backend.hbm_per_chip()
-                        if _chips:
-                            _hidx = int(backend.process_index())
-                            _wtel.log(
-                                {
-                                    f"tpu/host{_hidx}/chip{_cid}_hbm_gib": _used
-                                    for _cid, _used, _lim in _chips
-                                },
-                                step=step,
-                            )
+                        _hidx = int(backend.process_index())
+                        # Host-level stats ride along so per-host telemetry
+                        # lives in ORDINARY panels (the W&B System tab renders
+                        # labeled node streams inconsistently across UI builds).
+                        _tel = {f"tpu/host{_hidx}/rss_gb": _host_rss_gb()}
+                        try:
+                            import psutil as _psutil
+
+                            _tel[f"tpu/host{_hidx}/cpu_pct"] = _psutil.cpu_percent(interval=None)
+                        except Exception:  # noqa: BLE001 - psutil optional
+                            pass
+                        for _cid, _used, _lim in backend.hbm_per_chip():
+                            _tel[f"tpu/host{_hidx}/chip{_cid}_hbm_gib"] = _used
+                        _wtel.log(_tel, step=step)
                 except Exception as _tel_exc:  # noqa: BLE001 - telemetry never kills training
                     if is_main:
                         print(f"  [tpu-telemetry] skipped: {_tel_exc}", flush=True)
