@@ -36,12 +36,16 @@ LOCAL_TAR="/tmp/$TARBALL_NAME"
 
 echo "==> [1/5] tarballing repo"
 cd "$REPO_ROOT"
+# Provenance: TPU hosts have no .git, so stamp the deployed code identity
+# into the tarball -- the trainer reads it into wandb.config
+# (provenance/git_sha) so every public checkpoint is traceable.
+git rev-parse HEAD > BUILD_SHA 2>/dev/null || echo "unknown" > BUILD_SHA
 tar --exclude='.git' --exclude='.venv' --exclude='.env' \
     --exclude='__pycache__' --exclude='*.pyc' \
     --exclude='/mnt/*' --exclude='checkpoints' \
     --exclude='node_modules' --exclude='.pytest_cache' \
     -czf "$LOCAL_TAR" \
-    src scripts configs sweeps docs pyproject.toml uv.lock README.md
+    src scripts configs sweeps docs pyproject.toml uv.lock README.md BUILD_SHA
 ls -lh "$LOCAL_TAR"
 
 echo "==> [2/5] uploading tarball to $GCS_URI"

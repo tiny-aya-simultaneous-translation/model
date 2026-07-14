@@ -389,6 +389,9 @@ DEFAULTS = {
         "log_every": 20,
         "save_every": 1000,
         "audio_every": 1000,
+        # Inline TPU audio demo: AR frames generated per demo (the static-
+        # shape generate_audio_sample_tpu path; GPU path ignores this).
+        "audio_ar_frames": 50,
         "val_every": 1000,
         "val_max_batches": 50,
         # Inline validation on TPU is opt-in and WORKS (verified live on the
@@ -453,6 +456,89 @@ def resolve_loader_batch(train_cfg: dict, n_chips: int, n_hosts: int) -> int:
         return int(train_cfg["batch_size"])
     local_chips = int(n_chips) // max(1, int(n_hosts))
     return int(pcb) * local_chips
+
+
+def _resolve_build_sha() -> str:
+    """Best-effort code-identity for run provenance (public release).
+
+    Order: a ``BUILD_SHA`` file at the repo root (stamped into deploy
+    tarballs by hot_redeploy.sh -- TPU hosts have no .git), then
+    ``git rev-parse HEAD`` (local/GPU boxes), then the ``BUILD_SHA`` env,
+    else "unknown". Never raises.
+    """
+    root = Path(__file__).resolve().parents[1]
+    try:
+        p = root / "BUILD_SHA"
+        if p.is_file():
+            sha = p.read_text().strip()
+            if sha:
+                return sha
+    except OSError:
+        pass
+    try:
+        import subprocess as _sp
+
+        out = _sp.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=root,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        if out.returncode == 0 and out.stdout.strip():
+            return out.stdout.strip()
+    except Exception:  # noqa: BLE001 - provenance is best-effort
+        pass
+    return os.environ.get("BUILD_SHA", "unknown")
+
+
+def _read_data_digest(cfg: dict) -> str:
+    """Dataset identity for run provenance.
+
+    stage_dataset.sh writes ``rows=... pt=... al=... md5=...`` to
+    ``$DATA_DIR/.data_digest`` at boot (DATA_DIR = the parent of
+    data.encoded_dir). "unknown" on GPU boxes / local runs that never staged.
+    """
+    try:
+        p = Path(cfg["data"]["encoded_dir"]).parent / ".data_digest"
+        if p.is_file():
+            line = p.read_text().splitlines()[0].strip()
+            if line:
+                return line
+    except (OSError, KeyError, IndexError):
+        pass
+    return "unknown"
+
+
+def _codebook_entropy_stats(hist) -> tuple[list[float], list[float]]:
+    """Per-codebook prediction-distribution health from a count histogram.
+
+    Args:
+        hist: [num_codebooks, vocab] CPU tensor of predicted-code counts
+            (sentinel column already dropped by the caller).
+
+    Returns:
+        (entropy_bits, active_frac) lists, one entry per codebook.
+        Entropy of the empirical prediction distribution in BITS
+        (max = log2(vocab), e.g. 11.0 for the 2048-code Mimi books);
+        active_frac = fraction of the vocab predicted at least once.
+        A collapsing codebook shows falling entropy + active_frac -- this
+        directly instruments the deep-codebook-collapse failure mode.
+    """
+    entropy_bits: list[float] = []
+    active_frac: list[float] = []
+    for c in range(hist.shape[0]):
+        h = hist[c].to(torch.float64)
+        total = float(h.sum())
+        if total <= 0:
+            entropy_bits.append(0.0)
+            active_frac.append(0.0)
+            continue
+        p = h / total
+        nz = p[p > 0]
+        entropy_bits.append(float(-(nz * nz.log2()).sum()))
+        active_frac.append(float((h > 0).to(torch.float64).mean()))
+    return entropy_bits, active_frac
 
 
 def _percentile(values: list[float], q: float) -> float | None:
@@ -773,6 +859,139 @@ def generate_audio_sample(
     }
 
 
+@torch.no_grad()
+def generate_audio_sample_tpu(
+    model,
+    dataset,
+    mimi_encoder,
+    device,
+    num_codebooks,
+    backend,
+    sample_idx=0,
+    ctx_frames=100,
+    gen_frames=50,
+    is_main=True,
+):
+    """TPU-safe audio demo: static-shape teacher-forced + AR generation.
+
+    Why a separate path: the GPU generator above grows the sequence by one
+    frame per step, so XLA recompiles the backbone EVERY frame plus 640 host
+    syncs (documented 2-3 h/call at the old call site). This variant keeps
+    every tensor at a FIXED shape:
+
+    * one buffer ``[1, ctx+gen]``; each AR step re-runs the SAME compiled
+      fwd-only backbone graph over the whole buffer (causal attention makes
+      the not-yet-generated tail irrelevant to the frontier position);
+    * all position-dependent reads/writes use runtime INDEX TENSORS
+      (index_select / scatter) -- never python-int slices, which XLA would
+      bake in as constants and recompile per frame (XLA_NO_SPECIAL_SCALARS=1
+      keeps the host scalars as parameters);
+    * depth-decoder feedback stays on-device; generated codes accumulate in
+      an on-device ``[CB, gen]`` buffer with ONE ``.cpu()`` at the end.
+
+    Multi-host SPMD: every host MUST call this (replicated compute, exactly
+    like save/val); only ``is_main`` Mimi-decodes and gets wavs -- other
+    hosts get ``None``.
+
+    Cost: two small fwd-only graphs compiled ONCE per process (re-paid after
+    a preemption reboot), then ~gen_frames buffer forwards per demo.
+    """
+    model.eval()
+    sample = dataset[sample_idx]
+    src_codes_all = sample["audio_codes"]  # [CB, T_total] RAW (undelayed)
+    src_len = int(sample["source_length"])
+    tgt_len = int(sample["target_length"])
+
+    ctx = min(int(ctx_frames), src_len)
+    gen = int(gen_frames)
+    T = ctx + gen
+
+    # Static input buffers, assembled on host then moved once.
+    buf0_cpu = torch.zeros(1, T, dtype=torch.long)
+    buf0_cpu[0, :ctx] = src_codes_all[0, :ctx]
+    buf_cb0 = buf0_cpu.to(device)
+    text_ids = torch.full(
+        (1, T), TinyAyaBackbone.ZERO_PADDING, dtype=torch.long, device=device
+    )
+    attn = torch.ones(1, T, dtype=torch.long, device=device)
+    gen_buf = torch.zeros(num_codebooks, gen, dtype=torch.long, device=device)
+
+    autocast = (
+        backend.autocast_context(dtype=torch.bfloat16)
+        if backend
+        else torch.amp.autocast("cuda", dtype=torch.bfloat16)
+    )
+
+    def _frontier_hidden(codes_1T, pos_idx):
+        """One fixed-shape backbone+projection forward; gather ONE position."""
+        with autocast:
+            out = model.backbone(text_ids=text_ids, audio_codes=codes_1T, attention_mask=attn)
+            projected = model.projection(out["hidden_states"])  # [1, T, H]
+        return torch.index_select(projected, 1, pos_idx)  # [1, 1, H]
+
+    for i in range(gen):
+        cur = ctx + i  # next position to fill; condition on cur-1
+        pos_idx = torch.tensor([cur - 1], dtype=torch.long, device=device)
+        ctx_h = _frontier_hidden(buf_cb0, pos_idx)  # [1, 1, H]
+        ctx_expanded = ctx_h.expand(1, num_codebooks, -1).contiguous()
+
+        # In-frame depth AR: 8 depth calls, feedback stays on-device. cb_idx
+        # is a host constant (unrolled) => 8 small graph variants, compiled
+        # once each; the position indices are runtime tensors, so the frame
+        # loop reuses the same graphs for every i.
+        depth_input = torch.zeros(1, num_codebooks, dtype=torch.long, device=device)
+        frame_toks = []
+        for cb_idx in range(num_codebooks):
+            with autocast:
+                depth_out = model.depth_decoder(
+                    input_ids=depth_input,
+                    last_hidden_state=ctx_expanded,
+                    use_cache=False,
+                    return_dict=True,
+                )
+            cb_sel = torch.tensor([cb_idx], dtype=torch.long, device=device)
+            tok = (
+                torch.index_select(depth_out.logits, 1, cb_sel).argmax(dim=-1).to(torch.long)
+            )  # [1, 1]
+            frame_toks.append(tok)
+            if cb_idx + 1 < num_codebooks:
+                nxt_sel = torch.tensor([[cb_idx + 1]], dtype=torch.long, device=device)
+                depth_input = depth_input.scatter(1, nxt_sel, tok)
+        # one column write per frame: gen_buf[:, i] = this frame's 8 tokens
+        frame_col = torch.cat(frame_toks, dim=0)  # [CB, 1]
+        col_idx = torch.full((num_codebooks, 1), i, dtype=torch.long, device=device)
+        gen_buf = gen_buf.scatter(1, col_idx, frame_col)
+        # feed cb0 back into the static AR buffer at position cur
+        cur_idx = torch.tensor([[cur]], dtype=torch.long, device=device)
+        buf_cb0 = buf_cb0.scatter(1, cur_idx, frame_toks[0])
+        # Materialize per frame: keeps each compiled graph bounded instead of
+        # unrolling gen_frames x (backbone + 8 depth) into one giant graph.
+        if backend is not None and hasattr(backend, "sync"):
+            backend.sync()
+
+    gen_codes = gen_buf.cpu()  # ONE host sync for the payload
+    model.train()
+    if not is_main:
+        return None
+
+    from src.data.dataset import undo_codebook_delay
+
+    gen_undelayed = undo_codebook_delay(gen_codes)
+    src_full = src_codes_all[:, :src_len]
+    tgt_full = src_codes_all[:, src_len : src_len + tgt_len]
+    gt_cb0 = src_codes_all[0, ctx : ctx + gen]
+    n_cmp = min(len(gt_cb0), gen)
+    cb0_acc = (
+        (gen_codes[0, :n_cmp] == gt_cb0[:n_cmp]).float().mean().item() if n_cmp > 0 else 0.0
+    )
+    return {
+        "source_wav": mimi_encoder.decode(src_full).numpy(),
+        "target_gt_wav": mimi_encoder.decode(tgt_full).numpy(),
+        "generated_wav": mimi_encoder.decode(gen_undelayed).numpy(),
+        "cb0_accuracy": cb0_acc,
+    }
+
+
 # ---------------------------------------------------------------------------
 # validation loop
 # ---------------------------------------------------------------------------
@@ -818,6 +1037,12 @@ def run_validation(
     text_correct = torch.zeros((), device=device)
     text_total = torch.zeros((), device=device)
     n_finite = torch.zeros((), device=device)
+    # Codebook-health histogram: predicted-code counts per codebook over REAL
+    # target positions. Lazy [CB, V+1] (V from the first batch's logits; the
+    # +1 column is a sentinel absorbing masked positions -- dropped at
+    # readout). XLA-safe: torch.where + scatter_add, static shapes, no
+    # boolean indexing. Directly instruments deep-codebook collapse.
+    code_hist = None
     n = 0
     for batch in val_loader:
         if max_batches is not None and n >= max_batches:
@@ -970,6 +1195,17 @@ def run_validation(
         cb_correct = cb_correct + ((preds_cb == tgts_cb).to(m.dtype) * m.unsqueeze(1)).sum(
             dim=(0, 2)
         )
+        # Predicted-code histogram (see accumulator note above): masked
+        # positions route to the sentinel bucket V.
+        _V = audio_logits.size(-1)
+        if code_hist is None:
+            code_hist = torch.zeros(num_codebooks, _V + 1, device=device)
+        _sent = torch.full_like(preds_cb, _V)
+        _ph = torch.where(m.unsqueeze(1).bool(), preds_cb, _sent)  # [B, CB, T-1]
+        _flat = _ph.permute(1, 0, 2).reshape(num_codebooks, -1)
+        code_hist = code_hist.scatter_add(
+            1, _flat, torch.ones_like(_flat, dtype=code_hist.dtype)
+        )
         # Text teacher-forced next-token acc (same shift convention as the
         # text loss). Static-shape masked reduction like cb0 above. Mask =
         # target span AND real text tokens only: the interleaver fills most
@@ -1004,6 +1240,8 @@ def run_validation(
         text_correct = backend.reduce_mean(text_correct) * ws
         text_total = backend.reduce_mean(text_total) * ws
         n_finite = backend.reduce_mean(n_finite) * ws
+        if code_hist is not None:
+            code_hist = backend.reduce_mean(code_hist) * ws
 
     # Single host-sync point for the whole validation pass.
     cc = float(cb0_correct.item())
@@ -1018,10 +1256,24 @@ def run_validation(
     inv = 1.0 / nf
     _vt = (acc_text * inv).item()
     _va = (acc_audio * inv).item()
+    # Codebook prediction-distribution health (see accumulator note above).
+    _ent_bits: list[float] = []
+    _active: list[float] = []
+    if code_hist is not None:
+        _ent_bits, _active = _codebook_entropy_stats(
+            code_hist[:, :-1].detach().cpu()  # drop the mask-sentinel column
+        )
     return {
         "val/loss": (acc_loss * inv).item(),
         "val/text_loss": _vt,
         "val/audio_loss": _va,
+        # Perplexities: the cross-project lingua franca (exp of the stream
+        # CE; clamped so an early-run CE can't overflow). No composite ppl --
+        # exp of a weighted CE mix is not a perplexity.
+        "val/text_ppl": math.exp(min(_vt, 30.0)),
+        "val/audio_ppl": math.exp(min(_va, 30.0)),
+        "val/per_codebook_entropy_bits": _ent_bits,
+        "val/per_codebook_active_frac": _active,
         # Phase D: composite of the RAW stream losses (audio-heavier) — the metric
         # for best_by_val + early stopping, so neither stream can be sacrificed.
         "val/composite": composite_val_loss(
@@ -1962,6 +2214,30 @@ def main():
             # clip_coef, spike ratios). Was missing, so diag/* charted against
             # wall-clock _step instead of the training step.
             wandb.define_metric("diag/*", step_metric="global_step")
+            # Public-release families: ops counters (sys/*), optimizer
+            # trust-region ratios (opt/*), checkpoint index (checkpoints/*),
+            # offline-evaluator backfill (eval/*).
+            wandb.define_metric("sys/*", step_metric="global_step")
+            wandb.define_metric("opt/*", step_metric="global_step")
+            wandb.define_metric("checkpoints/*", step_metric="global_step")
+            wandb.define_metric("eval/*", step_metric="global_step")
+            # Provenance: pin code + data identity to the run so every public
+            # checkpoint is traceable (BUILD_SHA stamped into deploy tarballs;
+            # digest written by stage_dataset.sh at boot).
+            try:
+                wandb.config.update(
+                    {
+                        "provenance/git_sha": _resolve_build_sha(),
+                        "provenance/data_digest": _read_data_digest(cfg),
+                        "provenance/global_batch": int(cfg["train"]["batch_size"])
+                        * int(n_hosts)
+                        * int(cfg["train"].get("grad_accum", 1)),
+                        "provenance/seed": int(cfg["train"].get("seed", 42)),
+                    },
+                    allow_val_change=True,
+                )
+            except Exception as _pe:  # noqa: BLE001 - provenance is best-effort
+                print(f"[wandb] provenance update failed: {_pe}", flush=True)
             if is_tpu:
                 run_id = wandb.run.id
                 try:
@@ -2045,6 +2321,10 @@ def main():
     # early-stop countdown would silently reset.
     best_val = float(resume_meta.get("best_val", float("inf")))
     _patience_left = int(resume_meta.get("patience_left", early_stop_patience))
+    # Lifetime resume counter (public-release ops transparency: a reader
+    # correlating a loss blip with sys/resumes sees it was a preemption, not
+    # instability). Persisted via the periodic checkpoints' extra_state.
+    _resume_count = int(resume_meta.get("resumes", 0) or 0) + (1 if start_step > 0 else 0)
     if start_step > 0 and is_main and best_val != float("inf"):
         print(
             f"[resume] restored best_val={best_val:.4f}, "
@@ -2105,6 +2385,8 @@ def main():
     # the final save so a released run never exits mid-upload.
     async_ckpt = bool(cfg["logging"].get("async_checkpoint_upload", False))
     audio_every = cfg["logging"]["audio_every"]
+    # AR frames per inline TPU audio demo (context is fixed at 100 frames).
+    audio_ar_frames = int(cfg["logging"].get("audio_ar_frames", 50))
     val_every = cfg["logging"]["val_every"]
     text_w = cfg["loss"]["text_weight"]
     audio_w = cfg["loss"]["audio_weight"]
@@ -2731,6 +3013,15 @@ def main():
         if "name" in g
     }
 
+    # Boot-cost transparency (sys/boot_to_first_log_sec, logged once): time
+    # from loop entry (post model-build/compile-warmup) to the first log event
+    # -- dominated by the cold XLA compile on a fresh boot.
+    _t_boot = time.time()
+    _boot_logged = False
+    # Checkpoint-index rows (step, tokens, last val composite, path) +
+    # the freshest val composite for it.
+    _ckpt_index_rows: list[list] = []
+    _last_val_composite = float("nan")
     while step < max_steps:
         if is_tpu and micro_batches_seen_this_epoch + grad_accum > usable_micro_batches_per_epoch:
             # Reshuffle on epoch rollover. All hosts reach the same `step`, so a
@@ -2814,6 +3105,10 @@ def main():
                     diag_log[f"diag/grad_rms/{gname}"] = gn / _rt
                     diag_log[f"diag/update_rms_est/{gname}"] = lr * gn / _rt
                     diag_log[f"diag/update_rms_adam/{gname}"] = lr * un / _rt
+                    # Trust-region read: Adam step size relative to the
+                    # group's weight scale -- how fast the group is MOVING
+                    # (healthy LoRA fine-tunes sit around 1e-3..1e-2/step).
+                    diag_log[f"opt/update_weight_ratio/{gname}"] = (lr * un) / (pn + 1e-12)
                     _pv = _ema["v"].get(gname)
                     if _pv:
                         diag_log[f"diag/adam_v_drift/{gname}"] = vm / (_pv + 1e-12)
@@ -2871,6 +3166,17 @@ def main():
                     ),
                     "perf/log_interval_sec": log_interval_sec,
                 }
+                # Analytical MFU (no on-device flop counters on this stack):
+                # per token, fwd = 2*N_total, bwd = 2*N_total grad-activations
+                # (the frozen backbone still backprops activations) +
+                # 2*N_trainable grad-weights. Peak: Trillium (v6e) bf16
+                # ~918 TFLOP/s per chip. Estimate, labeled _est.
+                _flops_per_step = (4.0 * total + 2.0 * trainable) * frame_tokens_per_step
+                if step_time > 0:
+                    perf_log["perf/mfu_est"] = _flops_per_step / step_time / (
+                        918e12 * backend.world_size()
+                    )
+                perf_log["perf/cum_pf_days_est"] = _flops_per_step * step / 1e15 / 86400.0
                 p50 = _percentile(perf_step_times, 0.50)
                 p90 = _percentile(perf_step_times, 0.90)
                 p99 = _percentile(perf_step_times, 0.99)
@@ -2933,7 +3239,13 @@ def main():
                         # Host-level stats ride along so per-host telemetry
                         # lives in ORDINARY panels (the W&B System tab renders
                         # labeled node streams inconsistently across UI builds).
-                        _tel = {f"tpu/host{_hidx}/rss_gb": _host_rss_gb()}
+                        # NOTE: wandb.log(step=) is IGNORED in shared mode --
+                        # the x-axis must ride the global_step key (see the
+                        # define_metric block at wandb.init).
+                        _tel = {
+                            "global_step": step,
+                            f"tpu/host{_hidx}/rss_gb": _host_rss_gb(),
+                        }
                         try:
                             import psutil as _psutil
 
@@ -2942,7 +3254,7 @@ def main():
                             pass
                         for _cid, _used, _lim in backend.hbm_per_chip():
                             _tel[f"tpu/host{_hidx}/chip{_cid}_hbm_gib"] = _used
-                        _wtel.log(_tel, step=step)
+                        _wtel.log(_tel)
                 except Exception as _tel_exc:  # noqa: BLE001 - telemetry never kills training
                     if is_main:
                         print(f"  [tpu-telemetry] skipped: {_tel_exc}", flush=True)
@@ -2955,6 +3267,13 @@ def main():
                     "train/text_loss": avg["text"],
                     "train/audio_loss": avg["audio"],
                     "train/grad_norm": grad_norm.item(),
+                    # Cumulative data axes (derived from step arithmetic --
+                    # static padded shapes make tokens/step constant -- so they
+                    # are exact and resume-safe with no persisted state).
+                    "train/samples_seen": float(step) * effective_batch,
+                    "train/tokens_seen": float(step) * frame_tokens_per_step,
+                    "train/epoch": (float(step) * effective_batch) / max(1, len(train_ds)),
+                    "sys/resumes": _resume_count,
                     "perf/step_time": step_time,
                     "mem/peak_gb": peak_gb,
                     "mem/allocated_gb": alloc_gb,
@@ -2964,6 +3283,9 @@ def main():
                     **lrs,
                     **diag_log,
                 }
+                if not _boot_logged:
+                    log["sys/boot_to_first_log_sec"] = now - _t_boot
+                    _boot_logged = True
                 for i, v in enumerate(avg["per_cb"]):
                     log[f"train/per_codebook_loss_{i}"] = v
                 # Per-chip HBM + duty-cycle timeseries (tpu/chip{i}/hbm_gib,
@@ -2998,18 +3320,60 @@ def main():
             backend.sync()
 
         # ---- audio demo
-        # Skip on TPU: generate_audio_sample contains an autoregressive
-        # Python loop with `tok.cpu()` inside an inner per-codebook
-        # loop (640 sync points) AND the backbone forward sees a
-        # growing-by-1 sequence each iter, which forces a fresh XLA
-        # compile per generation step. Empirically that locks the
-        # main thread for 2-3 hours per call. The audio demo is a
-        # qualitative sanity check, not a training requirement;
-        # generate samples post-training on a GPU instead.
+        # TPU path: generate_audio_sample_tpu (static shapes, on-device
+        # feedback -- see its docstring; the naive generator recompiled per
+        # frame, 2-3 h/call). ALL hosts must enter it (SPMD replicated
+        # compute, like save/val); only is_main decodes + logs.
         is_distributed = int(os.environ.get("WORLD_SIZE", "1")) > 1
-        if (
-            audio_every
-            and step % audio_every == 0
+        _audio_due = bool(audio_every) and step % audio_every == 0
+        if _audio_due and is_tpu:
+            try:
+                _t_demo = time.time()
+                r = generate_audio_sample_tpu(
+                    unwrapped,
+                    train_ds,
+                    mimi_encoder,
+                    device,
+                    num_codebooks,
+                    backend=backend,
+                    sample_idx=0,
+                    ctx_frames=100,
+                    gen_frames=audio_ar_frames,
+                    is_main=is_main,
+                )
+                if is_main and r is not None:
+                    _demo_sec = time.time() - _t_demo
+                    print(
+                        f"  [audio-demo] ar_cb0_acc={r['cb0_accuracy'] * 100:.1f}% "
+                        f"({_demo_sec:.0f}s)",
+                        flush=True,
+                    )
+                    ad = _artifacts_dir / "audio_samples" / f"step_{step:06d}"
+                    ad.mkdir(parents=True, exist_ok=True)
+                    sf.write(ad / "source.wav", r["source_wav"], 24000)
+                    sf.write(ad / "target_gt.wav", r["target_gt_wav"], 24000)
+                    sf.write(ad / "generated.wav", r["generated_wav"], 24000)
+                    if use_wandb:
+                        import wandb
+
+                        wandb.log(
+                            {
+                                "global_step": step,
+                                "audio/source": wandb.Audio(r["source_wav"], sample_rate=24000),
+                                "audio/target_gt": wandb.Audio(
+                                    r["target_gt_wav"], sample_rate=24000
+                                ),
+                                "audio/generated": wandb.Audio(
+                                    r["generated_wav"], sample_rate=24000
+                                ),
+                                "audio/ar_cb0_acc": r["cb0_accuracy"],
+                                "audio/demo_sec": _demo_sec,
+                            },
+                        )
+            except Exception as e:
+                print(f"  [audio-demo] failed (non-fatal): {e}", flush=True)
+        elif (
+            _audio_due
             and is_main
             and not is_tpu
             and not is_distributed
@@ -3092,12 +3456,21 @@ def main():
             if val_ok and use_wandb and is_main:
                 import wandb
 
-                _list_keys = ("val/per_codebook_loss", "val/per_codebook_acc")
+                _list_keys = (
+                    "val/per_codebook_loss",
+                    "val/per_codebook_acc",
+                    "val/per_codebook_entropy_bits",
+                    "val/per_codebook_active_frac",
+                )
                 log = {k: v for k, v in val.items() if k not in _list_keys}
                 for i, v in enumerate(val["val/per_codebook_loss"]):
                     log[f"val/per_codebook_loss_{i}"] = v
                 for i, v in enumerate(val.get("val/per_codebook_acc", [])):
                     log[f"val/per_codebook_acc_{i}"] = v
+                for i, v in enumerate(val.get("val/per_codebook_entropy_bits", [])):
+                    log[f"val/per_codebook_entropy_bits_{i}"] = v
+                for i, v in enumerate(val.get("val/per_codebook_active_frac", [])):
+                    log[f"val/per_codebook_active_frac_{i}"] = v
                 log["global_step"] = step
                 wandb.log(log)
             _improved = False
@@ -3105,6 +3478,7 @@ def main():
                 # Phase D: select/early-stop on the composite (audio-heavier) metric;
                 # fall back to raw val/loss if composite is absent (older configs).
                 _stop_metric = val.get("val/composite", val.get("val/loss"))
+                _last_val_composite = float(_stop_metric)  # rides the ckpt index
                 _dec = early_stop_step(
                     _stop_metric,
                     best_val,
@@ -3181,6 +3555,7 @@ def main():
                     "wandb_run_id": run_id,
                     "best_val": best_val,
                     "patience_left": _patience_left,
+                    "resumes": _resume_count,
                 },
                 is_main=is_main,
                 keep_local_dir=keep_local_dir,
@@ -3196,6 +3571,37 @@ def main():
                         )
                     except Exception as e:
                         print(f"  hub push failed: {e}")
+                # Checkpoint index: the public suite's table of contents
+                # (step -> tokens -> quality -> location), re-logged as a
+                # small Table each save (~121 rows max on the long run).
+                if use_wandb:
+                    try:
+                        import wandb
+
+                        _ckpt_index_rows.append(
+                            [
+                                step,
+                                float(step) * frame_tokens_per_step,
+                                _last_val_composite,
+                                str(d),
+                            ]
+                        )
+                        wandb.log(
+                            {
+                                "global_step": step,
+                                "checkpoints/index": wandb.Table(
+                                    columns=[
+                                        "step",
+                                        "tokens_seen",
+                                        "last_val_composite",
+                                        "path",
+                                    ],
+                                    data=list(_ckpt_index_rows),
+                                ),
+                            }
+                        )
+                    except Exception as _cie:  # noqa: BLE001 - index never blocks saves
+                        print(f"  [ckpt-index] log failed: {_cie}", flush=True)
             backend.barrier()
 
         if _early_stop:

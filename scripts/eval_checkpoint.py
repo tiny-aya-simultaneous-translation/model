@@ -210,6 +210,59 @@ def compute_bleu(hypothesis, reference):
         return (matches / len(hyp_tokens)) * 100
 
 
+def load_model_and_data(checkpoint, val_jsonl, encoded_dir, device, lora_r_fallback=16):
+    """Self-configuring checkpoint loader shared by this eval and
+    eval_translation_proxy.py.
+
+    Builds the LoRA structure from the checkpoint's OWN adapter_config.json
+    (target_modules / r / alpha / rslora) rather than hardcoding it --
+    otherwise the adapter's weights for any module the eval didn't wrap
+    (e.g. the +MLP k/o/gate/up/down at r=32) silently fail to load and the
+    model runs mostly-untrained. Adapter LAYOUT must also match exactly:
+    scan_homogeneous checkpoints (layers_to_transform == null) carry adapters
+    on ALL 36 layers, and an eval model built with the classic exclude_top=2
+    (34 layers) would silently DROP the top-2 tensors as "unexpected" keys.
+
+    Returns (model.eval() on device, dataset, mimi decoder, val rows).
+    """
+    print("Loading model...", flush=True)
+    _acfg_uri = os.path.join(checkpoint, "peft_adapter", "adapter_config.json")
+    if checkpoint.startswith("gs://"):
+        import subprocess as _sp
+        _acfg = json.loads(_sp.run(["gsutil", "cat", _acfg_uri], capture_output=True, text=True).stdout)
+    else:
+        with open(_acfg_uri) as _f:
+            _acfg = json.load(_f)
+    _r = _acfg.get("r", lora_r_fallback)
+    _ltt = _acfg.get("layers_to_transform")
+    _scan_homog = _ltt is None
+    _excl = 0 if _scan_homog else max(0, 36 - len(_ltt))
+    print(f"  LoRA from checkpoint: r={_r} alpha={_acfg.get('lora_alpha')} "
+          f"rslora={_acfg.get('use_rslora')} targets={_acfg.get('target_modules')} "
+          f"layout={'ALL-36 (scan_homogeneous)' if _scan_homog else f'0..{35 - _excl}'}",
+          flush=True)
+    model = TinyAyaMoshiComposite(num_codebooks=8)
+    model.backbone = apply_lora(
+        model.backbone,
+        r=_r,
+        lora_alpha=_acfg.get("lora_alpha", 2 * _r),
+        target_modules=_acfg.get("target_modules"),
+        use_rslora=_acfg.get("use_rslora", False),
+        num_full_ft_layers=0,
+        lora_exclude_top=_excl,
+        scan_homogeneous=_scan_homog,
+    )
+    load_checkpoint(model, None, None, checkpoint)
+    model = model.to(device).to(_AC_DTYPE).eval()
+
+    tokenizer = AutoTokenizer.from_pretrained("CohereLabs/tiny-aya-base", trust_remote_code=True)
+    ds = StreamingTranslationDataset(val_jsonl, tokenizer, max_frames=300, encoded_dir=encoded_dir)
+    mimi = MimiEncoder(device=device)
+    with open(val_jsonl) as f:
+        rows = [json.loads(line) for line in f if line.strip()]
+    return model, ds, mimi, rows
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--checkpoint", required=True)
@@ -232,56 +285,10 @@ def main():
     global _AC_DTYPE
     _AC_DTYPE = torch.float32 if args.fp32 else torch.bfloat16
 
-    # Load model. Build the LoRA structure from the checkpoint's OWN
-    # adapter_config.json (target_modules / r / alpha / rslora) rather than
-    # hardcoding it -- otherwise the adapter's weights for any module the eval
-    # didn't wrap (e.g. the +MLP k/o/gate/up/down at r=32) silently fail to load
-    # and the model runs mostly-untrained. Self-configuring for any checkpoint.
-    print("Loading model...", flush=True)
-    _acfg_uri = os.path.join(args.checkpoint, "peft_adapter", "adapter_config.json")
-    if args.checkpoint.startswith("gs://"):
-        import subprocess as _sp
-        _acfg = json.loads(_sp.run(["gsutil", "cat", _acfg_uri], capture_output=True, text=True).stdout)
-    else:
-        with open(_acfg_uri) as _f:
-            _acfg = json.load(_f)
-    _r = _acfg.get("r", args.lora_r)
-    # Adapter LAYOUT must match the checkpoint exactly, or load_checkpoint's
-    # missing-keys guard can't protect us: scan_homogeneous checkpoints
-    # (layers_to_transform == null) carry adapters on ALL 36 layers, and an
-    # eval model built with the classic exclude_top=2 (34 layers) would
-    # silently DROP the top-2 tensors as "unexpected" keys. They are frozen
-    # zeros in training, so numerics happen to survive -- but silent drops are
-    # exactly the class of bug this eval exists to rule out. Mirror the layout.
-    _ltt = _acfg.get("layers_to_transform")
-    _scan_homog = _ltt is None
-    _excl = 0 if _scan_homog else max(0, 36 - len(_ltt))
-    print(f"  LoRA from checkpoint: r={_r} alpha={_acfg.get('lora_alpha')} "
-          f"rslora={_acfg.get('use_rslora')} targets={_acfg.get('target_modules')} "
-          f"layout={'ALL-36 (scan_homogeneous)' if _scan_homog else f'0..{35 - _excl}'}",
-          flush=True)
-    model = TinyAyaMoshiComposite(num_codebooks=8)
-    model.backbone = apply_lora(
-        model.backbone,
-        r=_r,
-        lora_alpha=_acfg.get("lora_alpha", 2 * _r),
-        target_modules=_acfg.get("target_modules"),
-        use_rslora=_acfg.get("use_rslora", False),
-        num_full_ft_layers=0,
-        lora_exclude_top=_excl,
-        scan_homogeneous=_scan_homog,
+    model, ds, mimi, rows = load_model_and_data(
+        args.checkpoint, args.val_jsonl, args.encoded_dir, device, lora_r_fallback=args.lora_r
     )
-    load_checkpoint(model, None, None, args.checkpoint)
-    model = model.to(device).to(_AC_DTYPE).eval()
-
-    # Load dataset + Mimi decoder
-    tokenizer = AutoTokenizer.from_pretrained("CohereLabs/tiny-aya-base", trust_remote_code=True)
-    ds = StreamingTranslationDataset(args.val_jsonl, tokenizer, max_frames=300, encoded_dir=args.encoded_dir)
-    mimi = MimiEncoder(device=device)
-
-    # Load metadata for reference texts
-    with open(args.val_jsonl) as f:
-        rows = [json.loads(line) for line in f if line.strip()]
+    tokenizer = model.backbone.tokenizer
 
     num_samples = min(args.num_samples, len(ds))
     results = []

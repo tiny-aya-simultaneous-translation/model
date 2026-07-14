@@ -218,6 +218,89 @@ def test_trainer_logs_per_host_tpu_telemetry():
         assert "tpu_telemetry_every: 250" in (REPO / "configs" / "tpu" / cfgname).read_text()
 
 
+# ---------------------------------------------------------------------------
+# public-release metrics (Tier A/B/C)
+# ---------------------------------------------------------------------------
+
+
+def _extract_fn(name):
+    """AST-extract a module-level function from the train script."""
+    tree = ast.parse(_TRAIN_SRC)
+    for node in tree.body:
+        if isinstance(node, ast.FunctionDef) and node.name == name:
+            import torch  # real torch: the helper does tensor math
+
+            ns: dict = {"torch": torch}
+            exec(ast.get_source_segment(_TRAIN_SRC, node), ns)
+            return ns[name]
+    raise AssertionError(f"{name} not found")
+
+
+def test_codebook_entropy_stats():
+    import torch
+
+    if isinstance(sys.modules.get("torch"), MagicMock):
+        del sys.modules["torch"]
+        import torch  # noqa: F811 - re-import the real one
+
+    f = _extract_fn("_codebook_entropy_stats")
+    V = 2048
+    hist = torch.zeros(3, V)
+    hist[0] = 1.0                # uniform -> max entropy = log2(2048) = 11 bits
+    hist[1, 7] = 100.0           # one-hot -> 0 bits, active 1/V
+    #      hist[2] stays empty  -> zeros
+    ent, act = f(hist)
+    assert abs(ent[0] - 11.0) < 1e-6 and abs(act[0] - 1.0) < 1e-9
+    assert ent[1] == 0.0 and abs(act[1] - 1.0 / V) < 1e-9
+    assert ent[2] == 0.0 and act[2] == 0.0
+
+
+def test_release_metric_wiring():
+    # Tier A: counters + sys + ppl + trust-region ratio
+    assert '"train/tokens_seen": float(step) * frame_tokens_per_step' in _TRAIN_SRC
+    assert '"train/samples_seen": float(step) * effective_batch' in _TRAIN_SRC
+    assert '"train/epoch"' in _TRAIN_SRC
+    assert '"sys/resumes": _resume_count' in _TRAIN_SRC
+    assert '"resumes": _resume_count' in _TRAIN_SRC  # persisted in extra_state
+    assert 'sys/boot_to_first_log_sec' in _TRAIN_SRC
+    assert '"val/text_ppl": math.exp(min(_vt, 30.0))' in _TRAIN_SRC
+    assert 'f"opt/update_weight_ratio/{gname}"' in _TRAIN_SRC
+    # provenance
+    assert '"provenance/git_sha": _resolve_build_sha()' in _TRAIN_SRC
+    assert '"provenance/data_digest": _read_data_digest(cfg)' in _TRAIN_SRC
+    # Tier B: codebook histogram + exploded list keys
+    assert '_codebook_entropy_stats(' in _TRAIN_SRC
+    assert '"val/per_codebook_entropy_bits"' in _TRAIN_SRC
+    assert 'f"val/per_codebook_active_frac_{i}"' in _TRAIN_SRC
+    # Tier C: MFU + PF-days + checkpoint index
+    assert 'perf/mfu_est' in _TRAIN_SRC
+    assert 'perf/cum_pf_days_est' in _TRAIN_SRC
+    assert '"checkpoints/index": wandb.Table(' in _TRAIN_SRC
+    # define_metric families
+    for fam in ("sys/*", "opt/*", "checkpoints/*", "eval/*"):
+        assert f'wandb.define_metric("{fam}", step_metric="global_step")' in _TRAIN_SRC
+    # shared-mode bug fix: telemetry rides global_step, never step=
+    _tel = _TRAIN_SRC.split("Host-level stats ride along")[1][:1600]
+    assert '"global_step": step' in _tel
+    assert "_wtel.log(_tel)" in _TRAIN_SRC and "_wtel.log(_tel, step=" not in _TRAIN_SRC
+
+
+def test_tpu_audio_demo_wiring():
+    # static-shape generator exists and never slices with python ints at the
+    # frontier (index_select/scatter with runtime index tensors instead)
+    assert "def generate_audio_sample_tpu(" in _TRAIN_SRC
+    gen_src = _TRAIN_SRC.split("def generate_audio_sample_tpu(")[1].split("\ndef ")[0]
+    assert "index_select" in gen_src and ".scatter(" in gen_src
+    assert "backend.sync()" in gen_src
+    # ALL hosts enter on TPU (no is_main gate on the call), GPU path intact
+    assert "if _audio_due and is_tpu:" in _TRAIN_SRC
+    assert "generate_audio_sample_tpu(" in _TRAIN_SRC
+    assert '"audio_ar_frames": 50,' in _TRAIN_SRC
+    # BUILD_SHA stamped into deploy tarballs
+    hot = (REPO / "scripts" / "tpu" / "hot_redeploy.sh").read_text()
+    assert "git rev-parse HEAD > BUILD_SHA" in hot and "BUILD_SHA" in hot.split("-czf")[1]
+
+
 def test_startup_hf_offline_gated_on_prefetch():
     # marker written only by prefetch verification...
     assert 'touch /tmp/hf_backbones_ready' in _PREFETCH_SRC
