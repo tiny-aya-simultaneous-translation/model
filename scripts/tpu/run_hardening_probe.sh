@@ -13,7 +13,9 @@
 #   CONFIG_FILE            (required) repo-relative config
 #   FLASH_ATTN             true|false (default false -- the validated default)
 #   XLA_CACHE              1|0 (default 1)
-#   RESUME                 auto|none (default auto)
+#   RESUME                 auto | <checkpoint dir> (default auto; a fresh
+#                          save_dir + auto = fresh start -- "none" is NOT valid,
+#                          the trainer treats it as a literal path)
 #   WANDB_RENDEZVOUS_URI   (required for multi-host; SAME value on all hosts)
 #   TMUX_SESSION           default train
 set -euo pipefail
