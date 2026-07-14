@@ -396,6 +396,10 @@ DEFAULTS = {
         # nan_to_num). Default stays off so bare smoke configs skip the extra
         # compile; production/probe configs set true. On GPU, val always runs.
         "val_on_tpu": False,
+        # TPU-SPMD-only: decouple the val loader batch from the locked train
+        # batch (val is inference-only; bigger batches only shorten the val
+        # cycle). None => val batch == train batch.
+        "val_per_chip_batch": None,
         "save_dir": "checkpoints/stage2_scale",
         # Log-spaced early checkpoints for the public mech-interp suite (in
         # ADDITION to save_every). log_spaced_saves auto-adds {1,2,4,...,512};
@@ -1282,6 +1286,28 @@ def main():
                 flush=True,
             )
 
+    # Decouple the VAL loader batch from the (locked) train batch. Val is
+    # inference-only: a larger per-chip val batch only shortens the every-
+    # `val_every` val cycle (fewer, bigger sharded batches; shard_to_device
+    # is shape-agnostic) -- it cannot change optimizer math. TPU-SPMD-only,
+    # same resolve path as train. Unset => val batch == train batch.
+    val_batch_size = cfg["train"]["batch_size"]
+    if cfg["logging"].get("val_per_chip_batch"):
+        if cfg.get("backend", "auto") != "tpu":
+            raise ValueError("logging.val_per_chip_batch is TPU-SPMD-only")
+        val_batch_size = resolve_loader_batch(
+            {**cfg["train"], "per_chip_batch": cfg["logging"]["val_per_chip_batch"]},
+            backend.world_size(),
+            n_hosts,
+        )
+        if is_main:
+            print(
+                f"[batch] val_per_chip_batch={cfg['logging']['val_per_chip_batch']} -> "
+                f"per_host val loader batch {val_batch_size} x {n_hosts} hosts "
+                f"= global {val_batch_size * n_hosts}",
+                flush=True,
+            )
+
     if is_main:
         print("\n=== Effective config ===")
         print(json.dumps(cfg, indent=2, default=str))
@@ -1456,6 +1482,16 @@ def main():
     )
     if _sa_cfg and _sa_cfg.get("enabled") and is_main:
         print(f"  [spec-augment] ON (train only): {_sa_cfg}", flush=True)
+    # Val collator must pad the batch axis to the VAL loader batch (the
+    # collator raises when real_b > batch_pad_to). Only distinct when
+    # logging.val_per_chip_batch decouples the val batch from train.
+    val_collator = collator
+    if is_tpu_cfg and val_batch_size != cfg["train"]["batch_size"]:
+        val_collator = InterleavedCollator(
+            pad_to=pad_to,
+            batch_pad_to=val_batch_size,
+            expected_num_codebooks=expected_codebooks,
+        )
     if args.dataset_mode == "streaming":
         if not cfg["data"]["train_split"]:
             raise ValueError("train_split required in streaming mode")
@@ -1610,10 +1646,10 @@ def main():
     if val_ds is not None:
         val_loader = torch.utils.data.DataLoader(
             val_ds,
-            batch_size=cfg["train"]["batch_size"],
+            batch_size=val_batch_size,
             shuffle=False,
             sampler=val_sampler,
-            collate_fn=collator,
+            collate_fn=val_collator,
             num_workers=num_workers,
             pin_memory=cfg["data"]["pin_memory"] and not is_tpu,
             persistent_workers=use_persistent,

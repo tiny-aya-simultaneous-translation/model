@@ -146,19 +146,36 @@ sudo mkdir -p "$DATA_DIR"
 sudo chown "$USER:$USER" "$DATA_DIR"
 
 if [ -n "$SWEEP_DATA_GS_URI" ]; then
-    # Phase E sweep fleet: pull the SMALL pre-staged subset tarball from GCS
-    # (built by scripts/tpu/stage_sweep_subset.sh) instead of the full HF corpus.
-    # Avoids 8 parallel hosts rate-limiting HF and 8x extracting ~4M files.
-    if [ ! -f "$DATA_DIR/encoded/.unpacked" ]; then
-        echo "[startup] sweep mode: fetching subset from $SWEEP_DATA_GS_URI"
+    # Pre-staged GCS tarball (probe subset OR the full corpus; built by
+    # scripts/tpu/stage_sweep_subset.sh and siblings). Avoids HF entirely.
+    # The .unpacked marker records WHICH source it belongs to (first line):
+    # a marker that doesn't match the requested SWEEP_DATA_GS_URI -- including
+    # the legacy empty marker -- forces a wipe + re-stage. Without this, a
+    # tarball swap (e.g. 4k probe subset -> full corpus) silently trains the
+    # long-horizon run on stale data (found live 2026-07-14: all 4 hosts held
+    # the 4k spoke-4 subset behind a contentless marker).
+    _marker="$DATA_DIR/encoded/.unpacked"
+    _staged_src="$(head -n1 "$_marker" 2>/dev/null || true)"
+    if [ "$_staged_src" != "$SWEEP_DATA_GS_URI" ]; then
+        if [ -e "$_marker" ] || [ -d "$DATA_DIR/encoded" ]; then
+            echo "[startup] staged corpus is '${_staged_src:-<unlabeled>}' but launch wants '$SWEEP_DATA_GS_URI' -- wiping stale corpus"
+            sudo rm -rf "$DATA_DIR/encoded" "$DATA_DIR/splits"
+            sudo find "$DATA_DIR" -maxdepth 1 -name '*.alignments.json' -delete 2>/dev/null || true
+        fi
+        echo "[startup] staging corpus from $SWEEP_DATA_GS_URI"
         gcloud storage cp "$SWEEP_DATA_GS_URI" /tmp/sweep_subset.tar.gz
         sudo mkdir -p "$DATA_DIR/encoded" "$DATA_DIR/splits"
         sudo chown -R "$USER:$USER" "$DATA_DIR/encoded" "$DATA_DIR/splits"
         # Tarball lays out encoded/ + splits/ at the top level -> extract into $DATA_DIR.
         tar -xzf /tmp/sweep_subset.tar.gz -C "$DATA_DIR"
+        rm -f /tmp/sweep_subset.tar.gz
         n_pt=$(find "$DATA_DIR/encoded" -maxdepth 1 -name '*.pt' | wc -l)
-        echo "[startup] sweep subset ready: $n_pt encoded .pt files"
-        touch "$DATA_DIR/encoded/.unpacked"
+        echo "[startup] staged: $n_pt encoded .pt files"
+        # Written LAST (set -e: a failed download/extract never writes it), and
+        # AFTER extraction so an in-tar marker can't overwrite the identity.
+        printf '%s\nn_pt=%s\n' "$SWEEP_DATA_GS_URI" "$n_pt" | sudo tee "$_marker" >/dev/null
+    else
+        echo "[startup] corpus already staged from $SWEEP_DATA_GS_URI (marker match)"
     fi
 else
 # We deliberately do NOT set HF_HUB_ENABLE_HF_TRANSFER here: hf_transfer isn't
@@ -175,8 +192,15 @@ uv run huggingface-cli download "$HF_DATASET" \
 # _resolve() matches on the BASENAME, so no --strip-components needed.
 # ~1.24M samples => ~4M small files (fits: ~12.5M inodes free on the v6e VM).
 # Idempotent: skip extraction once the marker file exists.
+_marker="$DATA_DIR/encoded/.unpacked"
+_staged_src="$(head -n1 "$_marker" 2>/dev/null || true)"
 if ls "$DATA_DIR"/mimi_encoded_batch*.tar.gz >/dev/null 2>&1 \
-        && [ ! -f "$DATA_DIR/encoded/.unpacked" ]; then
+        && [ "$_staged_src" != "hf:$HF_DATASET" ]; then
+    if [ -e "$_marker" ] || [ -d "$DATA_DIR/encoded" ]; then
+        echo "[startup] staged corpus is '${_staged_src:-<unlabeled>}' but launch wants 'hf:$HF_DATASET' -- wiping stale corpus"
+        sudo rm -rf "$DATA_DIR/encoded"
+        sudo find "$DATA_DIR" -maxdepth 1 -name '*.alignments.json' -delete 2>/dev/null || true
+    fi
     sudo mkdir -p "$DATA_DIR/encoded"
     sudo chown "$USER:$USER" "$DATA_DIR/encoded"
     for tb in "$DATA_DIR"/mimi_encoded_batch*.tar.gz; do
@@ -210,9 +234,44 @@ for split in ('train', 'val'):
     print(f'[startup] filtered {split}.jsonl: kept={len(kept)} dropped={dropped}')
 "
     sudo chown "$USER:$USER" "$DATA_DIR/splits/train.jsonl" "$DATA_DIR/splits/val.jsonl"
-    touch "$DATA_DIR/encoded/.unpacked"
+    printf 'hf:%s\nn_pt=%s\n' "$HF_DATASET" "$n_pt" | sudo tee "$DATA_DIR/encoded/.unpacked" >/dev/null
 fi
 fi  # end SWEEP_DATA_GS_URI branch
+
+# ----- 6a. dataset preflight (guards two SILENT failure modes) -----
+# (1) Row-count gate: metadata `expected-train-rows` (0 = skip). Catches a
+#     stale/wrong corpus that the marker logic somehow let through -- without
+#     it a 110k-step run can burn days on a 4k probe subset with no error.
+# (2) Text-coverage gate: src/data/dataset.py falls back to ZERO text when an
+#     alignment JSON is missing (no crash) -- exactly how the arm-era runs
+#     silently under-trained text. metadata `min-text-coverage` (percent,
+#     0 = warn only). The long-horizon launch sets both gates.
+# The digest (rows/pt/al/md5) also rides the rendezvous ready-marker so hosts
+# can refuse to launch on divergent splits (DistributedSampler shards by index:
+# different per-host datasets silently corrupt the global batch).
+TRAIN_ROWS=$(wc -l < "$DATA_DIR/splits/train.jsonl" 2>/dev/null || echo 0)
+VAL_ROWS=$(wc -l < "$DATA_DIR/splits/val.jsonl" 2>/dev/null || echo 0)
+N_PT=$(find "$DATA_DIR/encoded" -maxdepth 1 -name '*.pt' 2>/dev/null | wc -l)
+N_TGT_AL=$(find "$DATA_DIR" -maxdepth 1 -name '*.tgt.alignments.json' 2>/dev/null | wc -l)
+SPLIT_MD5=$(md5sum "$DATA_DIR/splits/train.jsonl" 2>/dev/null | awk '{print $1}' || echo none)
+_coverage=0
+[ "$N_PT" -gt 0 ] && _coverage=$(( N_TGT_AL * 100 / N_PT ))
+echo "[preflight] train_rows=$TRAIN_ROWS val_rows=$VAL_ROWS n_pt=$N_PT n_tgt_align=$N_TGT_AL text_coverage=${_coverage}% split_md5=$SPLIT_MD5"
+df -h "$DATA_DIR" | tail -1 | awk '{print "[preflight] disk: used "$3" of "$2", "$4" free"}'
+EXPECTED_TRAIN_ROWS="$(read_meta expected-train-rows 0)"
+MIN_TEXT_COVERAGE="$(read_meta min-text-coverage 0)"
+if [ "$EXPECTED_TRAIN_ROWS" -gt 0 ] && [ "$TRAIN_ROWS" -lt "$EXPECTED_TRAIN_ROWS" ]; then
+    echo "[preflight] FATAL: train.jsonl has $TRAIN_ROWS rows, expected >= $EXPECTED_TRAIN_ROWS (expected-train-rows metadata). Refusing to launch on the wrong corpus."
+    exit 1
+fi
+if [ "$_coverage" -lt "${MIN_TEXT_COVERAGE:-0}" ]; then
+    echo "[preflight] FATAL: text-alignment coverage ${_coverage}% < required ${MIN_TEXT_COVERAGE}% -- training would silently run (near-)audio-only. Refusing to launch."
+    exit 1
+fi
+if [ "$_coverage" -lt 99 ]; then
+    echo "[preflight] WARNING: text-alignment coverage is ${_coverage}% (dataset.py zero-fills text for uncovered rows -- verify this is intended)"
+fi
+DATA_DIGEST="rows=$TRAIN_ROWS pt=$N_PT al=$N_TGT_AL md5=$SPLIT_MD5"
 
 # ----- 6b. model backbones via WARP proxy (route around GCP-EU -> HF CDN stall) -----
 # The composite model loads three US-region HF repos (tiny-aya-base, hf-moshiko,
@@ -228,6 +287,13 @@ if [ "$(read_meta prefetch-backbones 1)" = "1" ]; then
     bash "$REPO_DIR/scripts/tpu/prefetch_backbones.sh" 2>&1 | tee -a /tmp/prefetch.log \
         || echo "[startup] backbone prefetch returned nonzero (non-fatal)"
 fi
+# With a verified-complete HF cache the trainer runs fully OFFLINE: no etag
+# HEADs at model build, immune to HF outages / the CDN route for the whole
+# multi-day run. prefetch_backbones.sh drops the marker only after verifying
+# all three snapshots; without it we stay online (cache-first fallback).
+_HF_OFFLINE=0
+[ -f /tmp/hf_backbones_ready ] && _HF_OFFLINE=1
+echo "[startup] HF_HUB_OFFLINE=$_HF_OFFLINE"
 
 # ----- 7. launch training with auto-restart in tmux -----
 # torch_xla's _XLAC.so dynamically links libpython3.12.so.1.0, which uv keeps
@@ -286,17 +352,33 @@ if [ "${NUM_HOSTS:-1}" -gt 1 ]; then
     _wid="$(hostname | grep -oP 'w-\K[0-9]+' || echo 0)"
     _barrier="gs://tinyaya-stage2-eu/rendezvous/${_slice_id}/${_bucket}"
     echo "[startup] rendezvous: host ${_wid}/${NUM_HOSTS} barrier=${_barrier}"
-    printf 'ready %s\n' "$(date -Is)" | gsutil -q cp - "${_barrier}/host-${_wid}" || true
+    # The ready-marker carries this host's dataset digest (section 6a) so the
+    # slice can refuse to launch on divergent per-host corpora.
+    printf 'ready %s %s\n' "$(date -Is)" "${DATA_DIGEST:-}" | gsutil -q cp - "${_barrier}/host-${_wid}" || true
+    _rdv_passed=0
     for _i in $(seq 1 240); do  # up to 20 min for the slowest host's startup
         _cnt=$(gsutil ls "${_barrier}/" 2>/dev/null | grep -c 'host-' || true)
         _cnt="${_cnt:-0}"
         if [ "${_cnt}" -ge "${NUM_HOSTS}" ]; then
             echo "[startup] rendezvous barrier PASSED (${_cnt}/${NUM_HOSTS} hosts)"
+            _rdv_passed=1
             break
         fi
         [ $(( _i % 6 )) -eq 0 ] && echo "[startup] waiting at barrier: ${_cnt}/${NUM_HOSTS}"
         sleep 5
     done
+    if [ "$_rdv_passed" = "1" ]; then
+        # Cross-host dataset-digest check: DistributedSampler shards by index,
+        # so hosts with different (rows, files, split md5) silently corrupt the
+        # global batch. All markers must agree before any trainer launches.
+        _uniq=$(gsutil cat "${_barrier}/host-"* 2>/dev/null | grep -o 'rows=.*' | sort -u | grep -c . || true)
+        if [ "${_uniq:-0}" -gt 1 ]; then
+            echo "[startup] FATAL: dataset digests DIVERGE across hosts -- refusing to launch:"
+            gsutil cat "${_barrier}/host-"* 2>/dev/null || true
+            exit 1
+        fi
+        echo "[startup] cross-host dataset digest MATCH (${DATA_DIGEST:-<none>})"
+    fi
 fi
 
 # Optional pre-flight probe of sharding strategies on the live mesh.
@@ -328,6 +410,7 @@ if [ -n "$SWEEP_ID" ]; then
         export TPU_STRATEGY='$TPU_STRATEGY_META'
         export LD_LIBRARY_PATH='$LIBPYTHON_DIR:\${LD_LIBRARY_PATH:-}'
         export HF_TOKEN='$HF_TOKEN' WANDB_API_KEY='${WANDB_API_KEY:-}'
+        export HF_HUB_OFFLINE='$_HF_OFFLINE'
         export PYTHONUNBUFFERED=1 TOKENIZERS_PARALLELISM=false
         uv run wandb agent $SWEEP_ID 2>&1 | tee -a /tmp/train.log
         echo \"[\$(date -Is)] wandb agent exited with status \$?\" | tee -a /tmp/train.log
@@ -351,6 +434,7 @@ else
         HF_TOKEN='$HF_TOKEN' \
         WANDB_API_KEY='${WANDB_API_KEY:-}' \
         WANDB_RENDEZVOUS_URI='${WANDB_RENDEZVOUS_URI:-}' \
+        HF_HUB_OFFLINE='$_HF_OFFLINE' \
         PYTHONUNBUFFERED=1 \
         uv run python -u scripts/train_hierarchical.py \
             --config '$CONFIG_FILE' \

@@ -42,8 +42,12 @@ _is_cached() {
     [ "$nm" -eq 4 ] && [ "$na" -eq 2 ] && [ "$ni" -ge 1 ] \
         && [ -z "$(find "$_moshiko" "$_tinyaya" "$_mimi" -name '*.incomplete' 2>/dev/null)" ]
 }
+# /tmp/hf_backbones_ready gates HF_HUB_OFFLINE=1 in the trainer env
+# (startup_script.sh): only set when this script has VERIFIED the cache.
+rm -f /tmp/hf_backbones_ready
 if _is_cached; then
     echo "[prefetch] backbones already cached; skipping"
+    touch /tmp/hf_backbones_ready
     exit 0
 fi
 
@@ -101,7 +105,11 @@ print(f"[prefetch] moshiko={nm}/4 tinyaya={na}/2", flush=True)
 sys.exit(0 if (nm == 4 and na == 2) else 3)
 PY
     rc=$?
-    if [ "$rc" -eq 0 ]; then echo "[prefetch] backbones ready"; exit 0; fi
+    if [ "$rc" -eq 0 ]; then
+        echo "[prefetch] backbones ready"
+        touch /tmp/hf_backbones_ready
+        exit 0
+    fi
     echo "[prefetch] attempt ${_try} incomplete (rc=${rc}); retrying"
     sleep 5
 done

@@ -164,6 +164,25 @@ def wait_for_uploads(timeout: float | None = None) -> None:
     _UPLOAD_FUTURES = [f for f in _UPLOAD_FUTURES if not f.done()]
 
 
+def build_file_manifest(root_dir: str) -> dict[str, int]:
+    """Map every file under ``root_dir`` (recursive, relative path) to its size.
+
+    Used to stamp an integrity manifest into ``metadata.json`` at save time:
+    a checkpoint auditor can then compare the GCS object list against the
+    manifest instead of guessing which files a complete checkpoint contains.
+    ``metadata.json`` is excluded -- it is written after the manifest is built
+    and its presence is already the atomic completeness gate.
+    """
+    manifest: dict[str, int] = {}
+    for cur, _dirs, names in os.walk(root_dir):
+        for name in names:
+            if name == "metadata.json" and cur == root_dir:
+                continue
+            path = os.path.join(cur, name)
+            manifest[os.path.relpath(path, root_dir)] = os.path.getsize(path)
+    return manifest
+
+
 def fetch_checkpoint_file(ckpt_dir: str, fname: str) -> str | None:
     """Return a LOCAL path for ``<ckpt_dir>/<fname>``, downloading from GCS if needed.
 
@@ -377,6 +396,10 @@ def save_checkpoint(
     meta = {"step": step}
     if extra_state:
         meta.update(extra_state)
+    # Integrity manifest: every payload file + its byte size, so a later audit
+    # can verify a checkpoint dir exactly instead of heuristically. Built after
+    # all payload writes and excludes metadata.json itself (the atomic gate).
+    meta["files"] = build_file_manifest(write_dir)
     meta_path = os.path.join(write_dir, "metadata.json")
     with open(meta_path, "w") as f:
         json.dump(meta, f, indent=2)
