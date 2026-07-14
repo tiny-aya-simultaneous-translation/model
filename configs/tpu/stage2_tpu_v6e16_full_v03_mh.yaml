@@ -19,12 +19,18 @@
 #
 # LAUNCH (europe-west4-a, co-located with the EU bucket -> zero egress):
 #   TRC_PROFILE=v6e-16-eu CONFIG_FILE=configs/tpu/stage2_tpu_v6e16_full_v03_mh.yaml \
-#   REPO_TARBALL_GS_URI=... SWEEP_DATA_GS_URI=<full-corpus tarball> \
-#   XLA_CACHE_GS_URI=gs://tinyaya-stage2-eu/xla-cache/v03-mh \
+#   REPO_TARBALL_GS_URI=... \
+#   SWEEP_DATA_GS_URI=gs://tinyaya-stage2-eu/data/full-corpus-ta-20260708.tar.gz \
 #   bash scripts/tpu/launch_spot.sh
-# Compile cache + flash-attn are launch-time metadata (xla-cache-gs-uri,
-# flash-attention), validated in Phase E before this run enables them.
-# Production launch ONLY on explicit user word + team sign-off.
+# Metadata gates (hardening pass 2026-07-14): set expected-train-rows=1100000
+# and min-text-coverage=99 so a wrong/stale corpus or missing alignments can
+# NEVER silently train (stage_dataset.sh preflight refuses to launch).
+# Probe verdicts (report addendum A.5): flash-attention OFF (no win at these
+# seq lengths); xla-cache-gs-uri UNSET (persistent-cache keys nondeterministic
+# on torch_xla 2.9 v6e SPMD -- never hits; ~14 min recompile per preemption is
+# the accepted cost); grad-ckpt ON + depth_chunk 100 confirmed optimal.
+# Run the QR babysitter for the whole run: scripts/tpu/qr_watch.sh (local tmux).
+# Launch ONLY on explicit user word.
 
 backend: tpu
 
@@ -100,7 +106,12 @@ logging:
   async_checkpoint_upload: true   # background the multi-GB keep-all upload
   audio_every: 1000000
   val_every: 250
-  val_max_batches: 100            # ~400-sample val gate (stabler than 25)
+  # Val gate = 3200 samples, unchanged -- but batched 4x wider so the cycle
+  # costs ~120 s instead of ~210 s (probe M3, 2026-07-14: ~1.9 s/batch at
+  # b8/host vs ~4 s at b32/host). Val is inference-only: training math is
+  # untouched. 25 x global 128 == the old 100 x global 32.
+  val_max_batches: 25
+  val_per_chip_batch: 8
   val_on_tpu: true
   diag_metrics: true
   save_dir: gs://tinyaya-stage2-eu/checkpoints/stage2-v6e16-mh-v03
