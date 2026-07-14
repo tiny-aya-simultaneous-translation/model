@@ -99,6 +99,7 @@ logging:
   val_max_batches: 25             # same 3200-sample gate as the long run
   val_per_chip_batch: 8           # (25 x global 128 == 100 x global 32)
   val_on_tpu: true
+  tpu_telemetry_every: 250    # per-host chip HBM into the shared run (all 16 chips)
   diag_metrics: true
   save_dir: gs://tinyaya-stage2-eu/checkpoints/stage2-v6e16-mh-v03   # SAME dir: continuation
   keep_last_n: 0

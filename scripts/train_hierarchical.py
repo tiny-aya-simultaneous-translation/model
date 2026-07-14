@@ -400,6 +400,11 @@ DEFAULTS = {
         # batch (val is inference-only; bigger batches only shorten the val
         # cycle). None => val batch == train batch.
         "val_per_chip_batch": None,
+        # Per-host TPU HBM telemetry into the shared W&B run (steps; 0 = off).
+        # Union of all hosts' tpu/host{N}/* panels = the full slice (the
+        # built-in W&B System TPU collector cannot see it: it probes before
+        # libtpu is up, and each host only sees its own 4 chips anyway).
+        "tpu_telemetry_every": 0,
         "save_dir": "checkpoints/stage2_scale",
         # Log-spaced early checkpoints for the public mech-interp suite (in
         # ADDITION to save_every). log_spaced_saves auto-adds {1,2,4,...,512};
@@ -2069,6 +2074,12 @@ def main():
     step = start_step
     max_steps = cfg["train"]["max_steps"]
     log_every = cfg["logging"]["log_every"]
+    # Per-host TPU HBM telemetry cadence (steps; 0 = off). Each host logs its
+    # own local chips into the SHARED W&B run under tpu/host{N}/... -- no
+    # single host can see the whole slice, so the union of panels is the
+    # full-chip view the built-in W&B System tab cannot provide (its TPU
+    # collector probes before libtpu is up and disables itself).
+    tpu_telemetry_every = int(cfg["logging"].get("tpu_telemetry_every", 0) or 0)
     save_every = cfg["logging"]["save_every"]
     # Log-spaced early checkpoints for the public mechanistic-interp suite
     # (Pythia convention: dense sampling of the fast early dynamics). Union of
@@ -2903,6 +2914,35 @@ def main():
                         f"nonfinite={_nf:.0f}",
                         flush=True,
                     )
+            # Per-host TPU telemetry into the SHARED run: EVERY host (not just
+            # primary) logs its local chips' HBM. Runs on the log cadence but
+            # throttled by tpu_telemetry_every (a tpu-info subprocess costs
+            # ~1.5 s; at 250 steps that is ~0.3% overhead).
+            if (
+                use_wandb
+                and is_tpu
+                and tpu_telemetry_every
+                and step % tpu_telemetry_every == 0
+                and hasattr(backend, "hbm_per_chip")
+            ):
+                try:
+                    import wandb as _wtel
+
+                    if _wtel.run is not None:
+                        _chips = backend.hbm_per_chip()
+                        if _chips:
+                            _hidx = int(backend.process_index())
+                            _wtel.log(
+                                {
+                                    f"tpu/host{_hidx}/chip{_cid}_hbm_gib": _used
+                                    for _cid, _used, _lim in _chips
+                                },
+                                step=step,
+                            )
+                except Exception as _tel_exc:  # noqa: BLE001 - telemetry never kills training
+                    if is_main:
+                        print(f"  [tpu-telemetry] skipped: {_tel_exc}", flush=True)
+
             if use_wandb and is_main:
                 import wandb
 

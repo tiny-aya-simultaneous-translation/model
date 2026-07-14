@@ -113,6 +113,7 @@ logging:
   val_max_batches: 25
   val_per_chip_batch: 8
   val_on_tpu: true
+  tpu_telemetry_every: 250    # per-host chip HBM into the shared run (all 16 chips)
   diag_metrics: true
   save_dir: gs://tinyaya-stage2-eu/checkpoints/stage2-v6e16-mh-v03
   keep_last_n: 0                  # keep ALL checkpoints (public suite)

@@ -160,6 +160,56 @@ def test_startup_delegates_staging_and_rides_digest():
     assert 'tar -xzf /tmp/sweep_subset.tar.gz' not in _STARTUP_SRC
 
 
+# ---------------------------------------------------------------------------
+# per-host TPU telemetry (all 16 chips via 4 labeled host streams)
+# ---------------------------------------------------------------------------
+
+
+def test_tpu_info_hbm_table_parser():
+    """Parse both live tpu-info cell formats; skip headers and N/A rows."""
+    import importlib.util as _ilu
+
+    # real torch (in the venv) -- evict a MagicMock left by _load_ckpt() in the
+    # same pytest session; stub only the TPU-only torch_xla family.
+    if isinstance(sys.modules.get("torch"), MagicMock):
+        del sys.modules["torch"]
+    for name in ("torch_xla", "torch_xla.core", "torch_xla.core.xla_model",
+                 "torch_xla.runtime", "torch_xla.distributed",
+                 "torch_xla.distributed.spmd"):
+        if name not in sys.modules:
+            sys.modules[name] = MagicMock()
+    path = REPO / "src" / "backend" / "tpu_backend.py"
+    spec = _ilu.spec_from_file_location("tpu_backend_hardening", path)
+    mod = _ilu.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    parse = mod.TPUBackend._parse_tpu_info_hbm_table
+
+    live_format = """TPU HBM Usage
+| Device | HBM Usage (GiB)       |
+|--------|-----------------------|
+| 8      | 27.19 GiB / 31.25 GiB |
+| 9      | 27.19 GiB / 31.25 GiB |
+| 12     | 25.56 GiB / 31.25 GiB |
+| 13     | N/A             |
+"""
+    rows = parse(live_format)
+    assert rows == [(8, 27.19, 31.25), (9, 27.19, 31.25), (12, 25.56, 31.25)]
+    # newer bare-number cells (unit in the header)
+    assert parse("| 0 | 12.34 |") == [(0, 12.34, 31.246)]
+    assert parse("garbage\nno table") == []
+
+
+def test_trainer_logs_per_host_tpu_telemetry():
+    # every host logs (not is_main-gated): the block checks wandb.run directly
+    assert 'tpu_telemetry_every' in _TRAIN_SRC
+    assert 'f"tpu/host{_hidx}/chip{_cid}_hbm_gib"' in _TRAIN_SRC
+    assert 'hasattr(backend, "hbm_per_chip")' in _TRAIN_SRC
+    # default off; production configs opt in
+    assert '"tpu_telemetry_every": 0,' in _TRAIN_SRC
+    for cfgname in ("stage2_tpu_v6e16_full_v03_mh.yaml", "stage2_tpu_v6e16_full_v03_mh_anneal.yaml"):
+        assert "tpu_telemetry_every: 250" in (REPO / "configs" / "tpu" / cfgname).read_text()
+
+
 def test_startup_hf_offline_gated_on_prefetch():
     # marker written only by prefetch verification...
     assert 'touch /tmp/hf_backbones_ready' in _PREFETCH_SRC

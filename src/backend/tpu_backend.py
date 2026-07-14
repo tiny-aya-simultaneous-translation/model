@@ -656,6 +656,61 @@ class TPUBackend(BackendBase):
             f"tpu-info returned no parseable hbm_usage output: {out.stdout[:160]!r}"
         )
 
+    @staticmethod
+    def _parse_tpu_info_hbm_table(text: str) -> list[tuple[int, float, float]]:
+        """Parse every chip row of a ``tpu-info --metric hbm_usage`` table.
+
+        Accepts both cell formats ("| 4 | 25.71 GiB / 31.25 GiB |" and the
+        newer bare-number "| 4 | 25.71 |"). Returns
+        ``[(chip_id, used_gib, limit_gib), ...]`` in table order; rows that
+        do not parse (headers, N/A) are skipped.
+        """
+        rows: list[tuple[int, float, float]] = []
+        for line in text.splitlines():
+            m = re.match(
+                r"^\|\s*(\d+)\s*\|\s*([0-9.]+)\s*(?:GiB)?"
+                r"(?:\s*/\s*([0-9.]+)\s*(?:GiB)?)?\s*\|",
+                line,
+            )
+            if m:
+                rows.append(
+                    (
+                        int(m.group(1)),
+                        float(m.group(2)),
+                        float(m.group(3)) if m.group(3) else 31.246,
+                    )
+                )
+        return rows
+
+    def hbm_per_chip(self) -> list[tuple[int, float, float]]:
+        """All LOCAL chips' ``(chip_id, used_gib, limit_gib)`` via tpu-info.
+
+        In-process HBM telemetry is unavailable under SPMD (the ``-1``
+        sentinel above), and libtpu's metrics endpoint only exposes THIS
+        host's chips (4 on a v6e host) — no host can see the whole slice.
+        The per-host W&B telemetry calls this on EVERY host and logs under
+        ``tpu/host{N}/...``; the union of the four panels covers all 16
+        chips. Returns ``[]`` on any failure (telemetry never raises).
+        """
+        import subprocess as _sp
+
+        tpu_info = self._find_tpu_info_binary()
+        if not tpu_info:
+            return []
+        try:
+            out = _sp.run(
+                [tpu_info, "--metric", "hbm_usage"],
+                capture_output=True,
+                text=True,
+                timeout=10,
+                env={**os.environ, "PJRT_DEVICE": "TPU"},
+            )
+        except Exception:  # noqa: BLE001 - telemetry, never blocks training
+            return []
+        if out.returncode != 0 or "N/A" in out.stdout:
+            return []
+        return self._parse_tpu_info_hbm_table(out.stdout)
+
     def get_memory_info(self) -> dict | None:
         """Return per-chip HBM usage in GB, or ``None`` on import failure.
 
