@@ -1,0 +1,102 @@
+# Probe 2/M5: capacity ladder b8/chip (global 128) -- CHARACTERIZATION
+# ONLY; expected to approach/hit the HBM boundary. OOM here is a valid
+# datapoint (the envelope), not a failure.
+backend: tpu
+data:
+  encoded_dir: /mnt/data/encoded
+  train_split: /mnt/data/splits/train.jsonl
+  val_split: /mnt/data/splits/val.jsonl
+  max_frames: 300
+  audio_frame_rate: 12.5
+  num_workers: 32
+  pin_memory: false
+train:
+  weight_decay: 0.01
+  num_codebooks: 8
+  per_chip_batch: 8
+  batch_size: 4
+  grad_accum: 1
+  max_steps: 60
+  warmup_steps: 50
+  min_lr_ratio: 0.0
+  early_stop_patience: 0
+  compile_warmup_steps: 1
+  enable_clip_grad_norm: true
+  clip_grad_norm: 1.0
+  log_grad_norm: true
+  fsdp_barrier_hook: false
+  micro_mark_step: true
+  depth_chunk_size: 100
+  precision: bfloat16
+  use_scan_layers: true
+  xla_grad_checkpoint: true
+  final_canonical_save: false
+  scheduler_total_steps: 60
+  schedule: wsd
+  wsd_anneal_steps: 6
+  seed: 1337
+loss:
+  text_weight: 0.2
+  audio_weight: 1.0
+  text_weight_curriculum_frac: 0.0
+  composite_text_w: 0.4
+  composite_audio_w: 0.6
+  text_padding_weight: 0.01
+  zero_padding_weight: 0.0
+  label_smoothing: 0.1
+  per_codebook_multipliers:
+  - 1.0
+  - 1.0
+  - 1.5
+  - 1.5
+  - 2.0
+  - 2.0
+  - 2.0
+  - 2.0
+  progressive_unmask_fraction: 0.1
+  unmask_k0: 1
+lora:
+  r: 32
+  alpha: 64
+  dropout: 0.05
+  use_rslora: true
+  target_modules:
+  - q_proj
+  - k_proj
+  - v_proj
+  - o_proj
+  - gate_proj
+  - up_proj
+  - down_proj
+  - embed_tokens
+  lora_exclude_top: 0
+  num_full_ft_layers: 0
+  depth_unfreeze_blocks: 0
+optim:
+  lr_lora: 0.0001716
+  lr_full_ft: 5.0e-05
+  lr_projection: 0.0005
+  lr_depth: 0.0001
+  lr_depth_blocks: 1.0e-05
+  lr_audio_embed: 0.0005
+  lr_text_embed: 0.0005
+logging:
+  log_every: 25
+  save_every: 100000
+  audio_every: 1000000
+  val_every: 250
+  val_max_batches: 25
+  val_on_tpu: false
+  diag_metrics: true
+  save_dir: gs://tinyaya-stage2-eu/checkpoints/mh-cadence/scratch-b8
+  keep_last_n: 1
+  keep_local_checkpoints: false
+  use_wandb: true
+  wandb_project: tinyaya-stage2-tpu
+  wandb_run_name: mh-hbm-b8
+  wandb_group: v03-mh-hardening
+  async_checkpoint_upload: false
+perf:
+  enabled: true
+  warmup_skip_steps: 25
+  xprof_trace_labels: false
