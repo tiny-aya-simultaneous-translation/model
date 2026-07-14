@@ -170,19 +170,27 @@ def test_tpu_info_hbm_table_parser():
     import importlib.util as _ilu
 
     # real torch (in the venv) -- evict a MagicMock left by _load_ckpt() in the
-    # same pytest session; stub only the TPU-only torch_xla family.
+    # same pytest session; stub only the TPU-only torch_xla family, and REMOVE
+    # the stubs afterwards (leaked mocks make later tests believe torch_xla is
+    # importable and flip their backend dispatch).
     if isinstance(sys.modules.get("torch"), MagicMock):
         del sys.modules["torch"]
+    _injected = []
     for name in ("torch_xla", "torch_xla.core", "torch_xla.core.xla_model",
                  "torch_xla.runtime", "torch_xla.distributed",
                  "torch_xla.distributed.spmd"):
         if name not in sys.modules:
             sys.modules[name] = MagicMock()
-    path = REPO / "src" / "backend" / "tpu_backend.py"
-    spec = _ilu.spec_from_file_location("tpu_backend_hardening", path)
-    mod = _ilu.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    parse = mod.TPUBackend._parse_tpu_info_hbm_table
+            _injected.append(name)
+    try:
+        path = REPO / "src" / "backend" / "tpu_backend.py"
+        spec = _ilu.spec_from_file_location("tpu_backend_hardening", path)
+        mod = _ilu.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        parse = mod.TPUBackend._parse_tpu_info_hbm_table
+    finally:
+        for name in _injected:
+            sys.modules.pop(name, None)
 
     live_format = """TPU HBM Usage
 | Device | HBM Usage (GiB)       |
