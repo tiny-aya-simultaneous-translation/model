@@ -214,6 +214,21 @@ for split in ('train', 'val'):
 fi
 fi  # end SWEEP_DATA_GS_URI branch
 
+# ----- 6b. model backbones via WARP proxy (route around GCP-EU -> HF CDN stall) -----
+# The composite model loads three US-region HF repos (tiny-aya-base, hf-moshiko,
+# mimi) at build time; on a GCP-EU host these large pulls stall on the congested
+# transatlantic route to us.gcp.cdn.hf.co. Prefetch them through a Cloudflare WARP
+# SOCKS proxy BEFORE the rendezvous barrier so no host launches (or writes its
+# ready-marker) without its backbones present. Idempotent -- skips when the boot
+# disk already holds them. See scripts/tpu/prefetch_backbones.sh +
+# docs/v0.3-mh-hf-cdn-unblock.md. Opt out with metadata prefetch-backbones=0.
+if [ "$(read_meta prefetch-backbones 1)" = "1" ]; then
+    echo "[startup] prefetching model backbones via WARP proxy"
+    chmod +x "$REPO_DIR/scripts/tpu/prefetch_backbones.sh" 2>/dev/null || true
+    bash "$REPO_DIR/scripts/tpu/prefetch_backbones.sh" 2>&1 | tee -a /tmp/prefetch.log \
+        || echo "[startup] backbone prefetch returned nonzero (non-fatal)"
+fi
+
 # ----- 7. launch training with auto-restart in tmux -----
 # torch_xla's _XLAC.so dynamically links libpython3.12.so.1.0, which uv keeps
 # inside its managed-Python directory rather than on the standard linker path.
