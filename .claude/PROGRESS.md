@@ -47,6 +47,231 @@ moved to `.claude/archive/PROGRESS-YYYY-Qn.md` by the
 
 ---
 
+## 2026-07-15T07:49:16Z | feat/v0.3-implementation@4f0954b | done | exec
+cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-15T07:48:38Z | feat/v0.3-implementation@4f0954b | done | exec
+cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-15T07:47:52Z | feat/v0.3-implementation@4f0954b | done | exec
+cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-15T07:39:59Z | feat/v0.3-implementation@4f0954b | fail | verify
+verify: 11 passed, 1 failed out of 12 on Stop
+
+FAIL [1] # the TPU↔GPU seam holds: torch_xla must NOT leak into shared model/data code
+    src/model/scan_utils.py:479:    from torch_xla.experimental.scan_layers import (
+
+
+## 2026-07-15T07:12:33Z | feat/v0.3-implementation@4f0954b | fail | verify
+verify: 11 passed, 1 failed out of 12 on Stop
+
+FAIL [1] # the TPU↔GPU seam holds: torch_xla must NOT leak into shared model/data code
+    src/model/scan_utils.py:479:    from torch_xla.experimental.scan_layers import (
+
+
+## 2026-07-15T07:09:46Z | feat/v0.3-implementation@4f0954b | fail | verify
+verify: 11 passed, 1 failed out of 12 on Stop
+
+FAIL [1] # the TPU↔GPU seam holds: torch_xla must NOT leak into shared model/data code
+    src/model/scan_utils.py:479:    from torch_xla.experimental.scan_layers import (
+
+
+## 2026-07-15T07:09:12Z | feat/v0.3-implementation@4f0954b | done | exec
+PAYLOAD=$(base64 -w0 <<'EOF'
+
+
+## 2026-07-15T07:08:27Z | feat/v0.3-implementation@4f0954b | done | exec
+cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-15T07:07:23Z | feat/v0.3-implementation@b45900a | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/tests/test_hardening_prelaunch.py`
+
+
+## 2026-07-15T07:07:20Z | feat/v0.3-implementation@b45900a | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/train_hierarchical.py`
+
+
+## 2026-07-15T07:04:46Z | feat/v0.3-implementation@b45900a | fail | verify
+verify: 11 passed, 1 failed out of 12 on Stop
+
+FAIL [1] # the TPU↔GPU seam holds: torch_xla must NOT leak into shared model/data code
+    src/model/scan_utils.py:479:    from torch_xla.experimental.scan_layers import (
+
+
+## 2026-07-15T07:04:21Z | feat/v0.3-implementation@b45900a | done | exec
+cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-15T07:03:23Z | feat/v0.3-implementation@80a53f9 | done | exec
+PAYLOAD=$(base64 -w0 <<'EOF'
+
+
+## 2026-07-15T07:02:30Z | feat/v0.3-implementation@80a53f9 | done | exec
+cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-15T07:01:26Z | feat/v0.3-implementation@deb5d24 | done | exec
+timeout 150 gcloud compute tpus tpu-vm ssh tinyaya-v6e16-eu --zone=europe-west4-a --worker=all --command='
+
+
+## 2026-07-15T06:57:04Z | feat/v0.3-implementation@deb5d24 | fail | verify
+verify: 11 passed, 1 failed out of 12 on Stop
+
+FAIL [1] # the TPU↔GPU seam holds: torch_xla must NOT leak into shared model/data code
+    src/model/scan_utils.py:479:    from torch_xla.experimental.scan_layers import (
+
+
+## 2026-07-15T06:56:40Z | feat/v0.3-implementation@deb5d24 | done | exec
+cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-15T06:55:51Z | feat/v0.3-implementation@f1650f5 | done | exec
+PAYLOAD=$(base64 -w0 <<'OUTER'
+
+
+## 2026-07-15T06:54:35Z | feat/v0.3-implementation@f1650f5 | done | exec
+PAYLOAD=$(base64 -w0 <<'OUTER'
+
+
+## 2026-07-15T06:52:37Z | feat/v0.3-implementation@f1650f5 | done | exec
+timeout 150 gcloud compute tpus tpu-vm ssh tinyaya-v6e16-eu --zone=europe-west4-a --worker=all --command='
+
+
+## 2026-07-15T06:51:35Z | feat/v0.3-implementation@f1650f5 | done | exec
+P=$(base64 -w0 <<'OUTER'
+
+
+## 2026-07-15T06:51:06Z | feat/v0.3-implementation@f1650f5 | done | exec
+PAYLOAD=$(base64 -w0 <<'OUTER'
+
+
+## 2026-07-15T06:50:08Z | feat/v0.3-implementation@f1650f5 | done | exec
+INNER=$(base64 -w0 <<'EOF'
+
+
+## 2026-07-15T06:49:25Z | feat/v0.3-implementation@f1650f5 | done | exec
+timeout 100 gcloud compute tpus tpu-vm ssh tinyaya-v6e16-eu --zone=europe-west4-a --worker=0 --command='
+
+
+## 2026-07-15T06:48:55Z | feat/v0.3-implementation@f1650f5 | done | exec
+INNER=$(base64 -w0 <<'EOF'
+
+
+## 2026-07-15T06:47:55Z | feat/v0.3-implementation@f1650f5 | done | exec
+timeout 150 gcloud compute tpus tpu-vm ssh tinyaya-v6e16-eu --zone=europe-west4-a --worker=all --command='
+
+
+## 2026-07-15T06:39:20Z | feat/v0.3-implementation@f1650f5 | fail | verify
+verify: 11 passed, 1 failed out of 12 on Stop
+
+FAIL [1] # the TPU↔GPU seam holds: torch_xla must NOT leak into shared model/data code
+    src/model/scan_utils.py:479:    from torch_xla.experimental.scan_layers import (
+
+
+## 2026-07-15T06:17:18Z | feat/v0.3-implementation@f1650f5 | fail | verify
+verify: 11 passed, 1 failed out of 12 on Stop
+
+FAIL [1] # the TPU↔GPU seam holds: torch_xla must NOT leak into shared model/data code
+    src/model/scan_utils.py:479:    from torch_xla.experimental.scan_layers import (
+
+
+## 2026-07-15T06:16:34Z | feat/v0.3-implementation@f1650f5 | done | exec
+PAYLOAD=$(base64 -w0 <<'EOF'
+
+
+## 2026-07-15T06:15:36Z | feat/v0.3-implementation@f1650f5 | done | exec
+timeout 150 gcloud compute tpus tpu-vm ssh tinyaya-v6e16-eu --zone=europe-west4-a --worker=all --command='
+
+
+## 2026-07-15T06:14:51Z | feat/v0.3-implementation@f1650f5 | done | exec
+timeout 150 gcloud compute tpus tpu-vm ssh tinyaya-v6e16-eu --zone=europe-west4-a --worker=all --command='
+
+
+## 2026-07-15T06:14:16Z | feat/v0.3-implementation@f1650f5 | fail | verify
+verify: 11 passed, 1 failed out of 12 on Stop
+
+FAIL [1] # the TPU↔GPU seam holds: torch_xla must NOT leak into shared model/data code
+    src/model/scan_utils.py:479:    from torch_xla.experimental.scan_layers import (
+
+
+## 2026-07-15T05:44:33Z | feat/v0.3-implementation@f1650f5 | fail | verify
+verify: 11 passed, 1 failed out of 12 on Stop
+
+FAIL [1] # the TPU↔GPU seam holds: torch_xla must NOT leak into shared model/data code
+    src/model/scan_utils.py:479:    from torch_xla.experimental.scan_layers import (
+
+
+## 2026-07-15T05:43:50Z | feat/v0.3-implementation@f1650f5 | done | exec
+PAYLOAD=$(base64 -w0 <<'EOF'
+
+
+## 2026-07-15T05:43:05Z | feat/v0.3-implementation@f1650f5 | done | exec
+PAYLOAD=$(base64 -w0 <<'EOF'
+
+
+## 2026-07-15T05:42:19Z | feat/v0.3-implementation@f1650f5 | done | exec
+timeout 120 gcloud compute tpus tpu-vm ssh tinyaya-v6e16-eu --zone=europe-west4-a --worker=0 --command='
+
+
+## 2026-07-15T05:41:34Z | feat/v0.3-implementation@f1650f5 | done | exec
+PAYLOAD=$(base64 -w0 <<'EOF'
+
+
+## 2026-07-15T05:33:08Z | feat/v0.3-implementation@f1650f5 | done | exec
+timeout 100 gcloud compute tpus tpu-vm ssh tinyaya-v6e16-eu --zone=europe-west4-a --worker=1 --command='
+
+
+## 2026-07-15T05:20:42Z | feat/v0.3-implementation@f1650f5 | done | exec
+timeout 150 gcloud compute tpus tpu-vm ssh tinyaya-v6e16-eu --zone=europe-west4-a --worker=all --command='
+
+
+## 2026-07-15T05:16:34Z | feat/v0.3-implementation@f1650f5 | fail | verify
+verify: 11 passed, 1 failed out of 12 on Stop
+
+FAIL [1] # the TPU↔GPU seam holds: torch_xla must NOT leak into shared model/data code
+    src/model/scan_utils.py:479:    from torch_xla.experimental.scan_layers import (
+
+
+## 2026-07-15T05:14:36Z | feat/v0.3-implementation@f1650f5 | fail | verify
+verify: 11 passed, 1 failed out of 12 on Stop
+
+FAIL [1] # the TPU↔GPU seam holds: torch_xla must NOT leak into shared model/data code
+    src/model/scan_utils.py:479:    from torch_xla.experimental.scan_layers import (
+
+
+## 2026-07-15T05:14:09Z | feat/v0.3-implementation@f1650f5 | done | exec
+cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-15T05:13:49Z | feat/v0.3-implementation@b80f248 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/tpu/prefetch_backbones.sh`
+
+
+## 2026-07-15T05:13:37Z | feat/v0.3-implementation@b80f248 | done | exec
+PAYLOAD=$(base64 -w0 <<'EOF'
+
+
+## 2026-07-15T05:12:33Z | feat/v0.3-implementation@b80f248 | done | exec
+timeout 120 gcloud compute tpus tpu-vm ssh tinyaya-v6e16-eu --zone=europe-west4-a --worker=1 --command='
+
+
+## 2026-07-15T05:11:31Z | feat/v0.3-implementation@b80f248 | done | exec
+timeout 150 gcloud compute tpus tpu-vm ssh tinyaya-v6e16-eu --zone=europe-west4-a --worker=1 --command='
+
+
+## 2026-07-15T05:10:42Z | feat/v0.3-implementation@b80f248 | done | exec
+timeout 150 gcloud compute tpus tpu-vm ssh tinyaya-v6e16-eu --zone=europe-west4-a --worker=all --command='
+
+
+## 2026-07-15T05:10:19Z | feat/v0.3-implementation@b80f248 | done | exec
+cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+
+
 ## 2026-07-15T05:09:41Z | feat/v0.3-implementation@c97de73 | done | exec
 cd /home/cataluna84/Workspace/tinyaya-stage2-scale
 
