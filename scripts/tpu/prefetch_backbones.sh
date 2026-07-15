@@ -78,6 +78,14 @@ sys.exit(0 if (nm == 4 and na == 2) else 3)
 PY
 }
 
+# Stale-lock sweep: huggingface_hub serializes per-blob downloads with .lock
+# files; a killed/zombie downloader leaves them behind and a NEW download then
+# blocks on the lock FOREVER (observed live on w-1, 2026-07-15: 22 h-old
+# zombie held a moshiko blob lock; the fresh download froze at 6/13 files
+# with the network perfectly healthy). At boot/prefetch time nothing else may
+# legitimately be downloading, so clearing is always safe here.
+find "$HF_HUB_CACHE" -name '*.lock' -delete 2>/dev/null || true
+
 # ----- 1. PRIMARY: direct from HF, default transports (Xet on), no proxy -----
 # Hard wall-clock cap: a route regression must FAIL FAST into the WARP
 # fallback, never hang the boot (the 2026-07-14 stall mode was silent 0 MB/s).
