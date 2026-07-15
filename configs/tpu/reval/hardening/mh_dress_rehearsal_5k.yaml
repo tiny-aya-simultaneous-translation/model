@@ -1,7 +1,7 @@
 # DRESS REHEARSAL (5000 steps) for the v0.3 long-horizon run -- derived from the
-# PRODUCTION config so every knob (val x4, per-host tpu telemetry, log-spaced
+# LONG-HORIZON config so every knob (val x4, per-host tpu telemetry, log-spaced
 # checkpoints) is exercised as-shipped. Full corpus (staged + digest-verified),
-# production WSD LR trajectory replayed exactly (scheduler_total_steps 110463:
+# long-horizon WSD LR trajectory replayed exactly (scheduler_total_steps 110463:
 # warmup 1100 -> plateau), diag metrics for per-group gradient-flow checks.
 # Differences from the real run: max_steps 5000, fresh scratch save_dir, no
 # final canonical save. Checks: all 5 param groups nonzero grads through the

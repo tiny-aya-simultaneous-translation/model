@@ -1,4 +1,4 @@
-# TPU v6e-16 MULTI-HOST PRODUCTION run v0.3 (text+audio, arm-D recipe).
+# TPU v6e-16 MULTI-HOST LONG-HORIZON run v0.3 (text+audio, arm-D recipe).
 #
 # THE MULTI-HOST DP PIPELINE (2026-07-13): unlike the legacy v6e-16 config
 # (which ran the SPMD replicated-input UB -- only host 0's rows survived), this
@@ -122,7 +122,7 @@ logging:
   use_wandb: true
   wandb_tags: [v0.3, multi-host, wsd]
   wandb_project: tinyaya-stage2-tpu
-  wandb_run_name: v0.3-production-mh
+  wandb_run_name: v0.3-long-horizon-mh
 
 perf:
   enabled: true

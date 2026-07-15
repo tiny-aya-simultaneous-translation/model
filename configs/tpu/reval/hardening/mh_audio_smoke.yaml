@@ -1,7 +1,7 @@
 # AUDIO SMOKE (300 steps): validates the FIXED generate_audio_sample_tpu
 # (9f30b9a -- dual-stream conventions + Mimi-range clamps) live on 4 hosts.
 # Demos at steps 100/200/300 measure cold (one-time compile) + warm demo cost;
-# wavs must land in W&B audio/*. Full corpus, production LR replay, no vals.
+# wavs must land in W&B audio/*. Full corpus, long-horizon LR replay, no vals.
 backend: tpu
 data:
   encoded_dir: /mnt/data/encoded

@@ -1,7 +1,7 @@
 # DRESS REHEARSAL for the v0.3 long-horizon run: 2000 steps on the PRODUCTION
-# config semantics -- full corpus (staged, digest-verified), production WSD LR
+# config semantics -- full corpus (staged, digest-verified), long-horizon run WSD LR
 # trajectory replayed exactly (scheduler_total_steps=110463, warmup 1100 ->
-# plateau), production val gate (val x4: 25 x global 128 = 3200 samples),
+# plateau), long-horizon val gate (val x4: 25 x global 128 = 3200 samples),
 # diag_metrics on for per-group gradient-flow checks. Differences from the
 # real run: max_steps 2000, fresh scratch save_dir, keep_last_n 2 (no
 # log-spaced suite), no final canonical save. Checks: all 5 param groups show
