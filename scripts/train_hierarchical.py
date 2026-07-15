@@ -420,6 +420,9 @@ DEFAULTS = {
         "wandb_project": "tinyaya-s2s",
         "wandb_run_name": "stage2_scale",
         "use_wandb": False,
+        # Extra W&B tags appended to the base set (version/schedule/topology,
+        # e.g. ["v0.3", "multi-host", "wsd"]).
+        "wandb_tags": [],
         "push_to_hub": False,
         "hub_repo_id": None,
     },
@@ -2109,13 +2112,32 @@ def main():
 
         assert not _has_secret(_run_config), "secret-like content in wandb config; aborting publish"
 
+        # Accelerator tag from the TPU VM's own metadata (e.g. "v6e-16") --
+        # the old hardcoded "v6e-8" mis-tagged every other topology. Fallback:
+        # chip count from the runtime. Run-specific tags (version, schedule,
+        # topology role) come from logging.wandb_tags in the config.
+        if is_tpu:
+            _accel = None
+            try:
+                import urllib.request as _ur
+
+                _req = _ur.Request(
+                    "http://metadata.google.internal/computeMetadata/v1/instance"
+                    "/attributes/accelerator-type",
+                    headers={"Metadata-Flavor": "Google"},
+                )
+                _accel = _ur.urlopen(_req, timeout=3).read().decode().strip() or None
+            except Exception:  # noqa: BLE001 - metadata server absent off-GCP
+                _accel = None
+            _accel_tag = _accel or f"tpu-{backend.world_size()}chips"
+        else:
+            _accel_tag = "cpu"
         _wandb_tags = [
             "stage2",
             "tr-hi",
             "speech-to-speech",
-            "v6e-8" if is_tpu else "cpu",
-            "release",
-        ]
+            _accel_tag,
+        ] + [str(t) for t in (cfg["logging"].get("wandb_tags") or [])]
         _wandb_notes = (
             "TinyAya Stage 2 TR<->HI speech-to-speech translation. "
             f"git={os.environ.get('GIT_SHA', 'unknown')[:12]}. "

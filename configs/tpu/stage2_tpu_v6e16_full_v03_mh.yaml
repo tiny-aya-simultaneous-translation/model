@@ -120,6 +120,7 @@ logging:
   keep_last_n: 0                  # keep ALL checkpoints (public suite)
   keep_local_checkpoints: false
   use_wandb: true
+  wandb_tags: [v0.3, multi-host, wsd]
   wandb_project: tinyaya-stage2-tpu
   wandb_run_name: v0.3-production-mh
 
