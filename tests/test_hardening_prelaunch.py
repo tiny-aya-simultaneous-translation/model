@@ -166,31 +166,27 @@ def test_startup_delegates_staging_and_rides_digest():
 
 
 def test_tpu_info_hbm_table_parser():
-    """Parse both live tpu-info cell formats; skip headers and N/A rows."""
-    import importlib.util as _ilu
+    """Parse both live tpu-info cell formats; skip headers and N/A rows.
 
-    # real torch (in the venv) -- evict a MagicMock left by _load_ckpt() in the
-    # same pytest session; stub only the TPU-only torch_xla family, and REMOVE
-    # the stubs afterwards (leaked mocks make later tests believe torch_xla is
-    # importable and flip their backend dispatch).
-    if isinstance(sys.modules.get("torch"), MagicMock):
-        del sys.modules["torch"]
-    _injected = []
-    for name in ("torch_xla", "torch_xla.core", "torch_xla.core.xla_model",
-                 "torch_xla.runtime", "torch_xla.distributed",
-                 "torch_xla.distributed.spmd"):
-        if name not in sys.modules:
-            sys.modules[name] = MagicMock()
-            _injected.append(name)
-    try:
-        path = REPO / "src" / "backend" / "tpu_backend.py"
-        spec = _ilu.spec_from_file_location("tpu_backend_hardening", path)
-        mod = _ilu.module_from_spec(spec)
-        spec.loader.exec_module(mod)
-        parse = mod.TPUBackend._parse_tpu_info_hbm_table
-    finally:
-        for name in _injected:
-            sys.modules.pop(name, None)
+    TORCH-FREE (CI runs without torch): the parser is pure regex, so it is
+    AST-extracted from the class body instead of importing the module (whose
+    top-level ``import torch`` would fail on the lightweight runner).
+    """
+    import re as _re
+
+    src = (REPO / "src" / "backend" / "tpu_backend.py").read_text()
+    tree = ast.parse(src)
+    fn_src = None
+    for node in ast.walk(tree):
+        if isinstance(node, ast.FunctionDef) and node.name == "_parse_tpu_info_hbm_table":
+            fn_src = ast.get_source_segment(src, node)
+    assert fn_src, "_parse_tpu_info_hbm_table not found"
+    # dedent the method body (class-level indentation) before exec
+    import textwrap
+
+    ns: dict = {"re": _re}
+    exec(textwrap.dedent(fn_src), ns)
+    parse = ns["_parse_tpu_info_hbm_table"]
 
     live_format = """TPU HBM Usage
 | Device | HBM Usage (GiB)       |
@@ -237,11 +233,11 @@ def _extract_fn(name):
 
 
 def test_codebook_entropy_stats():
-    import torch
+    import pytest
 
     if isinstance(sys.modules.get("torch"), MagicMock):
         del sys.modules["torch"]
-        import torch  # noqa: F811 - re-import the real one
+    torch = pytest.importorskip("torch")  # tensor math; skipped on torch-free CI
 
     f = _extract_fn("_codebook_entropy_stats")
     V = 2048
