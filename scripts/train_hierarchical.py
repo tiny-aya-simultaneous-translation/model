@@ -181,7 +181,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from src.backend import get_backend
 from src.data.bucket_sampler import BucketedMacroBatchSampler, normalize_buckets
 from src.data.collator import InterleavedCollator
-from src.data.dataset import StreamingTranslationDataset, TranslationDataset
+from src.data.dataset import SILENCE_TOKEN, StreamingTranslationDataset, TranslationDataset
 from src.model.backbone import TinyAyaBackbone
 from src.model.composite import TinyAyaMoshiComposite
 from src.model.lora_setup import apply_lora
@@ -872,47 +872,59 @@ def generate_audio_sample_tpu(
     gen_frames=50,
     is_main=True,
 ):
-    """TPU-safe audio demo: static-shape teacher-forced + AR generation.
+    """TPU-safe audio demo: static-shape AR generation, dual-stream convention.
 
-    Why a separate path: the GPU generator above grows the sequence by one
-    frame per step, so XLA recompiles the backbone EVERY frame plus 640 host
-    syncs (documented 2-3 h/call at the old call site). This variant keeps
-    every tensor at a FIXED shape:
+    Static-shape mechanics (why this exists): the GPU generator above grows
+    the sequence by one frame per step, so XLA recompiles the backbone EVERY
+    frame plus hundreds of host syncs (documented 2-3 h/call at the old call
+    site). Here every tensor keeps a FIXED shape [1, ctx+gen]; each AR step
+    re-runs the SAME compiled fwd-only graph over the whole buffer (causal
+    attention makes the not-yet-generated tail irrelevant to the frontier),
+    and every position-dependent read/write uses runtime INDEX tensors
+    (index_select / scatter) -- never python-int slices, which XLA would bake
+    in as constants and recompile per frame. Measured: first demo ~2 min
+    (one-time fwd-graph compiles), warm demos seconds.
 
-    * one buffer ``[1, ctx+gen]``; each AR step re-runs the SAME compiled
-      fwd-only backbone graph over the whole buffer (causal attention makes
-      the not-yet-generated tail irrelevant to the frontier position);
-    * all position-dependent reads/writes use runtime INDEX TENSORS
-      (index_select / scatter) -- never python-int slices, which XLA would
-      bake in as constants and recompile per frame (XLA_NO_SPECIAL_SCALARS=1
-      keeps the host scalars as parameters);
-    * depth-decoder feedback stays on-device; generated codes accumulate in
-      an on-device ``[CB, gen]`` buffer with ONE ``.cpu()`` at the end.
+    Generation conventions MIRROR the gate-validated eval_checkpoint.py AR
+    (the off-by-one + stream layout the 2026-07-09 gate caught): dual-stream
+    backbone input (user stream = source audio, model stream = SILENCE then
+    generated feedback), cb0 from the BACKBONE audio head at the frontier
+    hidden (position cur-1 predicts cur), cb1-7 from ONE depth call seeded
+    with cb0. Logits are sliced to the decodable Mimi range [0, 2048) before
+    argmax -- an early-training model happily argmaxes SILENCE(2048)+, which
+    Mimi's embeddings cannot decode (the first live demo failed exactly
+    there).
 
-    Multi-host SPMD: every host MUST call this (replicated compute, exactly
-    like save/val); only ``is_main`` Mimi-decodes and gets wavs -- other
-    hosts get ``None``.
-
-    Cost: two small fwd-only graphs compiled ONCE per process (re-paid after
-    a preemption reboot), then ~gen_frames buffer forwards per demo.
+    Multi-host SPMD: ALL hosts must call this (replicated compute, like
+    save/val); only ``is_main`` Mimi-decodes (CPU) and gets wavs.
     """
     model.eval()
     sample = dataset[sample_idx]
-    src_codes_all = sample["audio_codes"]  # [CB, T_total] RAW (undelayed)
+    audio_codes = sample["audio_codes"]  # [CB, T_total] src||tgt, raw 0-2047
+    user_codes = sample["user_audio_codes"][0]  # [T_total] source then SILENCE
+    text_ids_full = sample["text_ids"]  # [T_total]
     src_len = int(sample["source_length"])
     tgt_len = int(sample["target_length"])
+    t_total = int(audio_codes.shape[1])
 
-    ctx = min(int(ctx_frames), src_len)
+    MIMI_V = 2048  # decodable code range; >=2048 are specials (SILENCE etc.)
+    start = max(0, src_len - int(ctx_frames))
+    ctx = src_len - start
     gen = int(gen_frames)
     T = ctx + gen
 
-    # Static input buffers, assembled on host then moved once.
-    buf0_cpu = torch.zeros(1, T, dtype=torch.long)
-    buf0_cpu[0, :ctx] = src_codes_all[0, :ctx]
-    buf_cb0 = buf0_cpu.to(device)
-    text_ids = torch.full(
-        (1, T), TinyAyaBackbone.ZERO_PADDING, dtype=torch.long, device=device
-    )
+    def _window(vec, fill):
+        w = torch.full((1, T), fill, dtype=torch.long)
+        n = min(T, max(0, t_total - start))
+        if n > 0:
+            w[0, :n] = vec[start : start + n]
+        return w.to(device)
+
+    # Static buffers: user/text known everywhere; model stream = SILENCE with
+    # generated cb0 scattered in as we go (matching training's stream layout).
+    user_buf = _window(user_codes, SILENCE_TOKEN)
+    text_buf = _window(text_ids_full, TinyAyaBackbone.ZERO_PADDING)
+    model_buf = torch.full((1, T), SILENCE_TOKEN, dtype=torch.long, device=device)
     attn = torch.ones(1, T, dtype=torch.long, device=device)
     gen_buf = torch.zeros(num_codebooks, gen, dtype=torch.long, device=device)
 
@@ -922,50 +934,48 @@ def generate_audio_sample_tpu(
         else torch.amp.autocast("cuda", dtype=torch.bfloat16)
     )
 
-    def _frontier_hidden(codes_1T, pos_idx):
-        """One fixed-shape backbone+projection forward; gather ONE position."""
-        with autocast:
-            out = model.backbone(text_ids=text_ids, audio_codes=codes_1T, attention_mask=attn)
-            projected = model.projection(out["hidden_states"])  # [1, T, H]
-        return torch.index_select(projected, 1, pos_idx)  # [1, 1, H]
-
     for i in range(gen):
-        cur = ctx + i  # next position to fill; condition on cur-1
+        cur = ctx + i  # buffer position to fill; frontier hidden is cur-1
         pos_idx = torch.tensor([cur - 1], dtype=torch.long, device=device)
-        ctx_h = _frontier_hidden(buf_cb0, pos_idx)  # [1, 1, H]
-        ctx_expanded = ctx_h.expand(1, num_codebooks, -1).contiguous()
-
-        # In-frame depth AR: 8 depth calls, feedback stays on-device. cb_idx
-        # is a host constant (unrolled) => 8 small graph variants, compiled
-        # once each; the position indices are runtime tensors, so the frame
-        # loop reuses the same graphs for every i.
-        depth_input = torch.zeros(1, num_codebooks, dtype=torch.long, device=device)
-        frame_toks = []
-        for cb_idx in range(num_codebooks):
-            with autocast:
-                depth_out = model.depth_decoder(
-                    input_ids=depth_input,
-                    last_hidden_state=ctx_expanded,
-                    use_cache=False,
-                    return_dict=True,
-                )
-            cb_sel = torch.tensor([cb_idx], dtype=torch.long, device=device)
-            tok = (
-                torch.index_select(depth_out.logits, 1, cb_sel).argmax(dim=-1).to(torch.long)
-            )  # [1, 1]
-            frame_toks.append(tok)
-            if cb_idx + 1 < num_codebooks:
-                nxt_sel = torch.tensor([[cb_idx + 1]], dtype=torch.long, device=device)
-                depth_input = depth_input.scatter(1, nxt_sel, tok)
-        # one column write per frame: gen_buf[:, i] = this frame's 8 tokens
-        frame_col = torch.cat(frame_toks, dim=0)  # [CB, 1]
+        with autocast:
+            bb_out = model.backbone(
+                text_ids=text_buf,
+                audio_codes=user_buf,
+                model_audio_codes=model_buf,
+                attention_mask=attn,
+            )
+            h = torch.index_select(bb_out["hidden_states"], 1, pos_idx)  # [1,1,H]
+            cb0_logits = model.backbone.audio_heads[0](h)[..., :MIMI_V]
+            cb0_tok = cb0_logits.argmax(dim=-1).to(torch.long).view(1, 1)
+            projected = model.projection(h)
+            ctx_expanded = projected.expand(1, num_codebooks, -1).contiguous()
+            depth_input = torch.zeros(1, num_codebooks, dtype=torch.long, device=device)
+            one_idx = torch.tensor([[1]], dtype=torch.long, device=device)
+            depth_input = depth_input.scatter(1, one_idx, cb0_tok)
+            depth_out = model.depth_decoder(
+                input_ids=depth_input,
+                last_hidden_state=ctx_expanded,
+                use_cache=False,
+                return_dict=True,
+            )
+            # cb1-7 from the single depth call (index k reads codebook k),
+            # exactly like the gate-validated eval loop.
+            depth_toks = depth_out.logits[..., :MIMI_V].argmax(dim=-1).to(torch.long)  # [1, CB]
+        frame_col = torch.cat(
+            [cb0_tok.view(1, 1)]
+            + [
+                torch.index_select(
+                    depth_toks, 1, torch.tensor([k], dtype=torch.long, device=device)
+                ).view(1, 1)
+                for k in range(1, num_codebooks)
+            ],
+            dim=0,
+        )  # [CB, 1]
         col_idx = torch.full((num_codebooks, 1), i, dtype=torch.long, device=device)
         gen_buf = gen_buf.scatter(1, col_idx, frame_col)
-        # feed cb0 back into the static AR buffer at position cur
         cur_idx = torch.tensor([[cur]], dtype=torch.long, device=device)
-        buf_cb0 = buf_cb0.scatter(1, cur_idx, frame_toks[0])
-        # Materialize per frame: keeps each compiled graph bounded instead of
-        # unrolling gen_frames x (backbone + 8 depth) into one giant graph.
+        model_buf = model_buf.scatter(1, cur_idx, cb0_tok)
+        # Materialize per frame: bounded graphs instead of one giant unroll.
         if backend is not None and hasattr(backend, "sync"):
             backend.sync()
 
@@ -976,20 +986,24 @@ def generate_audio_sample_tpu(
 
     from src.data.dataset import undo_codebook_delay
 
-    gen_undelayed = undo_codebook_delay(gen_codes)
-    src_full = src_codes_all[:, :src_len]
-    tgt_full = src_codes_all[:, src_len : src_len + tgt_len]
-    gt_cb0 = src_codes_all[0, ctx : ctx + gen]
-    n_cmp = min(len(gt_cb0), gen)
+    # Generated cb1-7 live in the DELAYED stream space; undo before decoding.
+    # Clamp EVERYTHING entering Mimi to the decodable range (undo pads with
+    # SILENCE=2048, and refs may carry specials at boundaries).
+    gen_dec = undo_codebook_delay(gen_codes).clamp(0, MIMI_V - 1)
+    src_full = audio_codes[:, :src_len].clamp(0, MIMI_V - 1)
+    tgt_full = audio_codes[:, src_len : src_len + tgt_len].clamp(0, MIMI_V - 1)
+    gt_cb0 = audio_codes[0, src_len : src_len + gen]
+    n_cmp = min(int(gt_cb0.shape[0]), gen)
     cb0_acc = (
         (gen_codes[0, :n_cmp] == gt_cb0[:n_cmp]).float().mean().item() if n_cmp > 0 else 0.0
     )
     return {
         "source_wav": mimi_encoder.decode(src_full).numpy(),
         "target_gt_wav": mimi_encoder.decode(tgt_full).numpy(),
-        "generated_wav": mimi_encoder.decode(gen_undelayed).numpy(),
+        "generated_wav": mimi_encoder.decode(gen_dec).numpy(),
         "cb0_accuracy": cb0_acc,
     }
+
 
 
 # ---------------------------------------------------------------------------
