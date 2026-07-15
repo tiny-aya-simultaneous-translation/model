@@ -100,3 +100,15 @@
   `"global_step"`; UI x-axis must be set to global_step (internal step ≈ row count).
 - **Docs guard**: `scripts/ci/check_docs_sync.sh` (in CI) forbids regressions to the
   batch-256 fiction / old config / 14,532 steps / production framing.
+
+- **Killed `gcloud ssh` ≠ killed remote command**: a local `timeout` on the ssh
+  orphans the REMOTE process, which keeps running (two orphaned stagers per host
+  filled the root disk to 0 bytes, 2026-07-15). Long host ops go in detached
+  tmux with a liveness check; never foreground-ssh with a timeout, never pipe a
+  critical command's output through `head` (SIGPIPE kills it mid-run).
+- **Full-disk failure signature** (looks like a quoting bug, is not): tmux
+  servers die silently, `>` redirects create 0-byte files, heredoc-fed `cat`
+  writes nothing. Check `df` FIRST when detached sessions vanish instantly.
+- **HF cache `.lock` stall**: a zombie downloader's stale per-blob lock makes a
+  fresh download freeze mid-file with a healthy network (w-1, 2026-07-15).
+  prefetch_backbones.sh sweeps `*.lock` at boot (safe there).
