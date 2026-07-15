@@ -13,7 +13,7 @@ and their env vars.
 | `setup_gcp.sh` | workstation, once | enables APIs, creates the GCS bucket, seeds Secret Manager from `.env`, grants IAM |
 | `launch_qr.sh` | workstation | submits a Queued Resource (on-demand path / config via `CONFIG_FILE`) |
 | `launch_spot.sh` | workstation | submits a spot QR via `TRC_PROFILE` (e.g. `v6e-16-eu`, `v6e-8-eu`) |
-| `launch_release.sh` | on the VM | production launcher: injects `GIT_SHA`, tees + uploads a sanitized log |
+| `launch_release.sh` | on the VM | long-horizon launcher: injects `GIT_SHA`, tees + uploads a sanitized log |
 | `startup_script.sh` | every TPU host at boot | installs uv + Python, fetches code (GCS tarball or clone), syncs `uv.lock`, fetches secrets, stages data, starts training in a `tmux` restart loop with `--resume auto` |
 | `hot_redeploy.sh` / `_remote_redeploy.sh` | workstation | push code to a live QR without recreating it |
 | `ops.sh` | workstation | `status`, `tail-logs`, `attach`, `ssh`, `pull-best`, `delete` |
@@ -30,7 +30,7 @@ prefixing `VAR=value bash ...`.
 | `REGION` | `europe-west4` | `setup_gcp.sh` (bucket location) |
 | `ZONE` | `europe-west4-a` | `launch_*`, `ops.sh` |
 | `TRC_PROFILE` | unset | `launch_spot.sh` — `v6e-16-eu` (prod) / `v6e-8-eu` (smoke/eval) |
-| `CONFIG_FILE` | `configs/tpu/stage2_tpu_v6e16_full_v03.yaml` | `launch_*` |
+| `CONFIG_FILE` | `configs/tpu/stage2_tpu_v6e16_full_v03_mh.yaml` | `launch_*` |
 | `BUCKET` | `tinyaya-stage2-eu` | `setup_gcp.sh`, `ops.sh pull-best` |
 | `CKPT_PREFIX` | `checkpoints/stage2-tpu` | `ops.sh pull-best` |
 | `REPO_TARBALL_GS_URI` | unset | when set, startup fetches code from GCS instead of cloning GitHub |

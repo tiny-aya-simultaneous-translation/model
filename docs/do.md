@@ -32,7 +32,7 @@ missing `.pt` rows (dataset drops them; `rows` doesn't).
   subtoken-only stream means acc is measured on sparse positions; document the expected
   scale on the card.
 
-### Keep the v0.3 HF model card's infra section in sync with the production run
+### Keep the v0.3 HF model card's infra section in sync with the long-horizon run
 
 `docs/hf-model-card-tr-hi-s2st-v0.3.md` now has a "Training infrastructure: replicated
 strategy + XLA architecture changes" section (added 2026-07-08), and
@@ -56,7 +56,7 @@ strategy + XLA architecture changes" section (added 2026-07-08), and
 
 The docs pass left the `.sh`/`.py` scripts carrying v4 / v6e-8 / `v6e_v2` / `us-central2`
 defaults; refreshed to v0.3 / v6e-16 / europe-west4:
-- **Config default** `stage2_tpu_v6e_v2.yaml` → `stage2_tpu_v6e16_full_v03.yaml` across
+- **Config default** `stage2_tpu_v6e_v2.yaml` → `stage2_tpu_v6e16_full_v03_mh.yaml` across
   `launch_release`, `launch_qr`, `launch_canary`, `hot_redeploy`, `_remote_redeploy`,
   `startup_script`, and the `promote_sweep_winner.py` docstring.
 - **`launch_spot.sh`**: added a `v6e-16-eu` profile (v6e-16 / europe-west4-a /

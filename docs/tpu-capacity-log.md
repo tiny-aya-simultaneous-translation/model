@@ -205,3 +205,17 @@ canary failed.
 the compile is 5-10x longer. Until the `_KwargBoundLayer` patch in
 `.factory/memories.md` 2026-05-05 "scan_layers TypeError" is applied,
 do not budget less than 5h wall time for first-canary compile.
+
+
+## v6e-16 multi-host envelope (hardening probes, 2026-07-14)
+
+- Steady step (global batch 32 = b2/chip × 16, grad-ckpt ON, chunk 100):
+  **1.79–1.85 s/step**; HBM **25.7–27.8 / 31.25 GiB** with train+val graphs.
+- Capacity ladder: **b4/chip OOMs** — program arena wants 18.99 G with 18.42 G
+  free (resident weights+optimizer ≈ 12.8 G/chip). The locked b2 recipe sits
+  just under half the activation envelope.
+- Step-time levers all neutral (probes): grad-ckpt OFF, depth_chunk 300,
+  flash-attention ON. Persistent XLA compile cache: nondeterministic keys on
+  torch_xla 2.9 v6e SPMD — never hits; ~14 min recompile per cold boot.
+- Val×4 (`val_per_chip_batch: 8`, same 3200-sample gate): cycle ~210 s → ~41–60 s
+  measured warm on the rehearsals.

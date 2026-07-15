@@ -24,10 +24,11 @@ model-index:
 
 # TinyAya — Turkish⇄Hindi Speech-to-Speech Translation (v0.3)
 
-> 🚧 **Held — recipe frozen, weights pending.** The 3-epoch production run has not yet
-> completed, so weights and downstream metrics are **not yet published**. This card
-> documents the dataset and the recipe-as-frozen, for transparency; it will be updated
-> with checkpoints and evaluation once the run finishes.
+> 🚧 **Held — recipe frozen, weights pending.** The 110,463-step (≈3-epoch) long-horizon
+> run is validated and launch-ready but has not yet completed, so weights and downstream
+> metrics are **not yet published**. This card documents the dataset, the recipe-as-frozen,
+> and the release design, for transparency; it will be updated with checkpoints and
+> evaluation once the run finishes.
 
 Moshi-style **speech-to-speech translation with a text inner-monologue** for
 **Turkish ⇄ Hindi**: a LoRA-fine-tuned **Cohere2** backbone fused with a **frozen Moshi
@@ -85,12 +86,22 @@ Beyond the data-source fix, v0.3 carries codebase corrections and a recipe chose
   codebooks to 89–98%**. Note: an earlier per-codebook accuracy metric scored CB1–7
   against the *undelayed* target and read a false ~0%; fixed — CB1–7 were always learning.
 
-Production config: `configs/tpu/stage2_tpu_v6e16_full_v03.yaml`, **14,532 steps (3 epochs)**.
+Long-horizon run config: `configs/tpu/stage2_tpu_v6e16_full_v03_mh.yaml` —
+**110,463 steps ≈ 3 real epochs at global batch 32** (2 rows/chip × 16 chips,
+multi-host data-parallel), **WSD schedule** (linear warmup 1100 → peak plateau →
+11,000-step linear anneal to 0; a stop-anytime anneal template covers early stops).
+
+> **¹ Batch-semantics correction (2026-07-12 audit):** earlier configs (and the sweep
+> table above) reported `batch × accum × chips` as "global batch 256" (batch-semantics). A live on-mesh
+> audit proved the real optimizer batch is `loader batch × accum` — **32** for the reval
+> arms and for this run. All v0.3 numbers in this card use the corrected semantics; the
+> nominal-256 label is retained only where it names historical runs.
 
 ## Recipe re-validation: 6-arm text+audio sweep (`v03-5k-reval-ta`, 2026-07-09)
 
-Before production, the recipe was re-validated as **text+audio** on the full 1.24 M-pair
-corpus — 6 arms × 5,000 steps (≈1 epoch) at global batch 256, one v6e-8 per arm. Full
+Before the long-horizon run, the recipe was re-validated as **text+audio** on the full 1.24 M-pair
+corpus — 6 arms × 5,000 steps (≈1 epoch) at a *nominal* global batch 256 (batch-semantics
+note¹ — real 32), one v6e-8 per arm. Full
 report: [`v0.3-reval-report.md`](v0.3-reval-report.md). Winner: **arm D,
 `lora_exclude_top: 0`** — adapters on all 36 layers. The previously frozen champion
 (exclude_top=2) placed **last at every composite weighting**; the ranking
@@ -113,13 +124,18 @@ All per-arm `best_by_val` checkpoints:
 
 ## Training infrastructure: replicated strategy + XLA architecture changes
 
-**Parallelism = `replicated` (SPMD data-parallel).** The composite is **5.23B params
-total but only ~122M trainable** (LoRA + depth-decoder I/O), so the whole model is
-**replicated on every TPU chip** and only the *data* is sharded (global batch 256 across
-chips; gradients are averaged by SPMD). There is **no tensor/FSDP sharding of weights**
-in the released checkpoints — a checkpoint is a plain single-replica state and loads on
-one GPU without any resharding. (The trainer auto-selects `replicated` whenever
-trainable params < 500M; see `src/backend/tpu_backend.py::_resolve_strategy`.)
+**Parallelism = `replicated` (SPMD data-parallel), multi-host.** The composite is
+**5.24B params total but only ~192M trainable** (LoRA r=32 on all 36 layers incl.
+embed_tokens, projection, depth-decoder I/O), so the whole model is **replicated on
+every TPU chip** and only the *data* is sharded: the long-horizon run trains on a
+**v6e-16 (4 hosts × 4 chips)** where each host's `DistributedSampler` draws a disjoint
+corpus shard and the minibatch input pipeline assembles the **global batch of 32**
+(2 rows/chip) across the 16-chip mesh — verified bit-exact by a gradient-identity
+probe; inter-host all-reduce costs ≤3% of the 1.8 s step. There is **no tensor/FSDP
+sharding of weights** in the released checkpoints — a checkpoint is a plain
+single-replica state and loads on one GPU without any resharding. (The trainer
+auto-selects `replicated` whenever trainable params < 500M; see
+`src/backend/tpu_backend.py::_resolve_strategy`.)
 
 **Architecture / lowering changes made to train this on TPU** (all verified
 numerics-identical to stock; needed because XLA compiles static graphs and has no
@@ -141,7 +157,7 @@ stride-0 broadcast views):
 
 ## Pipeline validation (memorization gate, 2026-07-09)
 
-Before the production run, the exact shipping stack (scan + all-36-layer adapter layout +
+Before the long-horizon run, the exact shipping stack (scan + all-36-layer adapter layout +
 FlexibleLinear bmm + text+audio objective) passed a 32-example memorization gate
 (train==val, regularization stripped, 800 steps) with an independent checkpoint-reload
 inference examination. W&B: [`v03-overfit-ta-scan`](https://wandb.ai/cataluna84/tinyaya-stage2-tpu/runs/n768udgi).
@@ -162,6 +178,45 @@ for earlier versions (v0.2 included) used the broken decoding and understate AR
 quality**. Fixed in `scripts/eval_checkpoint.py`; all v0.3 release numbers use the
 corrected loop.
 
+## Release design: the checkpoint suite you will get
+
+This repo (**`tiny-aya-translate/tr-hi-s2st-v0.3`**, private during training,
+public at release) receives artifacts **live during the run**:
+
+- **One branch per checkpoint** (Pythia/OLMo convention): log-spaced early steps
+  `{1,2,4,…,512}` + every 1000 steps + `best` — ~122 revisions, weights-only
+  (optimizer/scheduler/RNG stay in GCS). Consume any point of the trajectory:
+  ```python
+  model = AutoModel.from_pretrained("tiny-aya-translate/tr-hi-s2st-v0.3",
+                                    revision="step-12000")
+  ```
+- **`samples/step_NNNNNN/`** on `main`: source / ground-truth-target / generated
+  WAVs from the inline audio demo that runs on the TPU every 5000 steps — you
+  can *listen* to the model improve across training.
+- **`logs/train_host0_latest.log`**: rolling training-log snapshot.
+- Every checkpoint's `metadata.json` carries provenance (git SHA of the exact
+  deployed code, dataset digest `rows/pt/al/md5`, seed, global batch) and a
+  byte-exact file manifest.
+
+Live telemetry is public on W&B: the
+[release dashboard](https://wandb.ai/cataluna84/tinyaya-stage2-tpu?nw=bg2vkino3r4)
+streams losses, per-codebook prediction **entropy + active-code fraction** (the
+codebook-collapse instrument), perplexities, tokens-seen axes, MFU estimate,
+per-chip HBM for all 16 chips, and the audio demos. Post-hoc, each published
+checkpoint gains teacher-forced text **chrF/BLEU** backfilled at its own step
+(`eval/*`, via `scripts/eval_translation_proxy.py`).
+
+## Dress rehearsals (pre-launch validation, 2026-07-14/15)
+
+The exact long-horizon stack was rehearsed end-to-end on the full corpus with
+the run's WSD trajectory replayed exactly:
+
+| rehearsal | W&B | result |
+|---|---|---|
+| 2,000 steps | [7pj1dkht](https://wandb.ai/cataluna84/tinyaya-stage2-tpu/runs/7pj1dkht) | text CE 10.90→2.92, audio 7.85→5.85; all param groups training; zero non-finite gradients |
+| 5,000 steps | [m3rmohn5](https://wandb.ai/cataluna84/tinyaya-stage2-tpu/runs/m3rmohn5) | loss 10.03→6.09; cb0 prediction entropy 8.71 bits / 64.7% active codes; TF text chrF 41.6 @ 0.14 epoch |
+| audio smoke | [xxbchrr6](https://wandb.ai/cataluna84/tinyaya-stage2-tpu/runs/xxbchrr6) | inline TPU AR audio demos: 48 s cold / 29 s warm, WAVs in W&B |
+
 ## Status checklist
 
 | Item | Status |
@@ -169,7 +224,7 @@ corrected loop.
 | Data source repointed to `tr-hi-mimi-encoded` | ✅ |
 | Capacity sweep → recipe frozen (r=32/+MLP/rsLoRA) | ✅ |
 | Pipeline validated (all 8 codebooks memorize) | ✅ |
-| Production training run (3 epochs) | ☐ held |
+| Long-horizon training run (110,463 steps ≈ 3 epochs) | ☐ validated + launch-ready |
 | Checkpoints published | ☐ pending |
 | Per-codebook acc / ASR-BLEU / DNSMOS eval | ☐ pending |
 

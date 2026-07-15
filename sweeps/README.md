@@ -1,7 +1,7 @@
 # W&B Hyperparameter Sweeps — Stage 2
 
-Proxy-first HP search before the expensive multi-day production run. The v0.3 recipe was
-chosen by a **two-stage capacity sweep** on the full 1.24M corpus (global batch 256, where
+Proxy-first HP search before the expensive multi-day long-horizon run. The v0.3 recipe was
+chosen by a **two-stage capacity sweep** on the full 1.24M corpus (nominal batch 256 — real optimizer batch 32 per the batch-semantics audit, where
 overfitting is no longer the binding constraint). Sweep specs live here; the launchers +
 multi-host coordination live in `scripts/tpu/`. See
 [`docs/tpu-runbook.md`](../docs/tpu-runbook.md) for the mesh/launch details.
@@ -16,7 +16,7 @@ multi-host coordination live in `scripts/tpu/`. See
   +MLP, `lr_lora` log-uniform `1e-5…5e-4` × `lora_r ∈ {8,16,32,64}`, rsLoRA (`α=2r`).
   **Winner: `lora_r=32, lr_lora=1.716e-4`** (`val/composite=5.1189`).
 
-Winner promoted to `configs/tpu/stage2_tpu_v6e16_full_v03.yaml` (14,532 steps = 3 epochs).
+Winner promoted to `configs/tpu/stage2_tpu_v6e16_full_v03_mh.yaml` (110,463 steps = 3 epochs).
 Throughput is rank-independent (~5.5 s/step on v6e-16), so rank choice doesn't change the
 wall-clock model. **W&B project:** https://wandb.ai/cataluna84/tinyaya-stage2-tpu
 
@@ -49,11 +49,11 @@ SWEEP_ID=ENTITY/PROJECT/SWEEP_ID bash scripts/tpu/launch_sweep_bayes.sh
 # 3. pick the winner in the W&B dashboard (lowest val/composite), then promote:
 python scripts/promote_sweep_winner.py \
     --sweep ENTITY/PROJECT/SWEEP_ID \
-    --config configs/tpu/stage2_tpu_v6e16_full_v03.yaml --metric val/composite
+    --config configs/tpu/stage2_tpu_v6e16_full_v03_mh.yaml --metric val/composite
 ```
 
 The trial proxy is `configs/tpu/stage2_tpu_v6e16_scale_proxy.yaml` (de-regularized,
-checkpointing on, global batch 256). `train_hierarchical.py`'s `--sweep` path maps swept
+checkpointing on, nominal batch 256 / real 32 — batch-semantics audit). `train_hierarchical.py`'s `--sweep` path maps swept
 args flat→nested (`lr_lora`→`optim`, `lora_r`/`lora_alpha_mult`→`lora`, etc.).
 
 > Note: `val/composite` is logged as a flat scalar (a prior `summary="min"` stored it as a

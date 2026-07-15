@@ -19,6 +19,8 @@ jobs:
 
       - name: Backend seam (no module-level torch_xla in shared code)
         run: bash scripts/ci/check_backend_seam.sh
+      - name: Docs consistency (batch semantics, run config, naming)
+        run: bash scripts/ci/check_docs_sync.sh
 
       - name: Byte-compile all Python sources
         run: |

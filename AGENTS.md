@@ -48,13 +48,17 @@ uv run python -m py_compile $(git ls-files '*.py')  # quick lint
 
 ## TPU launch (canonical commands)
 
-Current production path: **v6e-16 spot in `europe-west4-a`** (4 hosts × 4 chips = one
+Current long-horizon path: **v6e-16 spot in `europe-west4-a`** (4 hosts × 4 chips = one
 16-chip SPMD mesh, 32 GiB HBM/chip). A v6e-8 (single host) is used for smoke/overfit/eval.
 Checkpoints → **`gs://tinyaya-stage2-eu/`** (europe-west4, co-located with the TPUs).
 
 ```bash
-# v0.3 production run (r=32 / +MLP / rsLoRA winner, 14,532 steps)
-bash scripts/tpu/launch_release.sh configs/tpu/stage2_tpu_v6e16_full_v03.yaml
+# v0.3 long-horizon run (r=32 / +MLP / rsLoRA winner, 110,463 steps @ real global batch 32)
+TRC_PROFILE=v6e-16-eu CONFIG_FILE=configs/tpu/stage2_tpu_v6e16_full_v03_mh.yaml \
+SWEEP_DATA_GS_URI=gs://tinyaya-stage2-eu/data/full-corpus-ta-20260708.tar.gz \
+bash scripts/tpu/launch_spot.sh
+# babysit the QR for the whole run (local tmux):
+#   QR_NAME=... ZONE=europe-west4-a LAUNCH_ENV_FILE=launch.env bash scripts/tpu/qr_watch.sh
 
 # hot-redeploy code without recreating the QR
 bash scripts/tpu/hot_redeploy.sh
@@ -97,7 +101,7 @@ torch_xla >= 2.6 and silently no-op. Use the explicit
   Phase 0 `text_padding_weight` fix (ported from TPU).
 
 **TPU** (`configs/tpu/`):
-- `stage2_tpu_v6e16_full_v03.yaml` — **v0.3 production** run (v6e-16, r=32/+MLP/rsLoRA, 14,532 steps).
+- `stage2_tpu_v6e16_full_v03_mh.yaml` — **v0.3 long-horizon** run (v6e-16 multi-host, r=32/+MLP/rsLoRA, 110,463 steps @ real global batch 32).
 - `stage2_tpu_v6e16_smoke_r{8,32,64}.yaml` — full-corpus smoke arms (capacity-sweep candidates).
 - `stage2_tpu_v6e16_scale_proxy.yaml` — the capacity-sweep proxy (de-regularized, batch 256).
 - `stage2_tpu_v6e8_overfit.yaml` — overfit / pipeline-validation (32-example memorize).

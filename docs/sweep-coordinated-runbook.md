@@ -58,4 +58,4 @@ Checkpoints land per trial at `gs://tinyaya-stage2-eu/checkpoints/stage2-scale-s
 python scripts/promote_sweep_winner.py --sweep <entity/project/id> \
   --config configs/tpu/stage2_tpu_v6e16_b256.yaml --metric val/composite
 ```
-Then run a medium full-corpus confirmation before the full production run.
+Then run a medium full-corpus confirmation before the full long-horizon run.

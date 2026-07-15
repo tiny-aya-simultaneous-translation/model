@@ -19,7 +19,7 @@ pipeline_tag: audio-to-audio
 metrics:
   - bleu
 # Eval results (ASR-BLEU + per-codebook accuracy + DNSMOS) go here once the v0.3
-# production run finishes and the release eval has run. Template:
+# long-horizon run finishes and the release eval has run. Template:
 # model-index:
 #   - name: tinyaya-stage2-tr-hi
 #     results:
@@ -31,7 +31,7 @@ metrics:
 ---
 
 > **Version:** `v0.3` — audio-only, capacity-sweep recipe. **Held**: the full 3-epoch
-> production run has not yet completed, so weights + eval are pending. Versions are git
+> long-horizon run (110,463 steps, multi-host v6e-16) has not yet completed, so weights + eval are pending. Versions are git
 > tags; load a specific one with `revision=`. See **Version history** at the bottom.
 
 # TinyAya Stage 2 — Turkish ↔ Hindi Speech-to-Speech Translation (LoRA)
@@ -57,7 +57,7 @@ audio-head / embedding tensors.
 | Base | `CohereLabs/tiny-aya-base` + frozen Moshi depth decoder + Mimi codec |
 | Method | LoRA (r=32, +MLP, rsLoRA) + trained projection/heads/embeds; bf16, FSDPv2 SPMD |
 | Hardware | Cloud TPU v6e-16 (4 hosts × 4 chips), europe-west4-a, via Google TRC |
-| Horizon | 14,532 steps (3 epochs, effective batch 256) |
+| Horizon | 110,463 steps (3 epochs, effective batch 256) |
 | Data | `tiny-aya-translate/tr-hi-mimi-encoded` (synthetic, Mimi-encoded, audio-only) |
 
 ## Training procedure
@@ -83,7 +83,7 @@ CB1–7 in earlier dashboards and is fixed; loss-based metrics were never affect
 Audio-only, so we report what the model actually does — **per-codebook accuracy**
 (teacher-forced), **ASR-BLEU** (Whisper transcribes generated target audio, BLEU vs.
 reference), and **DNSMOS/UTMOS** (naturalness). Reproduce with `scripts/eval_checkpoint.py`.
-**Pending** for this release (production run held); will be filled into the YAML
+**Pending** for this release (long-horizon run launch-ready); will be filled into the YAML
 `model-index` + below.
 
 | Metric | tr→hi | hi→tr | overall |

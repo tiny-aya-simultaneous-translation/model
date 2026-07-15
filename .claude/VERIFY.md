@@ -169,3 +169,18 @@ grep -q "TPU_OPTIMIZATION_SPEC.md" .claude/orchestration/README.md
 grep -q "CONTROL_PLANE.md" .claude/skills/tpu-orchestrate/SKILL.md
 grep -q "ORCHESTRATION_CONTROL_PLANE" .claude/hooks/session_start.py
 ```
+
+
+## Pre-launch hardening verification (2026-07-14/15)
+
+- `uv run python -m pytest tests/test_hardening_prelaunch.py -q` — staging
+  marker identity, preflight gates, batch arithmetic, entropy stats, hub
+  publishing wiring, prefetch direct-first ordering.
+- Torch-free CI simulation (the seam-and-syntax runner has no torch):
+  run pytest under a `find_spec` blocker for torch/torch_xla — expect
+  1 skip (entropy), rest pass.
+- `bash scripts/ci/check_docs_sync.sh` — operative docs consistent
+  (batch semantics / run config / step count / long-horizon naming).
+- Live drills (idle slice): staging drill (marker mismatch → wipe →
+  re-stage → cross-host digests identical); fresh-provision drill (wipe all
+  caches → HF-direct backbones + dataset → digest == GCS tarball digest).

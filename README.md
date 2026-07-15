@@ -4,8 +4,11 @@ Moshi-style **speech-to-speech translation with a text inner-monologue** for
 Turkish↔Hindi, built on a LoRA-fine-tuned Cohere2 backbone (3B) with a **frozen** Moshi
 depth decoder producing 8 RVQ Mimi codebooks.
 
-> **Status (v0.3):** recipe frozen and pipeline-validated; the full 3-epoch production
-> run has not yet completed, so eval numbers are pending. This is a research checkpoint
+> **Status (v0.3):** recipe frozen, pipeline-validated, and the 110,463-step (≈3-epoch)
+> **long-horizon run** on multi-host v6e-16 is fully rehearsed and launch-ready (2000-
+> and 5000-step dress rehearsals PASS; live dashboards:
+> [W&B release view](https://wandb.ai/cataluna84/tinyaya-stage2-tpu?nw=bg2vkino3r4)).
+> Eval numbers land when the run completes. This is a research checkpoint
 > for low-resource S2ST, not a production translator. See
 > [`docs/v0.3-public-release-plan.md`](docs/v0.3-public-release-plan.md) for the honest
 > release narrative.
@@ -38,7 +41,7 @@ Key design choices:
 ├── configs/                    # Training configs (YAML), split per backend
 │   ├── gpu/                     # CUDA + FSDP configs
 │   └── tpu/                     # XLA/SPMD configs
-│       ├── stage2_tpu_v6e16_full_v03.yaml   # ★ v0.3 production run (v6e-16, 14,532 steps)
+│       ├── stage2_tpu_v6e16_full_v03_mh.yaml # ★ v0.3 long-horizon run (v6e-16 multi-host, 110,463 steps)
 │       ├── stage2_tpu_v6e16_smoke_r32.yaml  # r=32 winner full-corpus smoke
 │       └── stage2_tpu_v6e8_overfit.yaml     # pipeline-validation (32-example memorize)
 ├── scripts/
@@ -80,14 +83,21 @@ cd model
 uv sync
 ```
 
-### Training (TPU v6e-16, SPMD/FSDPv2 — the production path)
-The v0.3 production run trains on **v6e-16** (4 hosts × 4 chips) in `europe-west4-a`.
+### Training (TPU v6e-16, SPMD data-parallel — the long-horizon path)
+The v0.3 long-horizon run trains on **v6e-16** (4 hosts × 4 chips) in `europe-west4-a` —
+real global batch **32** (2 rows/chip × 16 chips, multi-host minibatch DP; the historical
+"global batch 256" label was batch-semantics fiction, see the reval report), WSD schedule,
+keep-all checkpoint suite streaming to GCS + the HF hub. Full runbook:
+[`docs/tpu-runbook.md`](docs/tpu-runbook.md).
 `startup_script.sh` deploys the repo, stages the corpus, and launches under a TPU-side
 `tmux train` session with `--resume auto` for spot-preemption recovery:
 
 ```bash
-# production run: r=32 / +MLP / rsLoRA winner, 14,532 steps (3 epochs)
-bash scripts/tpu/launch_release.sh configs/tpu/stage2_tpu_v6e16_full_v03.yaml
+# long-horizon run: r=32 / +MLP / rsLoRA winner, 110,463 steps (3 epochs)
+# (metadata gates: expected-train-rows=1100000, min-text-coverage=99)
+TRC_PROFILE=v6e-16-eu CONFIG_FILE=configs/tpu/stage2_tpu_v6e16_full_v03_mh.yaml \
+SWEEP_DATA_GS_URI=gs://tinyaya-stage2-eu/data/full-corpus-ta-20260708.tar.gz \
+bash scripts/tpu/launch_spot.sh
 ```
 
 `XLA_NO_SPECIAL_SCALARS=1` (set by the launchers) is required — it disables XLA's

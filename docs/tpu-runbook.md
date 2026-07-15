@@ -26,8 +26,16 @@ repo, stages data, and starts training under a TPU-side `tmux train` session.
 # provision a spot QR (see scripts/tpu/launch_qr.sh / launch_spot.sh for env vars)
 bash scripts/tpu/launch_spot.sh
 
-# launch the production run on the mesh (after deploy)
-bash scripts/tpu/launch_release.sh configs/tpu/stage2_tpu_v6e16_full_v03.yaml
+# launch the LONG-HORIZON run (fresh QR bakes self-healing metadata: config,
+# preflight gates, backbone prefetch; see the config header for the full recipe)
+TRC_PROFILE=v6e-16-eu CONFIG_FILE=configs/tpu/stage2_tpu_v6e16_full_v03_mh.yaml \
+SWEEP_DATA_GS_URI=gs://tinyaya-stage2-eu/data/full-corpus-ta-20260708.tar.gz \
+bash scripts/tpu/launch_spot.sh
+# then babysit the QR (QR-death != preemption; preemption self-heals):
+#   QR_NAME=tinyaya-stage2-spot-v6e16-eu-qr ZONE=europe-west4-a \
+#   LAUNCH_ENV_FILE=launch.env bash scripts/tpu/qr_watch.sh
+# early stop on the WSD plateau? fill max_steps in
+#   configs/tpu/stage2_tpu_v6e16_full_v03_mh_anneal.yaml and relaunch
 
 # redeploy code without recreating the QR
 bash scripts/tpu/hot_redeploy.sh

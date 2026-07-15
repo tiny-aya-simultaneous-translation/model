@@ -48,8 +48,10 @@
   under it loads 0 adapter tensors onto a vanilla (plain-namespace) eval/export model.
   `load_checkpoint` now remaps the namespace both ways and **raises** on any unfilled LoRA
   tensor (`eb17609`).
-- **No persistent XLA compile cache** (pytorch/xla #8930/#9094) → every process restart
-  re-pays ~35–40 min compile. Minimizing restarts is the top hardening lever.
+- **No persistent XLA compile cache** — empirically DOA on torch_xla 2.9 v6e SPMD
+  (2026-07-14 A/B: cache keys are nondeterministic across processes; identical config
+  rerun rewrote entries and saved zero time). Cold compile on v6e-16 ≈ 14 min/boot —
+  the accepted per-preemption cost.
 - **Checkpoint format:** LoRA `peft_adapter/` + `projection.pt` / `depth_decoder.pt` /
   `audio_heads.pt` / `text_embed.pt` / `model_audio_embed.pt` + `metadata.json`. Resume via
   `--resume auto`; optimizer (Adam moments) persist; dataloader cursor is at-least-once.
@@ -59,7 +61,9 @@
   delayed target (fixed `8854698`) — scoring the undelayed target pinned CB1–7 at false ~0%.
 - **transformers pin:** 4.49.x (5.x / 4.57 break Cohere2/Moshi).
 - **Data staging:** `/mnt/data` is ephemeral on spot (re-staged on preempt); the
-  `.unpacked` marker prevents re-extract — clear it when switching subset↔full corpus.
+  `.unpacked` marker records its SOURCE (tarball URI / `hf:<dataset>`, 2026-07-14 fix) —
+  a mismatch auto-wipes + re-stages, and boot preflight gates on `expected-train-rows`
+  + `min-text-coverage` metadata with a cross-host digest check on the rendezvous marker.
 - **Multi-host sweep:** 4 hosts = one 16-chip mesh, so a plain per-host `wandb agent`
   desyncs; use `sweep_coordinator.py` (grid) / `sweep_agent_primary.sh` (bayes) broadcast.
 
@@ -72,3 +76,27 @@
 - gsutil `/.` (contents-of) idiom works for local `cp` but NOT a GCS source (use `/*`).
 - Secrets (`HF_TOKEN`, `WANDB_API_KEY`) in Google Secret Manager — never print; rotate any
   leaked tokens before public release.
+
+
+## Long-horizon run facts (2026-07-15, pre-launch)
+- **Run** = `configs/tpu/stage2_tpu_v6e16_full_v03_mh.yaml`: 110,463 steps ≈ 3 real
+  epochs at REAL global batch 32 (2/chip × 16; the "256" of the sweep era was
+  batch×accum fiction), WSD (warmup 1100 / anneal 11k; stop-anytime anneal template
+  `_mh_anneal.yaml`), keep-all suite (log-spaced + every 1000, 4.23 GiB/ckpt with
+  integrity manifest), val×4 gate (25 × global 128 = 3200 samples), per-host tpu
+  telemetry, inline audio demos every 5000 (48 s cold / 29 s warm), W&B
+  `v0.3-long-horizon-mh` — never say "production".
+- **Rehearsals PASS**: 2k `7pj1dkht`, 5k `m3rmohn5` (bit-identical numerics to
+  pre-instrumentation), audio smoke `xxbchrr6`. Dashboard `?nw=bg2vkino3r4`.
+- **HF route**: 2026-07-14 GCP-EU stall was fixed upstream 07-15 (cas-bridge redirect,
+  146–219 MB/s direct). `prefetch_backbones.sh` = direct-first, WARP fallback;
+  `HF_HUB_OFFLINE=1` still gated on verified cache (revision pinning).
+- **Hub publishing**: artifacts stream during the run to
+  `tiny-aya-translate/tr-hi-s2st-v0.3` (PRIVATE until release): weights-only
+  branch-per-step, audio → `samples/step_N/`, rolling log → `logs/`. Push rides the
+  save closure (a post-hoc push of a `gs://` path silently uploads NOTHING — fixed).
+  `publish_checkpoint_suite.py` backfills; flip public manually at release.
+- **W&B shared-mode rule**: `wandb.log(step=)` is IGNORED — every metric must carry
+  `"global_step"`; UI x-axis must be set to global_step (internal step ≈ row count).
+- **Docs guard**: `scripts/ci/check_docs_sync.sh` (in CI) forbids regressions to the
+  batch-256 fiction / old config / 14,532 steps / production framing.
