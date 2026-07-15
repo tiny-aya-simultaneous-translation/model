@@ -308,6 +308,10 @@ def test_hub_publishing_wiring():
     assert "hub push failed" in src_ckpt
     # trainer: loud write-access preflight; bundles at best/periodic/final
     assert "push_to_hub enabled but cannot write" in _TRAIN_SRC
+    # offline mode must be flipped OFF before hub pushes (build is done by
+    # then; the flag would block every push -- caught live by the hub smoke)
+    assert 'os.environ.pop("HF_HUB_OFFLINE", None)' in _TRAIN_SRC
+    assert "_hf_constants.HF_HUB_OFFLINE = False" in _TRAIN_SRC
     assert '_hub_bundle("best")' in _TRAIN_SRC
     assert _TRAIN_SRC.count('_hub_bundle(f"step-{step}")') == 2  # periodic + final
     # audio + rolling-log artifact pushes

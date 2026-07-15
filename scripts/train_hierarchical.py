@@ -2309,6 +2309,20 @@ def main():
     # not silently drop every artifact push for 2.4 days. Also creates the
     # repo PRIVATE up front (flipped public manually at release).
     if push_to_hub and hub_repo_id:
+        # HF_HUB_OFFLINE guards the model BUILD (cache-only loads, no etag
+        # calls -- set by startup once the backbone prefetch verified the
+        # cache). By this point the build is complete, and artifact pushes
+        # NEED the network, so flip offline off for the rest of the process.
+        # huggingface_hub caches the flag at import time, so patch the
+        # constant too (found live: the hub-smoke preflight died on
+        # "offline mode is enabled" -- a launch blocker).
+        os.environ.pop("HF_HUB_OFFLINE", None)
+        try:
+            from huggingface_hub import constants as _hf_constants
+
+            _hf_constants.HF_HUB_OFFLINE = False
+        except Exception:  # noqa: BLE001 - best effort; preflight verifies below
+            pass
         try:
             from huggingface_hub import HfApi
 
