@@ -1,27 +1,25 @@
 #!/bin/bash
-# Prefetch the three HF model backbones the trainer loads into the host HF cache,
-# routing around the GCP-EU -> HF CDN route congestion with a Cloudflare WARP
-# SOCKS proxy. Idempotent: a no-op when the cache is already complete.
+# Prefetch the three HF model backbones the trainer loads into the host HF
+# cache. PRIMARY: direct download from huggingface.co with default transports.
+# FALLBACK: Cloudflare WARP SOCKS proxy + plain downloader.
+# Idempotent: a no-op when the cache is already complete.
 #
-# WHY (TPU-for-GPU-engineers note): the composite model loads three US-region HF
-# repos at build time -- CohereLabs/tiny-aya-base (backbone, 6.7 GB),
-# kmhf/hf-moshiko (depth decoder, 15.6 GB 4-shard bf16 set), kyutai/mimi (audio
-# monitor, 385 MB). On a GCP-EU host these large pulls STALL at tens-hundreds of
-# MB, ~0 MB/s, across every transport (Xet / hf_transfer / plain) -- proven live
-# 2026-07-14. Root cause is the network route, not auth/limit/transport: HF
-# geo-routes GCP-origin EU traffic to the US CDN gateway us.gcp.cdn.hf.co over a
-# congested transatlantic path (fast.hf.co = 3.8 KB/s). There is NO EU GCP
-# gateway, and the CDN edge is chosen server-side by the repo's storage region,
-# so no client env override exists. Cloudflare WARP in *proxy mode* egresses via
-# Cloudflare's Amsterdam edge (the request no longer looks GCP-origin) -> HF stops
-# using the US gateway and throughput jumps to ~50 MB/s. hf_transfer and the Xet
-# client ignore SOCKS proxies, so we use the plain, proxy-honoring downloader
-# (HF_HUB_DISABLE_XET=1 + HF_HUB_ENABLE_HF_TRANSFER=0). Proxy mode does NOT touch
-# the default route, so training's GCS/DCN/metadata stay on the internal EU route.
+# ROUTE HISTORY (TPU-for-GPU-engineers note): the composite model loads three
+# US-region HF repos at build time -- CohereLabs/tiny-aya-base (backbone,
+# 6.7 GB), kmhf/hf-moshiko (depth decoder, 15.6 GB 4-shard bf16 set),
+# kyutai/mimi (audio monitor, 385 MB). On 2026-07-14 these pulls STALLED on
+# GCP-EU hosts at ~0 MB/s across every transport: HF geo-routed GCP-origin EU
+# traffic to the congested US gateway us.gcp.cdn.hf.co. Workaround was WARP
+# proxy mode (AMS edge, ~50 MB/s). On 2026-07-15 the route was FIXED upstream:
+# the redirect now resolves to cas-bridge.xethub.hf.co and direct default-
+# transport (Xet) downloads measured 146-219 MB/s from the same hosts. So
+# DIRECT is primary again; WARP stays as the fallback because route
+# regressions of this class recur and a fresh boot must never be blocked.
 # Full write-up: docs/v0.3-mh-hf-cdn-unblock.md.
 #
-# A fresh boot (initial provision or QR-death recovery) pays this once (~8 min);
-# a warm reboot with a persisted boot disk skips it entirely.
+# A fresh boot (initial provision or QR-death recovery) pays this once
+# (~2-4 min direct; ~8 min if the WARP fallback engages); a warm reboot with a
+# persisted boot disk skips it entirely.
 set -uo pipefail
 
 export HF_HOME="${HF_HOME:-$HOME/.cache/huggingface}"
@@ -33,6 +31,10 @@ _moshiko="$HF_HUB_CACHE/models--kmhf--hf-moshiko"
 _tinyaya="$HF_HUB_CACHE/models--CohereLabs--tiny-aya-base"
 _mimi="$HF_HUB_CACHE/models--kyutai--mimi"
 
+# /tmp/hf_backbones_ready gates HF_HUB_OFFLINE=1 in the trainer env
+# (startup_script.sh): only set when this script has VERIFIED the cache.
+rm -f /tmp/hf_backbones_ready
+
 # ----- 0. skip when already complete (warm reboot) -----
 _is_cached() {
     local nm na ni
@@ -42,16 +44,61 @@ _is_cached() {
     [ "$nm" -eq 4 ] && [ "$na" -eq 2 ] && [ "$ni" -ge 1 ] \
         && [ -z "$(find "$_moshiko" "$_tinyaya" "$_mimi" -name '*.incomplete' 2>/dev/null)" ]
 }
-# /tmp/hf_backbones_ready gates HF_HUB_OFFLINE=1 in the trainer env
-# (startup_script.sh): only set when this script has VERIFIED the cache.
-rm -f /tmp/hf_backbones_ready
 if _is_cached; then
     echo "[prefetch] backbones already cached; skipping"
     touch /tmp/hf_backbones_ready
     exit 0
 fi
 
-# ----- 1. Cloudflare WARP proxy (idempotent) -----
+# The download job is identical for both paths; only the env differs.
+# Skip Moshiko's 31 GB -of-00007 fp32 set -- the index references the 4-shard
+# bf16 set. main revision (no pin) so this always matches from_pretrained.
+_download_py() {
+    cat <<'PY'
+import glob, os, sys
+from huggingface_hub import snapshot_download
+
+jobs = [
+    ("CohereLabs/tiny-aya-base", None),
+    ("kmhf/hf-moshiko", ["*-of-00007.safetensors"]),
+    ("kyutai/mimi", None),
+]
+mw = int(os.environ.get("PREFETCH_MAX_WORKERS", "4"))
+for repo, ignore in jobs:
+    snapshot_download(repo_id=repo, ignore_patterns=ignore, max_workers=mw,
+                      token=os.environ.get("HF_TOKEN"))
+
+base = os.environ["HF_HUB_CACHE"]
+nm = len(glob.glob(os.path.join(base, "models--kmhf--hf-moshiko",
+                                 "snapshots", "*", "model-*-of-00004.safetensors")))
+na = len(glob.glob(os.path.join(base, "models--CohereLabs--tiny-aya-base",
+                                 "snapshots", "*", "model-*-of-00002.safetensors")))
+print(f"[prefetch] moshiko={nm}/4 tinyaya={na}/2", flush=True)
+sys.exit(0 if (nm == 4 and na == 2) else 3)
+PY
+}
+
+# ----- 1. PRIMARY: direct from HF, default transports (Xet on), no proxy -----
+# Hard wall-clock cap: a route regression must FAIL FAST into the WARP
+# fallback, never hang the boot (the 2026-07-14 stall mode was silent 0 MB/s).
+echo "[prefetch] attempting DIRECT download (default transports)"
+for _try in 1 2; do
+    _download_py | timeout 900 env \
+        HF_HUB_DOWNLOAD_TIMEOUT=30 \
+        PREFETCH_MAX_WORKERS=4 \
+        uv run python -
+    rc=$?
+    if [ "$rc" -eq 0 ]; then
+        echo "[prefetch] backbones ready (direct)"
+        touch /tmp/hf_backbones_ready
+        exit 0
+    fi
+    echo "[prefetch] direct attempt ${_try} incomplete (rc=${rc}); retrying"
+    sleep 5
+done
+echo "[prefetch] DIRECT path failed twice -- falling back to WARP proxy"
+
+# ----- 2. FALLBACK: Cloudflare WARP proxy (idempotent) -----
 if ! command -v warp-cli >/dev/null 2>&1; then
     echo "[prefetch] installing cloudflare-warp"
     curl -fsSL https://pkg.cloudflareclient.com/pubkey.gpg \
@@ -73,48 +120,27 @@ sleep 5
 _warp=$(curl -s --max-time 10 --proxy "$PROXY" https://api.cloudflare.com/cdn-cgi/trace 2>/dev/null | grep -E '^warp=|^colo=' | tr '\n' ' ')
 echo "[prefetch] WARP proxy: ${_warp:-UNAVAILABLE}"
 
-# ----- 2. download the 3 backbones via the proxy (plain, resumable) -----
-# Pre-warm PySocks over the NORMAL route so uv's own package fetch isn't itself
-# sent through the SOCKS proxy.
+# hf_transfer and the Xet client ignore SOCKS proxies, so the fallback uses
+# the plain, proxy-honoring downloader. Pre-warm PySocks over the NORMAL
+# route so uv's own package fetch isn't itself sent through the proxy.
 uv run --with pysocks python -c "import socks" >/dev/null 2>&1 || true
 
 for _try in 1 2 3 4 5 6; do
-    HF_HUB_DISABLE_XET=1 HF_HUB_ENABLE_HF_TRANSFER=0 HF_HUB_DOWNLOAD_TIMEOUT=20 \
-    ALL_PROXY="$PROXY" HTTPS_PROXY="$PROXY" HTTP_PROXY="$PROXY" \
-    uv run --with pysocks python - <<'PY'
-import glob, os, sys
-from huggingface_hub import snapshot_download
-
-# main revision (no pin) so this always matches what from_pretrained resolves;
-# skip Moshiko's 31 GB -of-00007 fp32 set -- the index references the 4-shard set.
-jobs = [
-    ("CohereLabs/tiny-aya-base", None),
-    ("kmhf/hf-moshiko", ["*-of-00007.safetensors"]),
-    ("kyutai/mimi", None),
-]
-for repo, ignore in jobs:
-    snapshot_download(repo_id=repo, ignore_patterns=ignore, max_workers=1,
-                      token=os.environ.get("HF_TOKEN"))
-
-base = os.environ["HF_HUB_CACHE"]
-nm = len(glob.glob(os.path.join(base, "models--kmhf--hf-moshiko",
-                                 "snapshots", "*", "model-*-of-00004.safetensors")))
-na = len(glob.glob(os.path.join(base, "models--CohereLabs--tiny-aya-base",
-                                 "snapshots", "*", "model-*-of-00002.safetensors")))
-print(f"[prefetch] moshiko={nm}/4 tinyaya={na}/2", flush=True)
-sys.exit(0 if (nm == 4 and na == 2) else 3)
-PY
+    _download_py | HF_HUB_DISABLE_XET=1 HF_HUB_ENABLE_HF_TRANSFER=0 HF_HUB_DOWNLOAD_TIMEOUT=20 \
+        PREFETCH_MAX_WORKERS=1 \
+        ALL_PROXY="$PROXY" HTTPS_PROXY="$PROXY" HTTP_PROXY="$PROXY" \
+        uv run --with pysocks python -
     rc=$?
     if [ "$rc" -eq 0 ]; then
-        echo "[prefetch] backbones ready"
+        echo "[prefetch] backbones ready (WARP fallback)"
         touch /tmp/hf_backbones_ready
         exit 0
     fi
-    echo "[prefetch] attempt ${_try} incomplete (rc=${rc}); retrying"
+    echo "[prefetch] WARP attempt ${_try} incomplete (rc=${rc}); retrying"
     sleep 5
 done
 
-# Non-fatal: let the trainer attempt its own load (and the QR auto-retry recover)
-# rather than blocking boot forever.
+# Non-fatal: let the trainer attempt its own load (and the QR auto-retry
+# recover) rather than blocking boot forever.
 echo "[prefetch] WARNING: backbone prefetch did not complete after retries"
 exit 0

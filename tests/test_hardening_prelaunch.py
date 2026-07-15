@@ -297,6 +297,20 @@ def test_tpu_audio_demo_wiring():
     assert "git rev-parse HEAD > BUILD_SHA" in hot and "BUILD_SHA" in hot.split("-czf")[1]
 
 
+def test_prefetch_direct_primary_warp_fallback():
+    """2026-07-15 route fix: direct HF is primary; WARP is retained as fallback."""
+    i_direct = _PREFETCH_SRC.index("attempting DIRECT download")
+    i_fallback = _PREFETCH_SRC.index("FALLBACK: Cloudflare WARP proxy")
+    assert i_direct < i_fallback, "direct attempt must precede the WARP fallback"
+    # direct path must fail FAST on a route regression, never hang boot
+    assert "timeout 900" in _PREFETCH_SRC
+    # fallback still uses the proxy-honoring plain downloader
+    assert "HF_HUB_DISABLE_XET=1" in _PREFETCH_SRC
+    assert 'ALL_PROXY="$PROXY"' in _PREFETCH_SRC
+    # ready-marker fires on BOTH success paths + the warm-cache skip
+    assert _PREFETCH_SRC.count("touch /tmp/hf_backbones_ready") == 3
+
+
 def test_startup_hf_offline_gated_on_prefetch():
     # marker written only by prefetch verification...
     assert 'touch /tmp/hf_backbones_ready' in _PREFETCH_SRC
