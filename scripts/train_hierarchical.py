@@ -425,6 +425,8 @@ DEFAULTS = {
         "wandb_tags": [],
         "push_to_hub": False,
         "hub_repo_id": None,
+        # Hub repos are created PRIVATE during a run (flip public at release).
+        "hub_private": True,
     },
     "perf": {
         "enabled": False,
@@ -2302,6 +2304,35 @@ def main():
     push_to_hub = cfg["logging"]["push_to_hub"] and is_main
     hub_repo_id = cfg["logging"]["hub_repo_id"]
     hub_token = os.environ.get("HF_TOKEN")
+    hub_private = bool(cfg["logging"].get("hub_private", True))
+    # Write-access preflight: a token without write scope must fail LOUD here,
+    # not silently drop every artifact push for 2.4 days. Also creates the
+    # repo PRIVATE up front (flipped public manually at release).
+    if push_to_hub and hub_repo_id:
+        try:
+            from huggingface_hub import HfApi
+
+            HfApi(token=hub_token).create_repo(
+                hub_repo_id, repo_type="model", exist_ok=True, private=hub_private
+            )
+            print(f"[hub] write access OK: {hub_repo_id} (private={hub_private})", flush=True)
+        except Exception as _hub_exc:
+            raise RuntimeError(
+                f"push_to_hub enabled but cannot write to {hub_repo_id}: {_hub_exc}"
+            ) from _hub_exc
+    # Bundle for save_checkpoint: the hub push runs INSIDE the save's upload
+    # closure (from the staged LOCAL dir, before it is deleted) -- pushing
+    # str(gs://...) after the fact silently uploads nothing (os.walk on a
+    # gs:// string), which is exactly what the old best_by_val push did.
+    def _hub_bundle(revision):
+        if not (push_to_hub and hub_repo_id):
+            return None
+        return {
+            "repo_id": hub_repo_id,
+            "revision": revision,
+            "token": hub_token,
+            "private": hub_private,
+        }
 
     # ---- training loop
     # save_dir may be a gs:// URL. Do NOT wrap it in pathlib.Path -- Path
@@ -3389,6 +3420,27 @@ def main():
                     sf.write(ad / "source.wav", r["source_wav"], 24000)
                     sf.write(ad / "target_gt.wav", r["target_gt_wav"], 24000)
                     sf.write(ad / "generated.wav", r["generated_wav"], 24000)
+                    if push_to_hub and hub_repo_id:
+                        # async: rides the serialized background executor
+                        from src.training.checkpointing import (
+                            _submit_upload as _bg_upload,
+                            push_files_to_hub,
+                        )
+
+                        _wavs = [
+                            str(ad / n)
+                            for n in ("source.wav", "target_gt.wav", "generated.wav")
+                        ]
+                        _bg_upload(
+                            lambda p=_wavs, s=step: push_files_to_hub(
+                                p,
+                                hub_repo_id,
+                                f"samples/step_{s:06d}",
+                                token=hub_token,
+                                private=hub_private,
+                                commit_message=f"audio demo step {s}",
+                            )
+                        )
                     if use_wandb:
                         import wandb
 
@@ -3558,19 +3610,12 @@ def main():
                     str(best_dir),
                     extra_state={"best_val_loss": best_val, "config": cfg, "wandb_run_id": run_id},
                     is_main=is_main,
+                    # hub push runs inside the save closure (the old post-hoc
+                    # push of str(gs://...) walked nothing -- silent no-op).
+                    hub=_hub_bundle("best"),
                 )
                 if is_main:
                     print(f"  * new best val — saved to {best_dir}")
-                    if push_to_hub and hub_repo_id:
-                        try:
-                            push_checkpoint_to_hub(
-                                str(best_dir),
-                                hub_repo_id,
-                                commit_message=f"best val {best_val:.4f} @ step {step}",
-                                token=hub_token,
-                            )
-                        except Exception as e:
-                            print(f"  hub push failed: {e}")
             backend.barrier()
 
         # ---- periodic save + prune (save_every cadence UNION log-spaced early)
@@ -3596,6 +3641,9 @@ def main():
                 is_main=is_main,
                 keep_local_dir=keep_local_dir,
                 async_upload=async_ckpt,
+                # Pythia-style branch-per-step; rides the same (async) closure
+                # as the GCS upload, so the loop never stalls on the hub.
+                hub=_hub_bundle(f"step-{step}"),
             )
             if is_main:
                 # keep_last_n<=0 => prune_checkpoints no-ops (unlimited retention).
@@ -3607,6 +3655,39 @@ def main():
                         )
                     except Exception as e:
                         print(f"  hub push failed: {e}")
+                # Rolling log snapshot to the hub (last ~2 MB; the full log
+                # stays on-host). Async; failures never block the save.
+                if push_to_hub and hub_repo_id:
+                    try:
+                        import tempfile as _tfl
+
+                        from src.training.checkpointing import (
+                            _submit_upload as _bg_upload,
+                            push_files_to_hub,
+                        )
+
+                        _logsrc = "/tmp/train.log"
+                        if os.path.exists(_logsrc):
+                            _lpath = os.path.join(
+                                _tfl.mkdtemp(prefix="hublog_"), "train_host0_latest.log"
+                            )
+                            with open(_logsrc, "rb") as _lf:
+                                _lf.seek(max(0, os.path.getsize(_logsrc) - 2_000_000))
+                                _tail = _lf.read()
+                            with open(_lpath, "wb") as _lo:
+                                _lo.write(_tail)
+                            _bg_upload(
+                                lambda p=_lpath, s=step: push_files_to_hub(
+                                    [p],
+                                    hub_repo_id,
+                                    "logs",
+                                    token=hub_token,
+                                    private=hub_private,
+                                    commit_message=f"log snapshot step {s}",
+                                )
+                            )
+                    except Exception as _le:  # noqa: BLE001
+                        print(f"  [hub-log] snapshot failed: {_le}", flush=True)
                 # Checkpoint index: the public suite's table of contents
                 # (step -> tokens -> quality -> location), re-logged as a
                 # small Table each save (~121 rows max on the long run).
@@ -3673,9 +3754,11 @@ def main():
                 "wandb_run_id": run_id,
                 "best_val": best_val,
                 "patience_left": _patience_left,
+                "resumes": _resume_count,
             },
             is_main=is_main,
             keep_local_dir=keep_local_dir,
+            hub=_hub_bundle(f"step-{step}"),
         )
 
     # patch 19: end-of-training canonical save (HF transformers issue
@@ -3696,13 +3779,9 @@ def main():
             print("[patch 19] canonical final save complete")
     if is_main:
         print(f"\nTraining complete: {step} steps in {(time.time() - t0) / 60:.1f} min")
-        if save_every and push_to_hub and hub_repo_id:
-            try:
-                push_checkpoint_to_hub(
-                    str(d), hub_repo_id, commit_message=f"final step {step}", token=hub_token
-                )
-            except Exception as e:
-                print(f"  hub push failed: {e}")
+        # (final checkpoint's hub push already happened inside its save
+        # closure via hub=_hub_bundle -- the old post-hoc gs:// push was a
+        # silent no-op.)
     if use_wandb and is_main:
         import wandb
 

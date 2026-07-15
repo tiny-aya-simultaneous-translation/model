@@ -225,6 +225,7 @@ def save_checkpoint(
     is_main: bool = True,
     keep_local_dir: str | None = None,
     async_upload: bool = False,
+    hub: dict | None = None,
 ):
     """Save a multi-component checkpoint, multi-host SPMD-safe.
 
@@ -423,6 +424,22 @@ def save_checkpoint(
             _gsutil_cp_into(write_dir, gcs_dest)
             os.replace(staged_meta, meta_path)
             _gsutil_cp_file(meta_path, gcs_dest)
+            # HF-hub artifact push rides the SAME closure so it reads the
+            # staged LOCAL dir before deletion (pushing "gs://..." after the
+            # fact walks nothing). Weights-only; failures never block saves
+            # (publish_checkpoint_suite.py backfills post-hoc).
+            if hub:
+                try:
+                    push_checkpoint_to_hub(
+                        write_dir,
+                        hub["repo_id"],
+                        commit_message=f"step {step}",
+                        token=hub.get("token"),
+                        revision=hub.get("revision"),
+                        private=hub.get("private", True),
+                    )
+                except Exception as e:  # noqa: BLE001 - hub push never blocks a save
+                    print(f"[ckpt] WARNING: hub push failed: {e}", flush=True)
             if keep_local:
                 print(f"[ckpt] retained local mirror: {write_dir}", flush=True)
             else:
@@ -437,6 +454,19 @@ def save_checkpoint(
             _submit_upload(_do_upload)
         else:
             _do_upload()
+    elif hub:
+        # Local save_dir (GPU/CPU runs): write_dir persists; push directly.
+        try:
+            push_checkpoint_to_hub(
+                write_dir,
+                hub["repo_id"],
+                commit_message=f"step {step}",
+                token=hub.get("token"),
+                revision=hub.get("revision"),
+                private=hub.get("private", True),
+            )
+        except Exception as e:  # noqa: BLE001 - hub push never blocks a save
+            print(f"[ckpt] WARNING: hub push failed: {e}", flush=True)
 
 
 def save_checkpoint_canonical_final(
@@ -724,6 +754,7 @@ def push_checkpoint_to_hub(
     commit_message: str = "checkpoint",
     token: str | None = None,
     revision: str | None = None,
+    private: bool = True,
 ):
     """Upload model weights (no optimizer/scheduler) to a HuggingFace Hub repo.
 
@@ -731,11 +762,15 @@ def push_checkpoint_to_hub(
     the whole training trajectory lives in ONE repo, Pythia-style, for the
     public mechanistic-interp suite. The branch is created off ``main`` if new.
     Optimizer/scheduler/rng blobs are skipped -- released weights only.
+
+    ``private`` (default TRUE) applies only if this call creates the repo:
+    during-run pushes must never publish half-trained weights -- the repo is
+    flipped public manually at release time.
     """
     from huggingface_hub import HfApi
 
     api = HfApi(token=token)
-    api.create_repo(repo_id, repo_type="model", exist_ok=True, private=False)
+    api.create_repo(repo_id, repo_type="model", exist_ok=True, private=private)
     if revision:
         api.create_branch(repo_id, branch=revision, repo_type="model", exist_ok=True)
 
@@ -756,6 +791,39 @@ def push_checkpoint_to_hub(
             )
     _where = f"{repo_id}@{revision}" if revision else repo_id
     print(f"  pushed to https://huggingface.co/{_where}")
+
+
+def push_files_to_hub(
+    paths: list[str],
+    repo_id: str,
+    dest_prefix: str = "",
+    token: str | None = None,
+    private: bool = True,
+    commit_message: str = "artifacts",
+):
+    """Upload loose artifact files (audio samples, log snapshots) to the hub.
+
+    Companion to ``push_checkpoint_to_hub`` for non-checkpoint run artifacts:
+    files land on ``main`` under ``dest_prefix/<basename>``. Same private-on-
+    create semantics. Never raises past the caller's guard -- artifact pushes
+    must not kill training (callers wrap in try/except or the async executor).
+    """
+    from huggingface_hub import HfApi
+
+    api = HfApi(token=token)
+    api.create_repo(repo_id, repo_type="model", exist_ok=True, private=private)
+    for p in paths:
+        if not os.path.isfile(p):
+            continue
+        dest = f"{dest_prefix.rstrip('/')}/{os.path.basename(p)}" if dest_prefix else os.path.basename(p)
+        api.upload_file(
+            path_or_fileobj=p,
+            path_in_repo=dest,
+            repo_id=repo_id,
+            repo_type="model",
+            commit_message=commit_message,
+        )
+    print(f"  pushed {len(paths)} file(s) -> https://huggingface.co/{repo_id}/tree/main/{dest_prefix}")
 
 
 def prune_checkpoints(save_dir: str, keep_last: int = 5, keep_best: str | None = "best_by_val"):

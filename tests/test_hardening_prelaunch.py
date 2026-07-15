@@ -297,6 +297,32 @@ def test_tpu_audio_demo_wiring():
     assert "git rev-parse HEAD > BUILD_SHA" in hot and "BUILD_SHA" in hot.split("-czf")[1]
 
 
+def test_hub_publishing_wiring():
+    """Async HF-hub artifact publishing: private-by-default, closure-integrated."""
+    src_ckpt = (REPO / "src" / "training" / "checkpointing.py").read_text()
+    assert "private: bool = True" in src_ckpt
+    assert src_ckpt.count("exist_ok=True, private=private") == 2
+    assert "def push_files_to_hub(" in src_ckpt
+    # the hub push reads the staged LOCAL dir inside the save closure --
+    # pushing str(gs://...) post-hoc walks nothing (the old silent no-op)
+    assert "hub push failed" in src_ckpt
+    # trainer: loud write-access preflight; bundles at best/periodic/final
+    assert "push_to_hub enabled but cannot write" in _TRAIN_SRC
+    assert '_hub_bundle("best")' in _TRAIN_SRC
+    assert _TRAIN_SRC.count('_hub_bundle(f"step-{step}")') == 2  # periodic + final
+    # audio + rolling-log artifact pushes
+    assert 'f"samples/step_{s:06d}"' in _TRAIN_SRC
+    assert '"train_host0_latest.log"' in _TRAIN_SRC
+    # long-horizon + anneal configs opt in, PRIVATE
+    for cfgname in (
+        "stage2_tpu_v6e16_full_v03_mh.yaml",
+        "stage2_tpu_v6e16_full_v03_mh_anneal.yaml",
+    ):
+        t = (REPO / "configs" / "tpu" / cfgname).read_text()
+        assert "hub_repo_id: tiny-aya-translate/tr-hi-s2st-v0.3" in t
+        assert "hub_private: true" in t
+
+
 def test_prefetch_direct_primary_warp_fallback():
     """2026-07-15 route fix: direct HF is primary; WARP is retained as fallback."""
     i_direct = _PREFETCH_SRC.index("attempting DIRECT download")
