@@ -219,19 +219,6 @@ def test_trainer_logs_per_host_tpu_telemetry():
 # ---------------------------------------------------------------------------
 
 
-def _extract_fn(name):
-    """AST-extract a module-level function from the train script."""
-    tree = ast.parse(_TRAIN_SRC)
-    for node in tree.body:
-        if isinstance(node, ast.FunctionDef) and node.name == name:
-            import torch  # real torch: the helper does tensor math
-
-            ns: dict = {"torch": torch}
-            exec(ast.get_source_segment(_TRAIN_SRC, node), ns)
-            return ns[name]
-    raise AssertionError(f"{name} not found")
-
-
 def test_codebook_entropy_stats():
     import pytest
 
@@ -239,7 +226,10 @@ def test_codebook_entropy_stats():
         del sys.modules["torch"]
     torch = pytest.importorskip("torch")  # tensor math; skipped on torch-free CI
 
-    f = _extract_fn("_codebook_entropy_stats")
+    # Factored out to src/evaluation/stats.py (2026-07-15 evals program); the
+    # trainer imports it back under the old name -- pin BOTH facts.
+    assert "from src.evaluation.stats import codebook_entropy_stats" in _TRAIN_SRC
+    from src.evaluation.stats import codebook_entropy_stats as f
     V = 2048
     hist = torch.zeros(3, V)
     hist[0] = 1.0                # uniform -> max entropy = log2(2048) = 11 bits

@@ -20,17 +20,22 @@ suite trained by the 110,463-step long-horizon run on multi-host v6e-16.
 - [x] HF-direct primary / WARP fallback (route fixed upstream 2026-07-15)
 - [x] Async HF-hub publishing (private `tiny-aya-translate/tr-hi-s2st-v0.3`)
 - [x] Repo-wide docs sync + `check_docs_sync.sh` CI guard
-
-## In flight
-- [ ] Fresh-provision drill verdict (HF-direct backbones+dataset on wiped hosts;
-      digest must equal the GCS-tarball digest) + GCS restage to launch-ready
-- [ ] Hub smoke (300 steps → throwaway private repo; verify branch/samples/logs)
+- [x] Fresh-provision drill PASS (HF-direct backbones+dataset, byte-identical
+      digest on all 4 hosts) + GCS restage to launch-ready
+- [x] Hub smoke PASS (300 steps → throwaway repo; branches/samples/logs verified)
+- [x] **Evals program** (docs/v0.3-evals-plan.md): `src/evaluation/` package,
+      `eval_release.py` (8 resumable stages), Tier-1 proxy gold-ref upgrade,
+      frozen subsets `v03-val-500` + `v03-fleurs-200` (FLEURS = acoustic shift
+      only; 200/200 text overlap audited), runbook — GPU live-verify SHELVED
+      to post-run (docs/do.md)
 
 ## Next
 - [ ] **Launch** (explicit user word): fresh QR via `launch_spot.sh` + metadata
       gates; qr_watch babysitter; watchdog cadence ~30 min
-- [ ] During-run: watch dashboard; early stop ⇒ `_mh_anneal.yaml` runbook
-- [ ] Post-run: LAWA average → eval (best/final/averaged; corrected AR loop) →
+- [ ] During-run: watch dashboard; early stop ⇒ `_mh_anneal.yaml` runbook;
+      Tier-1 eval proxy sweeps on saved checkpoints (CPU, docs/evals-runbook.md)
+- [ ] Post-run: GPU eval session (eval_release.py full pass, do.md) → LAWA
+      average → paired-bootstrap best-vs-LAWA-vs-final →
       `publish_checkpoint_suite.py` backfill → flip hub public → model card
       eval numbers + release notes
 

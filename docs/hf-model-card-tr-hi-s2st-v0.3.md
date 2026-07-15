@@ -19,7 +19,9 @@ datasets:
   - tiny-aya-translate/tr-hi-mimi-encoded
 model-index:
   - name: tr-hi-s2st-v0.3
-    results: []   # TODO: ASR-BLEU / chrF / DNSMOS — to be filled after GPU eval
+    results: []   # TODO: filled post-run by scripts/eval_release.py (ASR-chrF++/BLEU/WER
+                  # vs GT-audio topline, MOS deltas, BLASER-2.0) over the frozen
+                  # eval/subsets/* -- procedure in docs/evals-runbook.md
 ---
 
 # TinyAya — Turkish⇄Hindi Speech-to-Speech Translation (v0.3)

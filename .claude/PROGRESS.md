@@ -47,6 +47,420 @@ moved to `.claude/archive/PROGRESS-YYYY-Qn.md` by the
 
 ---
 
+## 2026-07-15T16:04:56Z | feat/v0.3-implementation@21e4c47 | done | exec
+SP=/tmp/claude-1000/-home-cataluna84-Workspace-tinyaya-stage2-scale/2908a7e9-afe7-47af-8e1a-9e132b7ba923/scratchpad
+
+
+## 2026-07-15T16:04:39Z | feat/v0.3-implementation@21e4c47 | done | exec
+SP=/tmp/claude-1000/-home-cataluna84-Workspace-tinyaya-stage2-scale/2908a7e9-afe7-47af-8e1a-9e132b7ba923/scratchpad
+
+
+## 2026-07-15T16:04:20Z | feat/v0.3-implementation@21e4c47 | done | exec
+python3 - << 'EOF'
+
+
+## 2026-07-15T16:03:11Z | feat/v0.3-implementation@21e4c47 | done | edit
+edited `/home/cataluna84/.claude/projects/-home-cataluna84-Workspace-tinyaya-stage2-scale/memory/MEMORY.md`
+
+
+## 2026-07-15T16:03:08Z | feat/v0.3-implementation@21e4c47 | done | edit
+created `/home/cataluna84/.claude/projects/-home-cataluna84-Workspace-tinyaya-stage2-scale/memory/v03-evals-program.md`
+
+
+## 2026-07-15T16:02:27Z | feat/v0.3-implementation@21e4c47 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/.claude/PLAN.md`
+
+
+## 2026-07-15T16:01:49Z | feat/v0.3-implementation@21e4c47 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/docs/hf-model-card-tr-hi-s2st-v0.3.md`
+
+
+## 2026-07-15T16:01:46Z | feat/v0.3-implementation@21e4c47 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/docs/v0.3-public-release-plan.md`
+
+
+## 2026-07-15T16:01:24Z | feat/v0.3-implementation@21e4c47 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/docs/v0.3-evals-plan.md`
+
+
+## 2026-07-15T16:01:08Z | feat/v0.3-implementation@21e4c47 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/docs/v0.3-evals-plan.md`
+
+
+## 2026-07-15T16:00:53Z | feat/v0.3-implementation@21e4c47 | done | edit
+created `/home/cataluna84/Workspace/tinyaya-stage2-scale/docs/evals-runbook.md`
+
+
+## 2026-07-15T15:59:48Z | feat/v0.3-implementation@21e4c47 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/eval_release.py`
+
+
+## 2026-07-15T15:59:20Z | feat/v0.3-implementation@21e4c47 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/eval_release.py`
+
+
+## 2026-07-15T15:59:09Z | feat/v0.3-implementation@21e4c47 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/eval_release.py`
+
+
+## 2026-07-15T15:59:07Z | feat/v0.3-implementation@21e4c47 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/eval_release.py`
+
+
+## 2026-07-15T15:59:05Z | feat/v0.3-implementation@21e4c47 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/eval_release.py`
+
+
+## 2026-07-15T15:58:15Z | feat/v0.3-implementation@21e4c47 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/pyproject.toml`
+
+
+## 2026-07-15T15:57:26Z | feat/v0.3-implementation@21e4c47 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/pyproject.toml`
+
+
+## 2026-07-15T15:57:14Z | feat/v0.3-implementation@21e4c47 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/tests/test_evaluation.py`
+
+
+## 2026-07-15T15:56:54Z | feat/v0.3-implementation@21e4c47 | done | exec
+SP=/tmp/claude-1000/-home-cataluna84-Workspace-tinyaya-stage2-scale/2908a7e9-afe7-47af-8e1a-9e132b7ba923/scratchpad/fleurs
+
+
+## 2026-07-15T15:56:39Z | feat/v0.3-implementation@21e4c47 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/build_eval_subset.py`
+
+
+## 2026-07-15T15:56:31Z | feat/v0.3-implementation@21e4c47 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/build_eval_subset.py`
+
+
+## 2026-07-15T15:56:21Z | feat/v0.3-implementation@21e4c47 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/build_eval_subset.py`
+
+
+## 2026-07-15T15:56:05Z | feat/v0.3-implementation@21e4c47 | done | exec
+SP=/tmp/claude-1000/-home-cataluna84-Workspace-tinyaya-stage2-scale/2908a7e9-afe7-47af-8e1a-9e132b7ba923/scratchpad/fleurs
+
+
+## 2026-07-15T15:55:22Z | feat/v0.3-implementation@21e4c47 | done | exec
+SP=/tmp/claude-1000/-home-cataluna84-Workspace-tinyaya-stage2-scale/2908a7e9-afe7-47af-8e1a-9e132b7ba923/scratchpad/fleurs
+
+
+## 2026-07-15T15:55:05Z | feat/v0.3-implementation@21e4c47 | done | exec
+SP=/tmp/claude-1000/-home-cataluna84-Workspace-tinyaya-stage2-scale/2908a7e9-afe7-47af-8e1a-9e132b7ba923/scratchpad/fleurs
+
+
+## 2026-07-15T15:54:47Z | feat/v0.3-implementation@21e4c47 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/build_eval_subset.py`
+
+
+## 2026-07-15T15:54:37Z | feat/v0.3-implementation@21e4c47 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/build_eval_subset.py`
+
+
+## 2026-07-15T15:53:57Z | feat/v0.3-implementation@21e4c47 | done | exec
+python3 -c "
+
+
+## 2026-07-15T15:53:15Z | feat/v0.3-implementation@21e4c47 | done | exec
+SP=/tmp/claude-1000/-home-cataluna84-Workspace-tinyaya-stage2-scale/2908a7e9-afe7-47af-8e1a-9e132b7ba923/scratchpad/fleurs
+
+
+## 2026-07-15T15:52:55Z | feat/v0.3-implementation@21e4c47 | done | exec
+SP=/tmp/claude-1000/-home-cataluna84-Workspace-tinyaya-stage2-scale/2908a7e9-afe7-47af-8e1a-9e132b7ba923/scratchpad/fleurs
+
+
+## 2026-07-15T15:51:32Z | feat/v0.3-implementation@21e4c47 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/tests/test_evaluation.py`
+
+
+## 2026-07-15T15:49:13Z | feat/v0.3-implementation@21e4c47 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/eval_release.py`
+
+
+## 2026-07-15T15:48:57Z | feat/v0.3-implementation@21e4c47 | done | edit
+created `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/eval_release.py`
+
+
+## 2026-07-15T15:46:57Z | feat/v0.3-implementation@21e4c47 | done | edit
+created `/home/cataluna84/Workspace/tinyaya-stage2-scale/src/evaluation/llm_judge.py`
+
+
+## 2026-07-15T15:46:26Z | feat/v0.3-implementation@21e4c47 | done | edit
+created `/home/cataluna84/Workspace/tinyaya-stage2-scale/src/evaluation/semantic.py`
+
+
+## 2026-07-15T15:45:42Z | feat/v0.3-implementation@21e4c47 | done | edit
+created `/home/cataluna84/Workspace/tinyaya-stage2-scale/src/evaluation/latency.py`
+
+
+## 2026-07-15T15:45:25Z | feat/v0.3-implementation@21e4c47 | done | edit
+created `/home/cataluna84/Workspace/tinyaya-stage2-scale/src/evaluation/mos.py`
+
+
+## 2026-07-15T15:45:06Z | feat/v0.3-implementation@21e4c47 | done | edit
+created `/home/cataluna84/Workspace/tinyaya-stage2-scale/src/evaluation/asr_judge.py`
+
+
+## 2026-07-15T15:43:44Z | feat/v0.3-implementation@21e4c47 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/src/evaluation/text_metrics.py`
+
+
+## 2026-07-15T15:43:31Z | feat/v0.3-implementation@21e4c47 | done | exec
+uv run python -c "
+
+
+## 2026-07-15T15:43:05Z | feat/v0.3-implementation@21e4c47 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/tests/test_evaluation.py`
+
+
+## 2026-07-15T15:42:08Z | feat/v0.3-implementation@21e4c47 | done | exec
+timeout 300 gcloud compute tpus tpu-vm ssh tinyaya-v6e16-eu --zone=europe-west4-a --worker=0 --command '
+
+
+## 2026-07-15T15:41:18Z | feat/v0.3-implementation@21e4c47 | done | exec
+timeout 120 gcloud compute tpus tpu-vm scp --zone=europe-west4-a --worker=0 \
+
+
+## 2026-07-15T15:40:30Z | feat/v0.3-implementation@21e4c47 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/eval_translation_proxy.py`
+
+
+## 2026-07-15T15:40:15Z | feat/v0.3-implementation@21e4c47 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/eval_translation_proxy.py`
+
+
+## 2026-07-15T15:40:04Z | feat/v0.3-implementation@21e4c47 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/eval_translation_proxy.py`
+
+
+## 2026-07-15T15:39:55Z | feat/v0.3-implementation@21e4c47 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/eval_translation_proxy.py`
+
+
+## 2026-07-15T15:39:36Z | feat/v0.3-implementation@21e4c47 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/eval_translation_proxy.py`
+
+
+## 2026-07-15T15:39:23Z | feat/v0.3-implementation@21e4c47 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/eval_translation_proxy.py`
+
+
+## 2026-07-15T15:39:10Z | feat/v0.3-implementation@21e4c47 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/eval_translation_proxy.py`
+
+
+## 2026-07-15T15:38:11Z | feat/v0.3-implementation@21e4c47 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/eval_checkpoint.py`
+
+
+## 2026-07-15T15:38:02Z | feat/v0.3-implementation@21e4c47 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/eval_checkpoint.py`
+
+
+## 2026-07-15T15:37:48Z | feat/v0.3-implementation@21e4c47 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/eval_checkpoint.py`
+
+
+## 2026-07-15T15:37:32Z | feat/v0.3-implementation@21e4c47 | done | edit
+created `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/build_eval_subset.py`
+
+
+## 2026-07-15T15:37:10Z | feat/v0.3-implementation@21e4c47 | done | edit
+created `/home/cataluna84/Workspace/tinyaya-stage2-scale/src/evaluation/text_metrics.py`
+
+
+## 2026-07-15T15:36:47Z | feat/v0.3-implementation@21e4c47 | done | exec
+uv run python -c "
+
+
+## 2026-07-15T15:36:34Z | feat/v0.3-implementation@21e4c47 | done | exec
+uv run python -c "
+
+
+## 2026-07-15T15:36:20Z | feat/v0.3-implementation@21e4c47 | done | exec
+uv run python -c "
+
+
+## 2026-07-15T15:35:16Z | feat/v0.3-implementation@21e4c47 | done | exec
+uv run python -c "
+
+
+## 2026-07-15T15:33:07Z | feat/v0.3-implementation@21e4c47 | done | edit
+created `/home/cataluna84/Workspace/tinyaya-stage2-scale/tests/test_evaluation.py`
+
+
+## 2026-07-15T15:32:24Z | feat/v0.3-implementation@21e4c47 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/tests/test_hardening_prelaunch.py`
+
+
+## 2026-07-15T15:31:54Z | feat/v0.3-implementation@21e4c47 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/tests/test_hardening_prelaunch.py`
+
+
+## 2026-07-15T15:31:44Z | feat/v0.3-implementation@21e4c47 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/train_hierarchical.py`
+
+
+## 2026-07-15T15:31:42Z | feat/v0.3-implementation@21e4c47 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/train_hierarchical.py`
+
+
+## 2026-07-15T15:31:16Z | feat/v0.3-implementation@21e4c47 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/train_hierarchical.py`
+
+
+## 2026-07-15T15:30:58Z | feat/v0.3-implementation@21e4c47 | done | edit
+created `/home/cataluna84/Workspace/tinyaya-stage2-scale/src/evaluation/report.py`
+
+
+## 2026-07-15T15:30:25Z | feat/v0.3-implementation@21e4c47 | done | edit
+created `/home/cataluna84/Workspace/tinyaya-stage2-scale/src/evaluation/stats.py`
+
+
+## 2026-07-15T15:30:08Z | feat/v0.3-implementation@21e4c47 | done | edit
+created `/home/cataluna84/Workspace/tinyaya-stage2-scale/src/evaluation/subset.py`
+
+
+## 2026-07-15T15:29:48Z | feat/v0.3-implementation@21e4c47 | done | edit
+created `/home/cataluna84/Workspace/tinyaya-stage2-scale/src/evaluation/normalize.py`
+
+
+## 2026-07-15T15:27:43Z | feat/v0.3-implementation@21e4c47 | done | exec
+timeout 120 gcloud compute tpus tpu-vm ssh tinyaya-v6e16-eu --zone=europe-west4-a --worker=0 --command '
+
+
+## 2026-07-15T15:27:13Z | feat/v0.3-implementation@21e4c47 | done | exec
+timeout 120 gcloud compute tpus tpu-vm ssh tinyaya-v6e16-eu --zone=europe-west4-a --worker=0 --command '
+
+
+## 2026-07-15T15:26:28Z | feat/v0.3-implementation@21e4c47 | done | exec
+timeout 90 gcloud compute tpus tpu-vm ssh tinyaya-v6e16-eu --zone=europe-west4-a --worker=0 --command '
+
+
+## 2026-07-15T15:26:04Z | feat/v0.3-implementation@21e4c47 | done | exec
+timeout 90 gcloud compute tpus tpu-vm ssh tinyaya-v6e16-eu --zone=europe-west4-a --worker=0 --command '
+
+
+## 2026-07-15T15:25:29Z | feat/v0.3-implementation@21e4c47 | done | exec
+sed -n '40,90p' pyproject.toml
+
+
+## 2026-07-15T15:25:29Z | feat/v0.3-implementation@21e4c47 | done | exec
+timeout 90 gcloud compute tpus tpu-vm ssh tinyaya-v6e16-eu --zone=europe-west4-a --worker=0 --command '
+
+
+## 2026-07-15T15:21:42Z | feat/v0.3-implementation@21e4c47 | done | edit
+edited `/home/cataluna84/.claude/projects/-home-cataluna84-Workspace-tinyaya-stage2-scale/memory/MEMORY.md`
+
+
+## 2026-07-15T15:21:34Z | feat/v0.3-implementation@21e4c47 | done | edit
+created `/home/cataluna84/.claude/projects/-home-cataluna84-Workspace-tinyaya-stage2-scale/memory/v03-evals-program.md`
+
+
+## 2026-07-15T15:21:15Z | feat/v0.3-implementation@21e4c47 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/docs/do.md`
+
+
+## 2026-07-15T15:20:56Z | feat/v0.3-implementation@21e4c47 | done | edit
+created `/home/cataluna84/Workspace/tinyaya-stage2-scale/docs/v0.3-evals-plan.md`
+
+
+## 2026-07-15T15:16:01Z | feat/v0.3-implementation@21e4c47 | done | edit
+edited `/home/cataluna84/.claude/plans/fix-the-sweep-startegy-linear-flask.md`
+
+
+## 2026-07-15T15:15:49Z | feat/v0.3-implementation@21e4c47 | done | edit
+edited `/home/cataluna84/.claude/plans/fix-the-sweep-startegy-linear-flask.md`
+
+
+## 2026-07-15T15:04:19Z | feat/v0.3-implementation@21e4c47 | done | edit
+created `/home/cataluna84/.claude/plans/fix-the-sweep-startegy-linear-flask.md`
+
+
+## 2026-07-15T14:55:52Z | feat/v0.3-implementation@21e4c47 | done | edit
+created `/home/cataluna84/.claude/plans/fix-the-sweep-startegy-linear-flask.md`
+
+
+## 2026-07-15T14:54:14Z | feat/v0.3-implementation@21e4c47 | done | exec
+curl -s "https://huggingface.co/api/datasets/tiny-aya-translate/tr-hi-mimi-encoded" | python3 -c "
+
+
+## 2026-07-15T14:50:03Z | feat/v0.3-implementation@21e4c47 | done | exec
+SP=/tmp/claude-1000/-home-cataluna84-Workspace-tinyaya-stage2-scale/2908a7e9-afe7-47af-8e1a-9e132b7ba923/scratchpad
+
+
+## 2026-07-15T14:49:21Z | feat/v0.3-implementation@21e4c47 | done | exec
+for repo in sound-quality-check hindi-tts-probe simultaneous-translation data-pipeline tiny-aya-deliverables codec-finetuning; do
+
+
+## 2026-07-15T14:34:57Z | feat/v0.3-implementation@21e4c47 | info | session
+PreCompact (manual): 5 unchecked PLAN items
+
+Top open items:
+- Fresh-provision drill verdict (HF-direct backbones+dataset on wiped hosts;
+- Hub smoke (300 steps → throwaway private repo; verify branch/samples/logs)
+- **Launch** (explicit user word): fresh QR via `launch_spot.sh` + metadata
+- During-run: watch dashboard; early stop ⇒ `_mh_anneal.yaml` runbook
+- Post-run: LAWA average → eval (best/final/averaged; corrected AR loop) →
+
+
+## 2026-07-15T14:34:46Z | feat/v0.3-implementation@21e4c47 | fail | verify
+verify: 11 passed, 1 failed out of 12 on Stop
+
+FAIL [1] # the TPU↔GPU seam holds: torch_xla must NOT leak into shared model/data code
+    src/model/scan_utils.py:479:    from torch_xla.experimental.scan_layers import (
+
+
+## 2026-07-15T14:33:42Z | feat/v0.3-implementation@21e4c47 | info | session
+SessionEnd (resume): 5 item(s) carried forward
+
+Next steps:
+- Fresh-provision drill verdict (HF-direct backbones+dataset on wiped hosts;
+- Hub smoke (300 steps → throwaway private repo; verify branch/samples/logs)
+- **Launch** (explicit user word): fresh QR via `launch_spot.sh` + metadata
+- During-run: watch dashboard; early stop ⇒ `_mh_anneal.yaml` runbook
+- Post-run: LAWA average → eval (best/final/averaged; corrected AR loop) →
+
+
+## 2026-07-15T14:32:59Z | feat/v0.3-implementation@21e4c47 | info | session
+SessionEnd (other): 5 item(s) carried forward
+
+Next steps:
+- Fresh-provision drill verdict (HF-direct backbones+dataset on wiped hosts;
+- Hub smoke (300 steps → throwaway private repo; verify branch/samples/logs)
+- **Launch** (explicit user word): fresh QR via `launch_spot.sh` + metadata
+- During-run: watch dashboard; early stop ⇒ `_mh_anneal.yaml` runbook
+- Post-run: LAWA average → eval (best/final/averaged; corrected AR loop) →
+
+
+## 2026-07-15T10:08:12Z | feat/v0.3-implementation@21e4c47 | info | session
+SessionEnd (other): 5 item(s) carried forward
+
+Next steps:
+- Fresh-provision drill verdict (HF-direct backbones+dataset on wiped hosts;
+- Hub smoke (300 steps → throwaway private repo; verify branch/samples/logs)
+- **Launch** (explicit user word): fresh QR via `launch_spot.sh` + metadata
+- During-run: watch dashboard; early stop ⇒ `_mh_anneal.yaml` runbook
+- Post-run: LAWA average → eval (best/final/averaged; corrected AR loop) →
+
+
+## 2026-07-15T07:50:32Z | feat/v0.3-implementation@21e4c47 | fail | verify
+verify: 11 passed, 1 failed out of 12 on Stop
+
+FAIL [1] # the TPU↔GPU seam holds: torch_xla must NOT leak into shared model/data code
+    src/model/scan_utils.py:479:    from torch_xla.experimental.scan_layers import (
+
+
+## 2026-07-15T07:50:10Z | feat/v0.3-implementation@21e4c47 | done | exec
+cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-15T07:49:49Z | feat/v0.3-implementation@21e4c47 | done | exec
+cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+
+
 ## 2026-07-15T07:49:16Z | feat/v0.3-implementation@4f0954b | done | exec
 cd /home/cataluna84/Workspace/tinyaya-stage2-scale
 

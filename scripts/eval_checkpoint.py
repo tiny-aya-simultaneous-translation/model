@@ -108,8 +108,17 @@ def text_examination(text_pred, sample, tokenizer):
     return {"text_acc": acc, "text_target_str": target_str, "text_pred_str": pred_str}
 
 
-def generate_autoregressive(model, sample, device, temp=0.8, top_p=0.9):
+def generate_autoregressive(
+    model, sample, device, temp=0.8, top_p=0.9, free_text=False, return_text=False
+):
     """Autoregressive generation — realistic quality.
+
+    ``free_text=True`` additionally free-runs the TEXT stream (greedy argmax
+    from the backbone's text head at each frame) instead of teacher-forcing
+    the gold interleaved text — the honest AR text-translation mode used by
+    the evals program's gold-reference metrics. ``return_text=True`` returns
+    ``(codes, text_ids_of_target_region)`` instead of just codes; defaults
+    preserve the original behavior for existing callers.
 
     NEXT-TOKEN CONVENTION (the off-by-one this gate caught, 2026-07-09)
     -------------------------------------------------------------------
@@ -128,7 +137,7 @@ def generate_autoregressive(model, sample, device, temp=0.8, top_p=0.9):
 
     user_stream = sample["user_audio_codes"][0].unsqueeze(0).to(device)
     model_stream = torch.full((1, T), SILENCE_TOKEN, dtype=torch.long, device=device)
-    ar_text = sample["text_ids"].unsqueeze(0).to(device)
+    ar_text = sample["text_ids"].unsqueeze(0).to(device).clone()
     gen_all = torch.full((8, T), SILENCE_TOKEN, dtype=torch.long, device=device)
 
     for t in range(src_len, T):
@@ -142,6 +151,13 @@ def generate_autoregressive(model, sample, device, temp=0.8, top_p=0.9):
                 attention_mask=ar_mask,
             )
             hidden = bb_out["hidden_states"]
+
+            if free_text:
+                # Same next-token convention as audio: hidden[-1] (position
+                # t-1) predicts the text token AT t; the write lands before
+                # any later iteration reads position t. Greedy — the text
+                # stream is deterministic even when audio samples.
+                ar_text[0, t] = bb_out["text_logits"][0, -1].argmax(dim=-1)
 
             # CB0 from backbone
             cb0_logits = model.backbone.audio_heads[0](hidden[:, -1:, :]).squeeze()
@@ -167,6 +183,8 @@ def generate_autoregressive(model, sample, device, temp=0.8, top_p=0.9):
                 if cb_idx + 2 < model.num_codebooks:
                     depth_input[0, cb_idx + 2] = tok
 
+    if return_text:
+        return gen_all[:, src_len:T].cpu(), ar_text[0, src_len:T].cpu()
     return gen_all[:, src_len:T].cpu()
 
 

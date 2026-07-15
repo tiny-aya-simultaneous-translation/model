@@ -5,6 +5,18 @@ the backlog of loose ends. Delete an item when it's done.
 
 ## Open
 
+### Live GPU verification of the v0.3 evals harness — post-long-horizon-run (2026-07-15)
+
+The evals program is planned in `docs/v0.3-evals-plan.md`; the end-to-end GPU
+session is deliberately SHELVED until the long-horizon run completes (user
+decision 2026-07-15 — no GPU instances before then). When the run finishes:
+rent an H100/A100, install the `eval` extra, run `scripts/eval_release.py`
+(full stages) on a real checkpoint over `v03-val-500` + `v03-fleurs-200` →
+results.json + W&B backfill. Sanity gates: GT-audio topline ≫ model score,
+ASR-judge floor consistent with corpus QC (86% pass @ WER ≤ 0.20), DNSMOS(GT)
+≈ codec ceiling. Record wall-clock + $ cost per checkpoint sweep in
+`docs/evals-runbook.md`.
+
 ### eval_checkpoint ASR needs a CPU path before release eval (2026-07-09)
 
 `run_asr` hardcodes `WhisperModel(..., device="cuda", compute_type="float16")` and

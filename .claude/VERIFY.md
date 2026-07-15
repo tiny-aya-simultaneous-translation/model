@@ -184,3 +184,19 @@ grep -q "ORCHESTRATION_CONTROL_PLANE" .claude/hooks/session_start.py
 - Live drills (idle slice): staging drill (marker mismatch → wipe →
   re-stage → cross-host digests identical); fresh-provision drill (wipe all
   caches → HF-direct backbones + dataset → digest == GCS tarball digest).
+
+## Evals harness verification (2026-07-15)
+
+- `uv run python -m pytest tests/test_evaluation.py -q` — normalizer goldens
+  (candrabindu/anusvara, Devanagari digits, Turkish İ/I), subset determinism +
+  digest-tamper refusal, frozen-artifact integrity (v03-val-500 sha
+  `91c7e275…`, v03-fleurs-200 sha `5105afa6…` incl. its 200/200 overlap
+  audit), text-metric CIs + paired bootstrap, judge-id pins
+  (vasista22/whisper-hindi-large-v2 hi, whisper-large-v3 tr), eval_release
+  stage wiring, latency math. Torch-free CI safe (stats tests importorskip).
+- `_codebook_entropy_stats` factor-out: trainer imports from
+  `src.evaluation.stats`; equivalence pinned in
+  `test_hardening_prelaunch.py::test_codebook_entropy_stats`.
+- Live GPU end-to-end: SHELVED to post-long-horizon-run (docs/do.md); smoke =
+  `eval_release.py --limit 8 --stages generate,asr,text,report` per
+  docs/evals-runbook.md.

@@ -59,11 +59,21 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# Evals-program deps (docs/v0.3-evals-plan.md) -- GPU-box only; ALL imports in
+# src/evaluation are lazy so the training env / torch-free CI never needs these.
 eval = [
     "speechmos>=0.0.1",
     "datasets>=5.0",
     "torchaudio==2.9.0",
+    "jiwer>=3.0",             # WER/CER (text_metrics)
+    "faster-whisper>=1.0",    # optional CUDA ASR path (asr_judge)
+    "distillmos>=0.1",        # Distill-MOS predictor (mos)
+    "google-genai>=1.0",      # Gemini referee + GEMBA judge (asr_judge, llm_judge)
 ]
+# NOT in the extra (unresolvable against the training pins -- unbabel-comet
+# needs numpy<2, sonar-space/fairseq2 pin their own torch): the Tier-3
+# semantic stage runs in a STANDALONE venv on the eval GPU box --
+# see docs/evals-runbook.md ("semantic venv").
 dev = [
     "ruff>=0.15",
     "pytest>=9.0",

@@ -112,3 +112,18 @@
 - **HF cache `.lock` stall**: a zombie downloader's stale per-blob lock makes a
   fresh download freeze mid-file with a healthy network (w-1, 2026-07-15).
   prefetch_backbones.sh sweeps `*.lock` at boot (safe there).
+- **Evals program (2026-07-15)**: `src/evaluation/` + `scripts/eval_release.py`
+  (design docs/v0.3-evals-plan.md, ops docs/evals-runbook.md). Corpus `.pt`
+  gold-text keys are `src_text`/`tgt_text` (NOT `source_text` as the dataset
+  card claims). Frozen digest-verified subsets: `eval/subsets/v03-val-500`
+  (250/dir, host val split) + `v03-fleurs-200` (real FLEURS speech). ASR
+  judges: vasista22/whisper-hindi-large-v2 (hi) + whisper-large-v3 (tr), via
+  forced_decoder_ids (vasista22 ships a stale generation_config).
+- **FLEURS is NOT held-out text**: overlap audit found 200/200 fleurs_real
+  texts inside the training corpus (its FLORES slice = FLoRes = FLEURS
+  sentences). v03-fleurs-200 measures real-speech ACOUSTIC shift only —
+  never claim text novelty on it.
+- **Eval dep split**: unbabel-comet (numpy<2) + sonar-space (fairseq2 torch
+  pins) cannot co-resolve with training pins → standalone eval venv for the
+  semantic stage; everything else in the `[eval]` extra. GPU eval session
+  SHELVED until the long-horizon run completes (docs/do.md).

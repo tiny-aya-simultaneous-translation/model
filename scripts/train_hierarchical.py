@@ -182,6 +182,9 @@ from src.backend import get_backend
 from src.data.bucket_sampler import BucketedMacroBatchSampler, normalize_buckets
 from src.data.collator import InterleavedCollator
 from src.data.dataset import SILENCE_TOKEN, StreamingTranslationDataset, TranslationDataset
+# Shared with the offline evaluators (the same math scores generation-time
+# code usage in scripts/eval_release.py) -- single source of truth.
+from src.evaluation.stats import codebook_entropy_stats as _codebook_entropy_stats
 from src.model.backbone import TinyAyaBackbone
 from src.model.composite import TinyAyaMoshiComposite
 from src.model.lora_setup import apply_lora
@@ -515,35 +518,6 @@ def _read_data_digest(cfg: dict) -> str:
     return "unknown"
 
 
-def _codebook_entropy_stats(hist) -> tuple[list[float], list[float]]:
-    """Per-codebook prediction-distribution health from a count histogram.
-
-    Args:
-        hist: [num_codebooks, vocab] CPU tensor of predicted-code counts
-            (sentinel column already dropped by the caller).
-
-    Returns:
-        (entropy_bits, active_frac) lists, one entry per codebook.
-        Entropy of the empirical prediction distribution in BITS
-        (max = log2(vocab), e.g. 11.0 for the 2048-code Mimi books);
-        active_frac = fraction of the vocab predicted at least once.
-        A collapsing codebook shows falling entropy + active_frac -- this
-        directly instruments the deep-codebook-collapse failure mode.
-    """
-    entropy_bits: list[float] = []
-    active_frac: list[float] = []
-    for c in range(hist.shape[0]):
-        h = hist[c].to(torch.float64)
-        total = float(h.sum())
-        if total <= 0:
-            entropy_bits.append(0.0)
-            active_frac.append(0.0)
-            continue
-        p = h / total
-        nz = p[p > 0]
-        entropy_bits.append(float(-(nz * nz.log2()).sum()))
-        active_frac.append(float((h > 0).to(torch.float64).mean()))
-    return entropy_bits, active_frac
 
 
 def _percentile(values: list[float], q: float) -> float | None:
