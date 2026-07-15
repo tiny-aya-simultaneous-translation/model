@@ -104,7 +104,8 @@ logging:
   save_every: 1000                # keep-all periodic; log-spaced early adds {1,2,4,...,512}
   log_spaced_saves: true
   async_checkpoint_upload: true   # background the multi-GB keep-all upload
-  audio_every: 1000000
+  audio_every: 5000               # inline TPU demos: ~29 s warm, 48 s cold (validated 2026-07-15)
+  audio_ar_frames: 50
   val_every: 250
   # Val gate = 3200 samples, unchanged -- but batched 4x wider so the cycle
   # costs ~120 s instead of ~210 s (probe M3, 2026-07-14: ~1.9 s/batch at

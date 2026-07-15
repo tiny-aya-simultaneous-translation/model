@@ -94,7 +94,8 @@ logging:
   save_every: 1000                # keep-all continues through the anneal
   log_spaced_saves: true          # no-op here (steps 1..512 long past)
   async_checkpoint_upload: true
-  audio_every: 1000000
+  audio_every: 5000               # inline TPU demos: ~29 s warm, 48 s cold (validated 2026-07-15)
+  audio_ar_frames: 50
   val_every: 250
   val_max_batches: 25             # same 3200-sample gate as the long run
   val_per_chip_batch: 8           # (25 x global 128 == 100 x global 32)
