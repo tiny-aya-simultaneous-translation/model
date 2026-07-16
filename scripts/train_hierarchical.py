@@ -2515,6 +2515,12 @@ def main():
         n_hosts if is_tpu else max(1, backend.world_size())
     )
     frame_tokens_per_step = effective_batch * max_frames
+    # A frame is ONE backbone position but carries 1 text token + K audio
+    # codebook tokens, all supervised. Token axes (train/tokens_seen, the
+    # checkpoint index) count 1+K tokens per frame; the FLOP/MFU estimates
+    # below stay per-FRAME because the backbone runs once per frame.
+    tokens_per_frame = 1 + int(cfg["train"].get("num_codebooks", 8))
+    tokens_per_step = frame_tokens_per_step * tokens_per_frame
 
     xprof_trace = None
     if is_tpu and bool(perf_cfg.get("xprof_trace_labels", False)):
@@ -3219,13 +3225,19 @@ def main():
                     "perf/frame_tokens_per_sec": (
                         frame_tokens_per_step / step_time if step_time > 0 else 0
                     ),
+                    "perf/tokens_per_sec": (
+                        tokens_per_step / step_time if step_time > 0 else 0
+                    ),
                     "perf/log_interval_sec": log_interval_sec,
                 }
                 # Analytical MFU (no on-device flop counters on this stack):
-                # per token, fwd = 2*N_total, bwd = 2*N_total grad-activations
-                # (the frozen backbone still backprops activations) +
-                # 2*N_trainable grad-weights. Peak: Trillium (v6e) bf16
-                # ~918 TFLOP/s per chip. Estimate, labeled _est.
+                # per FRAME (one backbone position; the depth decoder's K
+                # sub-positions share it), fwd = 2*N_total, bwd = 2*N_total
+                # grad-activations (the frozen backbone still backprops
+                # activations) + 2*N_trainable grad-weights. Do NOT scale by
+                # tokens_per_frame -- the 1+K tokens of a frame share one
+                # backbone pass. Peak: Trillium (v6e) bf16 ~918 TFLOP/s per
+                # chip. Estimate, labeled _est.
                 _flops_per_step = (4.0 * total + 2.0 * trainable) * frame_tokens_per_step
                 if step_time > 0:
                     perf_log["perf/mfu_est"] = _flops_per_step / step_time / (
@@ -3326,7 +3338,7 @@ def main():
                     # static padded shapes make tokens/step constant -- so they
                     # are exact and resume-safe with no persisted state).
                     "train/samples_seen": float(step) * effective_batch,
-                    "train/tokens_seen": float(step) * frame_tokens_per_step,
+                    "train/tokens_seen": float(step) * tokens_per_step,
                     "train/epoch": (float(step) * effective_batch) / max(1, len(train_ds)),
                     "sys/resumes": _resume_count,
                     "perf/step_time": step_time,
@@ -3686,7 +3698,7 @@ def main():
                         _ckpt_index_rows.append(
                             [
                                 step,
-                                float(step) * frame_tokens_per_step,
+                                float(step) * tokens_per_step,
                                 _last_val_composite,
                                 str(d),
                             ]

@@ -243,7 +243,10 @@ def test_codebook_entropy_stats():
 
 def test_release_metric_wiring():
     # Tier A: counters + sys + ppl + trust-region ratio
-    assert '"train/tokens_seen": float(step) * frame_tokens_per_step' in _TRAIN_SRC
+    # tokens_seen counts TOKENS (1 text + K codebooks per frame), not frames.
+    assert 'tokens_per_frame = 1 + int(cfg["train"].get("num_codebooks", 8))' in _TRAIN_SRC
+    assert "tokens_per_step = frame_tokens_per_step * tokens_per_frame" in _TRAIN_SRC
+    assert '"train/tokens_seen": float(step) * tokens_per_step' in _TRAIN_SRC
     assert '"train/samples_seen": float(step) * effective_batch' in _TRAIN_SRC
     assert '"train/epoch"' in _TRAIN_SRC
     assert '"sys/resumes": _resume_count' in _TRAIN_SRC
