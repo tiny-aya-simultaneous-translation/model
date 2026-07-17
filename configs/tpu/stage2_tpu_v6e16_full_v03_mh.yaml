@@ -116,7 +116,10 @@ logging:
   val_on_tpu: true
   tpu_telemetry_every: 250    # per-host chip HBM into the shared run (all 16 chips)
   diag_metrics: true
-  save_dir: gs://tinyaya-stage2-eu/checkpoints/stage2-v6e16-mh-v03
+  # -r2: attempt 2 (from-scratch restart with native audio_loss_full +
+  # tokens_seen fix in the deployed code). Attempt 1 (run 1021mlne, aborted
+  # ~step 7.5k, healthy) kept at .../stage2-v6e16-mh-v03 for forensics.
+  save_dir: gs://tinyaya-stage2-eu/checkpoints/stage2-v6e16-mh-v03-r2
   keep_last_n: 0                  # keep ALL checkpoints (public suite)
   keep_local_checkpoints: false
   use_wandb: true
@@ -128,7 +131,7 @@ logging:
   hub_private: true
   wandb_tags: [v0.3, multi-host, wsd]
   wandb_project: tinyaya-stage2-tpu
-  wandb_run_name: v0.3-long-horizon-mh
+  wandb_run_name: v0.3-long-horizon-mh-r2
 
 perf:
   enabled: true
