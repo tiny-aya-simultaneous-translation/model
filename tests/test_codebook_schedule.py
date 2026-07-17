@@ -44,6 +44,23 @@ def test_k0_clamped_into_range():
     assert cs.active_codebooks(0, 1000, 8, unmask_fraction=0.10, k0=99) == 8  # <=num_cb
 
 
+def test_v03_long_run_onset_mapping():
+    # Pin the v0.3 long-horizon onset -> codebook mapping (110,463 steps,
+    # unmask_fraction 0.10 => unmask_steps 11,046, k0=1, K=8). Codebook c
+    # activates at step (c-1)*1578+1 for c>=2; cb0+cb1 active from step 1.
+    # These exact numbers appear in PR #10 / W&B notes / the runbook -- an
+    # off-by-one here mislabels which codebook a loss-chart onset belongs to
+    # (it happened once: "cb3 at 4735" when 4735 activates cb4).
+    args = dict(total_steps=110463, num_codebooks=8, unmask_fraction=0.10, k0=1)
+    assert cs.active_codebooks(1, **args) == 2       # cb0+cb1 from the start
+    for onset, k_after in [(1579, 3), (3157, 4), (4735, 5),
+                           (6313, 6), (7891, 7), (9469, 8)]:
+        assert cs.active_codebooks(onset - 1, **args) == k_after - 1
+        assert cs.active_codebooks(onset, **args) == k_after
+    assert cs.active_codebooks(11046, **args) == 8   # ramp complete
+    assert cs.active_codebooks(110463, **args) == 8
+
+
 # ---- codebook_weights ------------------------------------------------------
 
 def test_weights_default_multipliers_all_one_when_unmasked():

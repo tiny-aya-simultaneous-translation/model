@@ -129,12 +129,17 @@ LAWA-vs-best-vs-final with `src/evaluation/text_metrics.paired_bootstrap`
 - FLEURS numbers: label as real-speech ACOUSTIC shift (text 100% seen — see
   audit).
 - **Loss charts**: `train/audio_loss` is the CURRICULUM loss — its definition
-  grows at progressive-unmask onsets (v0.3 long run: steps
-  1579/3157/4735/6313/7891/9469; one more codebook's CE joins the weighted
-  mean), so upward steps there are accounting, not regressions. For public /
-  cross-run charts use `train/audio_loss_full` (unweighted all-codebook mean,
-  pre-mask; logged natively by the trainer; for runs recorded before it landed,
-  derive + backfill after the run finishes with
+  grows at progressive-unmask onsets (v0.3 long run: cb2..cb7 activate at
+  steps 1579/3157/4735/6313/7891/9469; onset→codebook mapping pinned by
+  `test_v03_long_run_onset_mapping`), so upward steps there are accounting,
+  not regressions. Per-codebook panels show the opposite at each onset: the
+  newly-activated AND all still-masked deeper codebooks' CEs drop together
+  (real transfer — the shared backbone context gains acoustic-residual
+  features that the frozen trunk's pre-trained deeper heads exploit; verified
+  live on both long-run attempts). For public / cross-run charts use
+  `train/audio_loss_full` (unweighted all-codebook mean, pre-mask; logged
+  natively by the trainer; for runs recorded before it landed, derive +
+  backfill after the run finishes with
   `scripts/wandb_audio_full_backfill.py --run <entity/project/run_id>
   --backfill` — it refuses while the run is live).
 
