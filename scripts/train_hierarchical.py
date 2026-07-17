@@ -3355,6 +3355,14 @@ def main():
                     _boot_logged = True
                 for i, v in enumerate(avg["per_cb"]):
                     log[f"train/per_codebook_loss_{i}"] = v
+                # Curriculum-independent audio loss: per_cb CEs are computed
+                # PRE-mask (translation_loss.py exposes all codebooks), so the
+                # unweighted all-codebook mean has no jump at progressive-unmask
+                # onsets (train/audio_loss's definition grows at each onset:
+                # step 1+ceil-boundaries of unmask_fraction*max_steps/(K-k0)).
+                # Use THIS series for public/cross-run loss charts.
+                if avg["per_cb"]:
+                    log["train/audio_loss_full"] = sum(avg["per_cb"]) / len(avg["per_cb"])
                 # Per-chip HBM + duty-cycle timeseries (tpu/chip{i}/hbm_gib,
                 # tpu/chip{i}/duty_pct, tpu/hbm_max_gib, ...). TPU backend
                 # only; internally cached 30 s so calling every log step is

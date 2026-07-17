@@ -257,6 +257,9 @@ def test_release_metric_wiring():
     # provenance
     assert '"provenance/git_sha": _resolve_build_sha()' in _TRAIN_SRC
     assert '"provenance/data_digest": _read_data_digest(cfg)' in _TRAIN_SRC
+    # Curriculum-independent audio loss: unweighted all-codebook mean from the
+    # PRE-mask per-cb CEs -- the public-chart series with no unmask-onset jumps.
+    assert '"train/audio_loss_full"' in _TRAIN_SRC
     # Tier B: codebook histogram + exploded list keys
     assert '_codebook_entropy_stats(' in _TRAIN_SRC
     assert '"val/per_codebook_entropy_bits"' in _TRAIN_SRC
@@ -332,6 +335,37 @@ def test_prefetch_direct_primary_warp_fallback():
     assert 'ALL_PROXY="$PROXY"' in _PREFETCH_SRC
     # ready-marker fires on BOTH success paths + the warm-cache skip
     assert _PREFETCH_SRC.count("touch /tmp/hf_backbones_ready") == 3
+
+
+def test_audio_full_backfill_derivation():
+    # Pure derivation math of the curriculum-independent audio-loss series
+    # (scripts/wandb_audio_full_backfill.py; wandb import is lazy in main()).
+    path = REPO / "scripts" / "wandb_audio_full_backfill.py"
+    spec = importlib.util.spec_from_file_location("wandb_audio_full_backfill", path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    K = 4
+    rows = [
+        # out-of-order steps + one incomplete row (must be skipped)
+        {"global_step": 50, **{f"train/per_codebook_loss_{i}": 2.0 for i in range(K)}},
+        {"global_step": 25, **{f"train/per_codebook_loss_{i}": 4.0 for i in range(K)}},
+        {"global_step": 75, "train/per_codebook_loss_0": 1.0},
+        {"global_step": None, **{f"train/per_codebook_loss_{i}": 9.0 for i in range(K)}},
+    ]
+    out = mod.derive_full_series(rows, K, multipliers=[1.0, 1.0, 2.0, 2.0])
+    assert [gs for gs, _, _ in out] == [25, 50]          # sorted, incomplete dropped
+    assert out[0][1] == 4.0 and out[1][1] == 2.0          # unweighted mean
+    assert out[0][2] == 4.0 and out[1][2] == 2.0          # weighted mean (equal CEs)
+    # weighted variant actually weights: CEs [0,0,3,3] with mult [1,1,2,2] -> 2.0
+    row = {"global_step": 1, "train/per_codebook_loss_0": 0.0,
+           "train/per_codebook_loss_1": 0.0, "train/per_codebook_loss_2": 3.0,
+           "train/per_codebook_loss_3": 3.0}
+    (_, mean, wmean), = mod.derive_full_series([row], K, [1.0, 1.0, 2.0, 2.0])
+    assert mean == 1.5 and wmean == 2.0
+    # multiplier-length mismatch refuses
+    import pytest
+    with pytest.raises(ValueError):
+        mod.derive_full_series([row], K, [1.0])
 
 
 def test_startup_hf_offline_gated_on_prefetch():

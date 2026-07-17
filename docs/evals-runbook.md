@@ -128,6 +128,15 @@ LAWA-vs-best-vs-final with `src/evaluation/text_metrics.paired_bootstrap`
   speech); BLASER/SONAR + COMET weights are CC-BY-NC (eval-only);
 - FLEURS numbers: label as real-speech ACOUSTIC shift (text 100% seen — see
   audit).
+- **Loss charts**: `train/audio_loss` is the CURRICULUM loss — its definition
+  grows at progressive-unmask onsets (v0.3 long run: steps
+  1579/3157/4735/6313/7891/9469; one more codebook's CE joins the weighted
+  mean), so upward steps there are accounting, not regressions. For public /
+  cross-run charts use `train/audio_loss_full` (unweighted all-codebook mean,
+  pre-mask; logged natively by the trainer; for runs recorded before it landed,
+  derive + backfill after the run finishes with
+  `scripts/wandb_audio_full_backfill.py --run <entity/project/run_id>
+  --backfill` — it refuses while the run is live).
 
 ## Sanity gates for the (shelved) live verification
 

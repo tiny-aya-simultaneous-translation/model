@@ -34,7 +34,10 @@ suite trained by the 110,463-step long-horizon run on multi-host v6e-16.
       gates; qr_watch babysitter; watchdog cadence ~30 min
 - [ ] During-run: watch dashboard; early stop ⇒ `_mh_anneal.yaml` runbook;
       Tier-1 eval proxy sweeps on saved checkpoints (CPU, docs/evals-runbook.md)
-- [ ] Post-run: GPU eval session (eval_release.py full pass, do.md) → LAWA
+- [ ] Post-run: backfill `train/audio_loss_full` into run 1021mlne
+      (`scripts/wandb_audio_full_backfill.py --backfill`; refuses while live —
+      curriculum-onset jumps in train/audio_loss are accounting, verified) →
+      GPU eval session (eval_release.py full pass, do.md) → LAWA
       average → paired-bootstrap best-vs-LAWA-vs-final →
       `publish_checkpoint_suite.py` backfill → flip hub public → model card
       eval numbers + release notes
