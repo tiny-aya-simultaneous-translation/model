@@ -30,10 +30,21 @@ suite trained by the 110,463-step long-horizon run on multi-host v6e-16.
       to post-run (docs/do.md)
 
 ## Next
-- [ ] **Launch** (explicit user word): fresh QR via `launch_spot.sh` + metadata
-      gates; qr_watch babysitter; watchdog cadence ~30 min
-- [ ] During-run: watch dashboard; early stop ⇒ `_mh_anneal.yaml` runbook;
-      Tier-1 eval proxy sweeps on saved checkpoints (CPU, docs/evals-runbook.md)
+- [x] Attempt-2 restart executed 2026-07-17 (run xzcb60bl, code 6dcc9e1) —
+      **COMPLETED by designed early stop 2026-07-19 at step 65,250**
+      (patience 10; best val/composite 2.9048 @ step 62,750; exit 0;
+      canonical final save `step_065250_final`; GCS keep-all suite complete:
+      78 checkpoint dirs)
+- [ ] **DECISION: anneal leg** (`_mh_anneal.yaml` from best 62,750 — round-3
+      R5 evidence: anneal beats plateau on all metrics; early stop means the
+      WSD anneal never ran). Launch ONLY on explicit user word.
+- [ ] Hub interim suite (private-storage 50 GB cap; pushes 403'd from
+      step-5000 during the run): 12-bundle ladder per-6000 + best + final
+      backfilling via priority-ordered publish_checkpoint_suite.py (HF frees
+      deleted LFS space asynchronously — re-drive failures until 12/12
+      weights=YES). At release flip-public: backfill the remaining 66.
+- [ ] Tier-1 eval proxy sweeps on saved checkpoints (CPU,
+      docs/evals-runbook.md)
 - [ ] Post-run: backfill `train/audio_loss_full` into run 1021mlne
       (`scripts/wandb_audio_full_backfill.py --backfill`; refuses while live —
       curriculum-onset jumps in train/audio_loss are accounting, verified) →
