@@ -158,7 +158,9 @@ def _fake_composite():
     nn = torch.nn
 
     class _FakePeft(nn.Module):
-        def save_pretrained(self, d, state_dict=None, safe_serialization=False):
+        # **kwargs: tolerate HF/peft-convention kwargs the trainer states
+        # explicitly (e.g. save_embedding_layers=True).
+        def save_pretrained(self, d, state_dict=None, safe_serialization=False, **kwargs):
             pathlib.Path(d).mkdir(parents=True, exist_ok=True)
             torch.save(state_dict or {}, pathlib.Path(d) / "adapter_model.bin")
 

@@ -130,6 +130,28 @@ def _gsutil_cp_file(src_file: str, gcs_dest_dir: str, attempts: int = 4) -> None
 _UPLOAD_EXECUTOR = None
 _UPLOAD_FUTURES: list = []
 
+# Storage-limit circuit breaker. Once HF rejects a weight push with the
+# private-storage-limit 403, every later push this run fails identically --
+# the v0.3-r2 run printed one WARNING per save for ~60k steps and staged
+# ~3.8 GB of doomed upload each time. Trip once, announce once, skip the
+# rest; GCS saving is unaffected and publish_checkpoint_suite.py backfills.
+_HUB_PUSH_DISABLED = False
+
+
+def _hub_push_failed(e: Exception) -> None:
+    """Log a failed hub push; trip the breaker on the storage-limit 403."""
+    global _HUB_PUSH_DISABLED
+    if "storage limit" in str(e).lower():
+        _HUB_PUSH_DISABLED = True
+        print(
+            "[ckpt] hub publishing DISABLED for this run: private storage limit "
+            "reached; weights keep saving to GCS -- backfill post-run with "
+            "publish_checkpoint_suite.py",
+            flush=True,
+        )
+    else:
+        print(f"[ckpt] WARNING: hub push failed: {e}", flush=True)
+
 
 def _submit_upload(fn) -> None:
     """Run ``fn`` (a checkpoint upload closure) on the background uploader."""
@@ -369,7 +391,11 @@ def save_checkpoint(
     peft_dir = os.path.join(write_dir, "peft_adapter")
     # peft_state is always pre-gathered now; use state_dict= to avoid
     # save_pretrained touching the (possibly re-sharded) model.
-    model.backbone.model.save_pretrained(peft_dir, state_dict=peft_state)
+    # save_embedding_layers stated explicitly: embed_tokens is a LoRA target,
+    # and letting peft infer it emits a UserWarning on EVERY save.
+    model.backbone.model.save_pretrained(
+        peft_dir, state_dict=peft_state, save_embedding_layers=True
+    )
 
     torch.save(proj_state, os.path.join(write_dir, "projection.pt"))
     torch.save(depth_state, os.path.join(write_dir, "depth_decoder.pt"))
@@ -428,7 +454,7 @@ def save_checkpoint(
             # staged LOCAL dir before deletion (pushing "gs://..." after the
             # fact walks nothing). Weights-only; failures never block saves
             # (publish_checkpoint_suite.py backfills post-hoc).
-            if hub:
+            if hub and not _HUB_PUSH_DISABLED:
                 try:
                     push_checkpoint_to_hub(
                         write_dir,
@@ -439,7 +465,7 @@ def save_checkpoint(
                         private=hub.get("private", True),
                     )
                 except Exception as e:  # noqa: BLE001 - hub push never blocks a save
-                    print(f"[ckpt] WARNING: hub push failed: {e}", flush=True)
+                    _hub_push_failed(e)
             if keep_local:
                 print(f"[ckpt] retained local mirror: {write_dir}", flush=True)
             else:
@@ -454,7 +480,7 @@ def save_checkpoint(
             _submit_upload(_do_upload)
         else:
             _do_upload()
-    elif hub:
+    elif hub and not _HUB_PUSH_DISABLED:
         # Local save_dir (GPU/CPU runs): write_dir persists; push directly.
         try:
             push_checkpoint_to_hub(
@@ -466,7 +492,7 @@ def save_checkpoint(
                 private=hub.get("private", True),
             )
         except Exception as e:  # noqa: BLE001 - hub push never blocks a save
-            print(f"[ckpt] WARNING: hub push failed: {e}", flush=True)
+            _hub_push_failed(e)
 
 
 def save_checkpoint_canonical_final(
@@ -791,6 +817,29 @@ def push_checkpoint_to_hub(
             )
     _where = f"{repo_id}@{revision}" if revision else repo_id
     print(f"  pushed to https://huggingface.co/{_where}")
+
+
+def dedupe_repeats(lines: list[str]) -> list[str]:
+    """Collapse CONSECUTIVE identical lines into one + a repeat marker.
+
+    Guards the published rolling log against a noisy dependency flooding it:
+    the v0.3-r2 artifact was 88% one torch_xla UserWarning repeated 6,925
+    times. Order-preserving; unique lines pass through untouched; a run of
+    N>1 identical lines becomes the line followed by ``[repeated N x]``.
+    Pure (no I/O) so it is unit-testable and reusable for post-hoc cleanup.
+    """
+    out: list[str] = []
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        n = 1
+        while i + n < len(lines) and lines[i + n] == line:
+            n += 1
+        out.append(line)
+        if n > 1:
+            out.append(f"[repeated {n} x]")
+        i += n
+    return out
 
 
 def push_files_to_hub(

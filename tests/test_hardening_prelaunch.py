@@ -340,6 +340,48 @@ def test_prefetch_direct_primary_warp_fallback():
     assert _PREFETCH_SRC.count("touch /tmp/hf_backbones_ready") == 3
 
 
+_CKPT_SRC = (REPO / "src" / "training" / "checkpointing.py").read_text()
+_REDEPLOY_SRC = (REPO / "scripts" / "tpu" / "_remote_redeploy.sh").read_text()
+
+
+def test_log_noise_elimination_wiring():
+    # (1) torch_xla FSDPv2 full-backward-hook warning filtered at boot
+    #     (source: torch_xla/distributed/spmd/xla_sharding.py, fires 1/step;
+    #     v0.3-r2's published log was 88% this single line).
+    assert 'message=r"Full backward hook is firing' in _TRAIN_SRC
+    # (2) peft embedding save intent stated -> no per-save UserWarning
+    assert "save_embedding_layers=True" in _CKPT_SRC
+    # (3) storage-limit circuit breaker: trip once, announce once, skip rest
+    assert "_HUB_PUSH_DISABLED" in _CKPT_SRC
+    assert '"storage limit" in str(e).lower()' in _CKPT_SRC
+    assert _CKPT_SRC.count("hub and not _HUB_PUSH_DISABLED") == 2
+    # (4) published rolling log is deduped before push
+    assert "dedupe_repeats" in _TRAIN_SRC
+    # (5) boot env hygiene on BOTH launch paths
+    for src in (_STARTUP_SRC, _REDEPLOY_SRC):
+        assert "HF_HUB_DISABLE_PROGRESS_BARS=1" in src
+        assert "TRANSFORMERS_VERBOSITY=error" in src
+
+
+def test_dedupe_repeats():
+    path = REPO / "src" / "training" / "checkpointing.py"
+    spec = importlib.util.spec_from_file_location("ckpt_dedupe", path)
+    mod = importlib.util.module_from_spec(spec)
+    try:
+        spec.loader.exec_module(mod)
+    except ImportError:
+        import pytest
+
+        pytest.skip("checkpointing needs torch at import time")
+    f = mod.dedupe_repeats
+    assert f([]) == []
+    assert f(["a", "b", "c"]) == ["a", "b", "c"]          # unique -> untouched
+    assert f(["w"] * 5) == ["w", "[repeated 5 x]"]
+    assert f(["a", "w", "w", "w", "b", "b", "a"]) == [
+        "a", "w", "[repeated 3 x]", "b", "[repeated 2 x]", "a",
+    ]  # order preserved; non-adjacent repeats NOT merged
+
+
 def test_audio_full_backfill_derivation():
     # Pure derivation math of the curriculum-independent audio-loss series
     # (scripts/wandb_audio_full_backfill.py; wandb import is lazy in main()).

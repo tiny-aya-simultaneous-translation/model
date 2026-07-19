@@ -59,6 +59,15 @@ from pathlib import Path
 # of warning lines per logged step into /tmp/train.log. Filter BEFORE
 # importing torch (torch_xla autoloads via torch's backend entry point).
 warnings.filterwarnings("ignore", message=r"Use torch_xla\.sync instead")
+# torch_xla's FSDPv2/SPMD wrapper (torch_xla/distributed/spmd/xla_sharding.py)
+# registers a full backward hook on the wrapped module; torch warns at hook
+# EXECUTION time -- once per training step -- because the composite root's
+# inputs (token ids) never require grad. Benign by construction (grads flow
+# via the embedding params, not the int inputs), and the hook is torch_xla's,
+# not ours: v0.3-r2's published log was 88% this one line (6,925 of 7,851).
+warnings.filterwarnings(
+    "ignore", message=r"Full backward hook is firing when gradients are computed"
+)
 
 # ruff: noqa: E402,I001
 import soundfile as sf
@@ -3687,8 +3696,18 @@ def main():
                             with open(_logsrc, "rb") as _lf:
                                 _lf.seek(max(0, os.path.getsize(_logsrc) - 2_000_000))
                                 _tail = _lf.read()
-                            with open(_lpath, "wb") as _lo:
-                                _lo.write(_tail)
+                            # Public artifact: collapse consecutive duplicate
+                            # lines (dedupe_repeats) so a noisy dependency can
+                            # never flood the published log again.
+                            from src.training.checkpointing import dedupe_repeats
+
+                            _clean = "\n".join(
+                                dedupe_repeats(
+                                    _tail.decode("utf-8", errors="replace").splitlines()
+                                )
+                            )
+                            with open(_lpath, "w", encoding="utf-8") as _lo:
+                                _lo.write(_clean)
                             _bg_upload(
                                 lambda p=_lpath, s=step: push_files_to_hub(
                                     [p],

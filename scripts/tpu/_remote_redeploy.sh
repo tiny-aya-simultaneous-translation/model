@@ -120,6 +120,9 @@ HF_TOKEN="$HF_TOKEN" \
 WANDB_API_KEY="$WANDB_API_KEY" \
 WANDB_RENDEZVOUS_URI="$WANDB_RENDEZVOUS_URI" \
 PYTHONUNBUFFERED=1 \
+HF_HUB_DISABLE_PROGRESS_BARS=1 \
+TRANSFORMERS_VERBOSITY=error \
+ABSL_MIN_LOG_LEVEL=2 \
 "$UV_BIN" run python -u scripts/train_hierarchical.py \
     --config "$CONFIG_FILE" \
     --resume auto 2>&1 | tee -a /tmp/train.log
