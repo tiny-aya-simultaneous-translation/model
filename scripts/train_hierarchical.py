@@ -2061,7 +2061,12 @@ def main():
                 "versions": _versions,
                 "git_sha": os.environ.get("GIT_SHA", "unknown"),
                 "git_dirty": os.environ.get("GIT_DIRTY", "unknown"),
-                "tpu_topology": "v6e-8" if is_tpu else platform.machine(),
+                # Derived, not hardcoded (was a stale "v6e-8" literal from the
+                # single-host era): world_size() == chip count on SPMD, and the
+                # slice name is v6e-<chips> (v6e-16 multi-host, v6e-8 probes).
+                "tpu_topology": (
+                    f"v6e-{backend.world_size()}" if is_tpu else platform.machine()
+                ),
                 "dataset_id": "tiny-aya-translate/tr-hi-mimi-encoded",
                 "dataset_revision": os.environ.get("DATASET_REVISION", "unknown"),
                 "train_rows": _count_lines(cfg["data"].get("train_split")),

@@ -257,6 +257,9 @@ def test_release_metric_wiring():
     # provenance
     assert '"provenance/git_sha": _resolve_build_sha()' in _TRAIN_SRC
     assert '"provenance/data_digest": _read_data_digest(cfg)' in _TRAIN_SRC
+    # tpu_topology derived from the real chip count, never a hardcoded slice
+    assert 'f"v6e-{backend.world_size()}" if is_tpu' in _TRAIN_SRC
+    assert '"tpu_topology": "v6e-8"' not in _TRAIN_SRC
     # Curriculum-independent audio loss: unweighted all-codebook mean from the
     # PRE-mask per-cb CEs -- the public-chart series with no unmask-onset jumps.
     assert '"train/audio_loss_full"' in _TRAIN_SRC
