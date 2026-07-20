@@ -46,6 +46,8 @@ sample (see Dataset), so the inner-monologue/text stream is supervised alongside
 earlier versions trained audio-only due to a loader bug, disclosed below.
 
 - **Developed by:** [tiny-aya-translate](https://huggingface.co/tiny-aya-translate)
+- **Blog post:** [Adapting Moshi for Low-Resource Speech Translation](https://labscommunity.cohere.com/blog/2026/adapting-moshi-low-resource-speech-translation/)
+  (Cohere Labs Community — the v0.3 training/infrastructure specifics land in its current revision)
 - **Funded by:** Google **TPU Research Cloud (TRC)**
 - **Model type:** parallel two-stream S2ST (Cohere2 + LoRA → CB0; frozen Moshi depth decoder → CB1–7)
 - **Languages:** Turkish (`tr`), Hindi (`hi`)
