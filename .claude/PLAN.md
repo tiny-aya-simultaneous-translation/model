@@ -35,23 +35,28 @@ suite trained by the 110,463-step long-horizon run on multi-host v6e-16.
       (patience 10; best val/composite 2.9048 @ step 62,750; exit 0;
       canonical final save `step_065250_final`; GCS keep-all suite complete:
       78 checkpoint dirs)
+- [x] Hub interim suite DONE 2026-07-19/20: 12/12 branches weights=YES
+      (per-6000 + best@62,750 + final 65,250, 45.4 GB) + `main:checkpoints/`
+      mirror for file-tree discoverability (Xet dedup verified ~storage-free);
+      model card refreshed (run results, playable samples, checkpoints table,
+      CC-BY-NC-4.0 license correction, blog link); governance files
+      (CONTRIBUTING.md, CITATION.cff); published log cleaned 7,851→927 lines
 - [ ] **DECISION: anneal leg** (`_mh_anneal.yaml` from best 62,750 — round-3
       R5 evidence: anneal beats plateau on all metrics; early stop means the
       WSD anneal never ran). Launch ONLY on explicit user word.
-- [ ] Hub interim suite (private-storage 50 GB cap; pushes 403'd from
-      step-5000 during the run): 12-bundle ladder per-6000 + best + final
-      backfilling via priority-ordered publish_checkpoint_suite.py (HF frees
-      deleted LFS space asynchronously — re-drive failures until 12/12
-      weights=YES). At release flip-public: backfill the remaining 66.
-- [ ] Tier-1 eval proxy sweeps on saved checkpoints (CPU,
-      docs/evals-runbook.md)
-- [ ] Post-run: backfill `train/audio_loss_full` into run 1021mlne
-      (`scripts/wandb_audio_full_backfill.py --backfill`; refuses while live —
-      curriculum-onset jumps in train/audio_loss are accounting, verified) →
-      GPU eval session (eval_release.py full pass, do.md) → LAWA
-      average → paired-bootstrap best-vs-LAWA-vs-final →
-      `publish_checkpoint_suite.py` backfill → flip hub public → model card
-      eval numbers + release notes
+- [ ] **DECISION: v6e-16 slice teardown** (idle since run end; TRC spot
+      capacity; used for hub backfills — tear down on user word)
+- [ ] Tier-1 eval proxy sweeps on saved checkpoints (CPU, actionable NOW —
+      docs/evals-runbook.md "Post-run state")
+- [ ] GPU eval session (UNBLOCKED — do.md; rent on user word):
+      eval_release.py full pass → LAWA average → paired-bootstrap
+      best-vs-LAWA-vs-final
+- [ ] Blog revision (USER-OWNED, do.md): training run / curriculum / infra
+      tables / checkpoint story; evals numbers after the GPU session
+- [ ] Release flip: full 78-checkpoint backfill (branches + --main-folder),
+      model-index eval numbers, W&B project visibility, release notes
+      (obsolete: 1021mlne audio_loss_full backfill — superseded run;
+      xzcb60bl logs the metric natively)
 
 ## Definition of Done
 Public HF repo with the full revision suite + audio + logs, model card with eval

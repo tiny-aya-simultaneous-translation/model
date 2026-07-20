@@ -219,3 +219,12 @@ do not budget less than 5h wall time for first-canary compile.
   torch_xla 2.9 v6e SPMD — never hits; ~14 min recompile per cold boot.
 - Val×4 (`val_per_chip_batch: 8`, same 3200-sample gate): cycle ~210 s → ~41–60 s
   measured warm on the rehearsals.
+
+## v0.3 long-horizon run complete — slice idle (2026-07-19/20)
+
+- `tinyaya-v6e16-eu` (v6e-16 spot, europe-west4-a) ran the full long-horizon
+  leg with ZERO preemptions (2026-07-17 → 07-19, early stop @ 65,250).
+- Since run end the slice is IDLE (reused briefly for hub backfills — fast
+  datacenter uplink pushed 12 × 3.77 GB bundles in ~7 min). Teardown pending
+  an explicit user decision (also gates the optional anneal leg, which would
+  reuse it).

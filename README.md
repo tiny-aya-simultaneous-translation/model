@@ -168,6 +168,10 @@ never silently run un-adapted. Each checkpoint = LoRA adapter (`peft_adapter/`) 
 custom `projection.pt` / `depth_decoder.pt` / `audio_heads.pt` / `text_embed.pt` /
 `model_audio_embed.pt` + `metadata.json`.
 
+## Related Links
+- [Blog: Adapting Moshi for Low-Resource Speech Translation](https://labscommunity.cohere.com/blog/2026/adapting-moshi-low-resource-speech-translation/) — Cohere Labs Community
+- [Model + checkpoints on Hugging Face](https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3)
+
 ## Related Repos
 - [`data-pipeline`](https://github.com/tiny-aya-simulatenous-translation/data-pipeline) — TTS generation, deployment, Mimi encoding
 - [`sound-quality-check`](https://github.com/tiny-aya-simulatenous-translation/sound-quality-check) — 4-stage audio QC pipeline

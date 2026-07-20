@@ -78,7 +78,7 @@
   leaked tokens before public release.
 
 
-## Long-horizon run facts (2026-07-15, pre-launch)
+## Long-horizon run facts (2026-07-15, pre-launch — run since COMPLETED, see 2026-07-20 entry)
 - **Run** = `configs/tpu/stage2_tpu_v6e16_full_v03_mh.yaml`: 110,463 steps ≈ 3 real
   epochs at REAL global batch 32 (2/chip × 16; the "256" of the sweep era was
   batch×accum fiction), WSD (warmup 1100 / anneal 11k; stop-anytime anneal template
@@ -127,3 +127,18 @@
   pins) cannot co-resolve with training pins → standalone eval venv for the
   semantic stage; everything else in the `[eval]` extra. GPU eval session
   SHELVED until the long-horizon run completes (docs/do.md).
+
+## Long-horizon outcome + next phase (2026-07-20)
+
+- Run `xzcb60bl` (v0.3-long-horizon-mh-r2) COMPLETED 2026-07-19 by designed
+  early stop @ 65,250/110,463 (patience 10); best val composite 2.9048 @
+  step 62,750; zero preemptions. GCS keep-all suite complete (78 dirs).
+- Hub `tr-hi-s2st-v0.3`: interim 12-checkpoint ladder (per-6000 + best +
+  final) as branches AND `main:checkpoints/` mirror (Xet dedup ~free);
+  HF private-storage cap (~50 GB) was the constraint (403'd per-1000 pushes
+  from step-5000 during the run). Full 78 backfill at public flip.
+- Model card refreshed: run results, playable samples, checkpoints table,
+  license corrected to CC-BY-NC-4.0 (base tiny-aya is NC), blog link.
+- OPEN DECISIONS (user word): WSD anneal leg from best 62,750; v6e-16 slice
+  teardown. NEXT: Tier-1 CPU proxy sweeps; GPU eval_release.py session
+  (UNBLOCKED, do.md); blog revision (user-owned).

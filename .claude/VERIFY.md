@@ -197,6 +197,6 @@ grep -q "ORCHESTRATION_CONTROL_PLANE" .claude/hooks/session_start.py
 - `_codebook_entropy_stats` factor-out: trainer imports from
   `src.evaluation.stats`; equivalence pinned in
   `test_hardening_prelaunch.py::test_codebook_entropy_stats`.
-- Live GPU end-to-end: SHELVED to post-long-horizon-run (docs/do.md); smoke =
+- Live GPU end-to-end: UNBLOCKED (run completed 2026-07-19; docs/do.md); smoke =
   `eval_release.py --limit 8 --stages generate,asr,text,report` per
   docs/evals-runbook.md.

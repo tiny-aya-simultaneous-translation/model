@@ -5,26 +5,48 @@ the backlog of loose ends. Delete an item when it's done.
 
 ## Open
 
-### Live GPU verification of the v0.3 evals harness — post-long-horizon-run (2026-07-15)
+### Cohere Labs blog revision — v0.3 backend specifics (2026-07-20)
 
-The evals program is planned in `docs/v0.3-evals-plan.md`; the end-to-end GPU
-session is deliberately SHELVED until the long-horizon run completes (user
-decision 2026-07-15 — no GPU instances before then). When the run finishes:
-rent an H100/A100, install the `eval` extra, run `scripts/eval_release.py`
-(full stages) on a real checkpoint over `v03-val-500` + `v03-fleurs-200` →
-results.json + W&B backfill. Sanity gates: GT-audio topline ≫ model score,
+USER-OWNED. The team blog
+([Adapting Moshi for Low-Resource Speech Translation](https://labscommunity.cohere.com/blog/2026/adapting-moshi-low-resource-speech-translation/))
+has had multiple iterations; the user is contributing the backend/training
+revision. Planned sections, sourced from the model card
+(`docs/hf-model-card-tr-hi-s2st-v0.3.md`):
+
+1. **the training run** (⚡ section: run xzcb60bl, early stop 65,250, val table)
+2. **the curriculum notes** (onset steps, cross-codebook transfer drop,
+   `audio_loss_full` — investigation arc in PR #10 comments)
+3. **the infra lowering tables** (XLA/scan/bmm changes, replicated strategy)
+4. **the checkpoint story** (keep-all suite, interim ladder, storage-cap saga,
+   Xet-dedup main mirror)
+
+Evals + numbers get added later, after the GPU `eval_release.py` session —
+same `results.json` feeds card model-index and blog so they can't drift.
+
+### Live GPU verification of the v0.3 evals harness — UNBLOCKED (2026-07-20)
+
+The long-horizon run **completed 2026-07-19** (xzcb60bl, early stop 65,250,
+best 2.9048 @ 62,750), so the GPU session is no longer shelved — it runs on
+the user's word (rented H100/A100). Procedure: install the `eval` extra, run
+`scripts/eval_release.py` (full stages) over `v03-val-500` + `v03-fleurs-200`
+→ results.json + W&B backfill. Checkpoint sources: GCS
+`gs://tinyaya-stage2-eu/checkpoints/stage2-v6e16-mh-v03-r2/` (all 78 incl.
+`best_by_val`), or hub `tiny-aya-translate/tr-hi-s2st-v0.3` (12 revisions +
+`main:checkpoints/`). Sanity gates: GT-audio topline ≫ model score,
 ASR-judge floor consistent with corpus QC (86% pass @ WER ≤ 0.20), DNSMOS(GT)
 ≈ codec ceiling. Record wall-clock + $ cost per checkpoint sweep in
-`docs/evals-runbook.md`.
+`docs/evals-runbook.md`. Note: if the anneal leg runs first, extend the eval
+targets to its checkpoints.
 
-### eval_checkpoint ASR needs a CPU path before release eval (2026-07-09)
+### eval_checkpoint ASR needs a CPU path before release eval (2026-07-09; scope narrowed 2026-07-20)
 
-`run_asr` hardcodes `WhisperModel(..., device="cuda", compute_type="float16")` and
-`faster_whisper` is not in the lockfile. The pipeline-validation gate runs `--skip_asr`
-(token-level reproduction is the right memorization metric); the RELEASE eval (ASR-BLEU
-per release-plan §3) needs: `faster-whisper` pinned (+ int8 CPU branch or a GPU box),
-and the `rows[i]`/`ds[i]` positional-desync fixed if eval ever runs on splits with
-missing `.pt` rows (dataset drops them; `rows` doesn't).
+Largely SUPERSEDED for release evals: the evals program's
+`src/evaluation/asr_judge.py` (transformers Whisper, benchmarked judges)
+replaced the legacy faster-whisper `run_asr` path in `eval_release.py`.
+Remaining scope only if someone revives `eval_checkpoint.py --skip_asr`'s ASR:
+`run_asr` hardcodes `WhisperModel(..., device="cuda", compute_type="float16")`,
+`faster_whisper` is not in the lockfile, and the `rows[i]`/`ds[i]`
+positional-desync bites on splits with missing `.pt` rows.
 
 ### Text+audio pivot follow-ups (2026-07-08)
 
@@ -44,25 +66,20 @@ missing `.pt` rows (dataset drops them; `rows` doesn't).
   subtoken-only stream means acc is measured on sparse positions; document the expected
   scale on the card.
 
-### Keep the v0.3 HF model card's infra section in sync with the long-horizon run
-
-`docs/hf-model-card-tr-hi-s2st-v0.3.md` now has a "Training infrastructure: replicated
-strategy + XLA architecture changes" section (added 2026-07-08), and
-`docs/v0.3-public-release-plan.md` §2 has the matching checklist item. Before publishing:
-
-- Confirm which layout the published checkpoints actually use: `scan_homogeneous`
-  (adapters on ALL 36 layers, top-2 frozen/zero — any run with `use_scan_layers: true`,
-  e.g. the v6e-8 reval arms) vs classic `exclude_top=2` 34-layer layout (unscanned
-  v6e-16). Update the card's bolded checkpoint-structural row + `metadata.json` note.
-- Verify `metadata.json` actually records the adapter layout / `use_scan_layers` flag —
-  add it to the checkpoint writer if it doesn't yet.
-- Re-verify the "numerics-identical" claims one final time on the shipped code
-  (FlexibleLinear bmm + identity-skip parity test, `_ScanSafeDropout` eval no-op,
-  full-attention forcing gated to seq ≤ sliding_window).
-
 ---
 
 ## Done
+
+### ~~Keep the v0.3 HF model card's infra section in sync with the long-horizon run~~ ✅ (2026-07-20)
+
+Card fully refreshed post-run (run results, playable samples, checkpoints
+table, license correction to CC-BY-NC-4.0, intended-use + attribution
+sections) and pushed to the hub as `main:README.md` — byte-verified against
+`docs/hf-model-card-tr-hi-s2st-v0.3.md`. The run used `use_scan_layers: true`
+⇒ published checkpoints carry the all-36-layer adapter layout described in
+the card's bolded checkpoint-structural row. Residual (fold into the GPU eval
+session): one final parity re-verification of the "numerics-identical" claims
+on the shipped code while a checkpoint is loaded anyway.
 
 ### ~~Update stale defaults baked into the TPU scripts~~ ✅ (2026-07-06)
 
