@@ -41,9 +41,9 @@ suite trained by the 110,463-step long-horizon run on multi-host v6e-16.
       model card refreshed (run results, playable samples, checkpoints table,
       CC-BY-NC-4.0 license correction, blog link); governance files
       (CONTRIBUTING.md, CITATION.cff); published log cleaned 7,851→927 lines
-- [ ] **DECISION: anneal leg** (`_mh_anneal.yaml` from best 62,750 — round-3
-      R5 evidence: anneal beats plateau on all metrics; early stop means the
-      WSD anneal never ran). Launch ONLY on explicit user word.
+- [x] **Anneal leg DONE 2026-07-20** (user go): 65,250 → 76,250, linear
+      LR→0; best val composite **2.8199 @ 76,000** (vs plateau 2.9048);
+      zero preemptions; plan docs/v0.3-anneal-leg-plan.md + PR #10
 - [ ] **DECISION: v6e-16 slice teardown** (idle since run end; TRC spot
       capacity; used for hub backfills — tear down on user word)
 - [ ] Tier-1 eval proxy sweeps on saved checkpoints (CPU, actionable NOW —
@@ -53,10 +53,13 @@ suite trained by the 110,463-step long-horizon run on multi-host v6e-16.
       best-vs-LAWA-vs-final
 - [ ] Blog revision (USER-OWNED, do.md): training run / curriculum / infra
       tables / checkpoint story; evals numbers after the GPU session
-- [ ] Release flip: full 78-checkpoint backfill (branches + --main-folder),
-      model-index eval numbers, W&B project visibility, release notes
-      (obsolete: 1021mlne audio_loss_full backfill — superseded run;
-      xzcb60bl logs the metric natively)
+- [x] Repo FLIPPED PUBLIC 2026-07-20 (user go; 50 GB private cap was the
+      blocker); full ~87-checkpoint backfill running from the VM
+      (branches + --main-folder; status: gs://…/watch/fullsuite-status.txt);
+      card updated with anneal results
+- [ ] Remaining for full release: model-index eval numbers (GPU session),
+      W&B project visibility, release notes / GitHub release promotion
+      (obsolete: 1021mlne audio_loss_full backfill — superseded run)
 
 ## Definition of Done
 Public HF repo with the full revision suite + audio + logs, model card with eval

@@ -28,15 +28,15 @@ model-index:
 
 # 🗣️🔁 TinyAya — Turkish⇄Hindi Speech-to-Speech Translation (v0.3)
 
-> ✅ **Training complete (2026-07-19).** The long-horizon run
+> ✅ **Training complete — plateau + anneal (2026-07-20).** The long-horizon run
 > ([`v0.3-long-horizon-mh-r2`](https://wandb.ai/cataluna84/tinyaya-stage2-tpu/runs/xzcb60bl))
-> ended by **designed early stopping at step 65,250** of the 110,463-step horizon
-> (10 validation cycles without improvement), with **best val composite 2.9048 at
-> step 62,750** — every metric improved monotonically to the end of its budget.
-> An optional WSD anneal leg from the best checkpoint is under consideration.
-> **Checkpoints are live in this repo** as an interim 12-point ladder (see
-> *Release design*); the full 78-checkpoint suite and the end-task release evals
-> (ASR-chrF++, MOS, BLASER) land at the public flip.
+> early-stopped on the WSD plateau at step 65,250 (best 2.9048 @ 62,750), then
+> completed its **11,000-step linear LR→0 anneal leg** to step **76,250** —
+> improving validation on essentially every cycle of the descent to a final
+> **val composite 2.8199** (text ppl 1.489, text acc 96.6%). Best = step 76,000
+> ≈ final. **The repo is public and carries the FULL checkpoint suite**
+> (~87 training points as branches and under `checkpoints/`). End-task release
+> evals (ASR-chrF++, MOS, BLASER) are still pending — see *Evaluation*.
 
 Moshi-style **speech-to-speech translation with a text inner-monologue** for
 **Turkish ⇄ Hindi**: a LoRA-fine-tuned **Cohere2** backbone fused with a **frozen Moshi
@@ -64,14 +64,24 @@ earlier versions trained audio-only due to a loader bug, disclosed below.
 **Validation metrics** (teacher-forced, fixed 3,200-sample val gate — *not* the
 end-task release evals, which are pending; see *Evaluation*):
 
-| metric | step 250 | best (step 62,750) |
-|---|---|---|
-| val composite (0.4·text + 0.6·audio) | 6.719 | **2.9048** |
-| val text loss / perplexity | 4.328 / 75.8 | **0.486 / 1.63** |
-| val audio loss | 8.313 | **4.518** |
-| val text token accuracy | 25.6% | **94.4%** |
-| val cb0 (semantic codebook) accuracy | 10.4% | **40.4%** |
-| val cb1–7 accuracies | 10.5 → 0.1% | **21.0 / 17.4 / 11.5 / 8.8 / 7.2 / 6.1 / 5.9%** |
+| metric | step 250 | plateau best (62,750) | **annealed (76,000 = best ≈ final)** |
+|---|---|---|---|
+| val composite (0.4·text + 0.6·audio) | 6.719 | 2.9048 | **2.8199** |
+| val text loss / perplexity | 4.328 / 75.8 | 0.486 / 1.63 | **0.398 / 1.489** |
+| val audio loss | 8.313 | 4.518 | **4.435** |
+| val text token accuracy | 25.6% | 94.4% | **96.6%** |
+| val cb0 (semantic codebook) accuracy | 10.4% | 40.4% | **41.5%** |
+| val cb1–7 accuracies | 10.5 → 0.1% | 21.0 … 5.9% | **22.0 / 18.2 / 12.1 / 9.2 / 7.5 / 6.4 / 6.1%** |
+
+**Anneal leg.** The early stop fired on the WSD *plateau*, skipping the
+scheduled decay — so the run was resumed from step 65,250 (weights + Adam
+state + RNG) with `max_steps` extended to 76,250, placing the entire remaining
+horizon in the pre-registered **11,000-step linear LR descent 1.716e-4 → 0**
+(the shape and length our round-3 probe validated against cosine and plateau).
+Everything else stayed byte-identical; the same W&B run continues across both
+legs. The descent improved validation on essentially every 250-step cycle —
+the WSD "harvest" phase working as the literature predicts. Full plan +
+rationale: `docs/v0.3-anneal-leg-plan.md` (also on PR #10).
 
 Every deep codebook is alive and far above the 0.05% chance floor — the
 deep-codebook collapse that capped v0.2 (cb0 ~14%, cb1–7 <4%) is resolved
@@ -120,33 +130,30 @@ The same clips are browsable with a step slider in the
 [W&B run's](https://wandb.ai/cataluna84/tinyaya-stage2-tpu/runs/xzcb60bl)
 `audio/` media panels.
 
-## 📦 Checkpoints
+## 📦 Checkpoints — the full training trajectory
 
-All released checkpoints are browsable **directly in this repo's file tree**
-under [`checkpoints/`](https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3/tree/main/checkpoints)
-— no branch dropdown needed. Each folder is a complete weights-only bundle
-(`peft_adapter/` + projection / depth-decoder / embeddings / audio heads +
-`metadata.json` with full provenance):
+**Every checkpoint of the run is published** (~87 training points): log-spaced
+early steps `{1, 2, 4, …, 512}`, **every 1,000 steps from 1,000 → 76,000**
+(covering both the plateau and anneal legs), the annealed final `step-76250`,
+and 🏆 `best` (step **76,000**, val composite **2.8199**). Each is a complete
+weights-only bundle (`peft_adapter/` + projection / depth-decoder / embeddings
+/ audio heads + `metadata.json` with full provenance), available two ways:
 
-| checkpoint | val composite ↓ | browse |
-|---|---|---|
-| 🏆 **`best` (step 62,750)** | **2.9048** | [checkpoints/best](https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3/tree/main/checkpoints/best) |
-| `step-65250` (final) | 2.9084 | [checkpoints/step-65250](https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3/tree/main/checkpoints/step-65250) |
-| `step-60000` | 2.9191 | [checkpoints/step-60000](https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3/tree/main/checkpoints/step-60000) |
-| `step-54000` | 2.9307 | [checkpoints/step-54000](https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3/tree/main/checkpoints/step-54000) |
-| `step-48000` | 2.9486 | [checkpoints/step-48000](https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3/tree/main/checkpoints/step-48000) |
-| `step-42000` | 2.9679 | [checkpoints/step-42000](https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3/tree/main/checkpoints/step-42000) |
-| `step-36000` | 2.9897 | [checkpoints/step-36000](https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3/tree/main/checkpoints/step-36000) |
-| `step-30000` | 3.0203 | [checkpoints/step-30000](https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3/tree/main/checkpoints/step-30000) |
-| `step-24000` | 3.0693 | [checkpoints/step-24000](https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3/tree/main/checkpoints/step-24000) |
-| `step-18000` | 3.1292 | [checkpoints/step-18000](https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3/tree/main/checkpoints/step-18000) |
-| `step-12000` | 3.2263 | [checkpoints/step-12000](https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3/tree/main/checkpoints/step-12000) |
-| `step-6000` | 3.9410 | [checkpoints/step-6000](https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3/tree/main/checkpoints/step-6000) |
+- **Browse in the file tree** — no branch dropdown needed:
+  [`checkpoints/`](https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3/tree/main/checkpoints)
+  (e.g. [checkpoints/best](https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3/tree/main/checkpoints/best),
+  [checkpoints/step-76250](https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3/tree/main/checkpoints/step-76250))
+- **Git revisions** (Pythia/OLMo convention) for programmatic loading:
+  ```python
+  model = AutoModel.from_pretrained("tiny-aya-translate/tr-hi-s2st-v0.3",
+                                    revision="best")   # or "step-42000", …
+  ```
 
-The same bundles are also available as git revisions (Pythia convention) for
-programmatic loading — `revision="best"`, `revision="step-60000"`, etc. This
-is the interim ladder; the **full per-1,000 suite (78 checkpoints)** is
-published at the public flip.
+Trajectory landmarks (val composite): step 6,000 → 3.941 · 24,000 → 3.069 ·
+48,000 → 2.949 · 62,750 (plateau best) → 2.9048 · anneal onset 65,250 →
+**76,000 → 2.8199**. Curriculum onsets, the WSD plateau, and the anneal
+descent are all visible across the suite — built for training-dynamics and
+mech-interp study, not just the final weights.
 
 ## 📊 Evaluation
 
@@ -317,21 +324,15 @@ corrected loop.
 
 ## 🚀 Release design: the checkpoint suite you will get
 
-This repo (**`tiny-aya-translate/tr-hi-s2st-v0.3`**, private during training,
-public at release) follows the Pythia/OLMo one-branch-per-checkpoint convention,
-weights-only (optimizer/scheduler/RNG stay in archival storage):
+This repo (**`tiny-aya-translate/tr-hi-s2st-v0.3`**, now **public**) follows
+the Pythia/OLMo one-branch-per-checkpoint convention, weights-only
+(optimizer/scheduler/RNG stay in archival storage):
 
-- **Currently live: a 12-point interim ladder** — `best` (step 62,750),
-  `step-65250` (final), and `step-{6000,12000,…,60000}` (every 6,000).
-  *Ops disclosure:* the run saved **every** checkpoint (log-spaced early steps
-  `{1,2,4,…,512}` + every 1,000 — 78 in total, all safe in GCS), but
-  private-repo storage limits (~50 GB) capped what could be hosted here during
-  the private phase; the **full 78-checkpoint suite is published at the public
-  flip**. Consume any live point of the trajectory:
-  ```python
-  model = AutoModel.from_pretrained("tiny-aya-translate/tr-hi-s2st-v0.3",
-                                    revision="step-60000")
-  ```
+- **The full suite is live** — see *Checkpoints* above for the complete
+  ladder and loading examples. *Ops disclosure:* during the private training
+  phase, private-repo storage limits (~50 GB) meant only a 12-point interim
+  ladder could be hosted; the flip to public (no such cap) enabled the full
+  ~87-point publication, backfilled from the keep-all GCS archive.
 - **`samples/step_NNNNNN/`** on `main`: source / ground-truth-target / generated
   WAVs from the inline audio demo that runs on the TPU every 5000 steps — you
   can *listen* to the model improve across training.
@@ -356,11 +357,11 @@ checkpoint gains teacher-forced text **chrF/BLEU** backfilled at its own step
 | Data source repointed to `tr-hi-mimi-encoded` | ✅ |
 | Capacity sweep → recipe frozen (r=32/+MLP/rsLoRA) | ✅ |
 | Pipeline validated (all 8 codebooks memorize) | ✅ |
-| Long-horizon training run | ✅ completed 2026-07-19 (early stop @65,250; best val composite 2.9048 @62,750) |
-| Checkpoints published | ✅ interim 12-point ladder live · ☐ full 78-checkpoint suite at public flip |
+| Long-horizon training run (plateau leg) | ✅ completed 2026-07-19 (early stop @65,250; plateau best 2.9048 @62,750) |
+| WSD anneal leg (65,250 → 76,250, linear LR→0) | ✅ completed 2026-07-20 — **best val composite 2.8199 @76,000** |
+| Repo public + full checkpoint suite (~87 points) | ✅ (branches + `checkpoints/` tree) |
 | Audio samples + training log on `main` | ✅ (13 milestones, playable above) |
 | Release evals (ASR-chrF++ / MOS / BLASER) | ☐ pending — harness ready (`scripts/eval_release.py`) |
-| Optional WSD anneal leg from best checkpoint | ☐ decision pending |
 
 ## 🙏 Acknowledgements
 
