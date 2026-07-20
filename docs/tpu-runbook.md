@@ -84,6 +84,28 @@ cast explicitly in `wrap_model`.
   model's namespace and **raises** on any unfilled LoRA tensor (a base-only model can never
   load silently). See `src/training/checkpointing.py`.
 
+## Durable monitoring (MANDATORY for multi-hour runs)
+
+Any watcher for work longer than a session runs **in tmux ON the TPU VM**
+(worker 0) and publishes status to GCS — never as a workstation-local loop.
+Local loops die with the operator's session/power (proven twice: the
+2026-07-20 storm outage killed qr_watch; a Claude Code exit killed the anneal
+monitors — the *training* survived both because it follows this rule).
+
+- **Trainer**: tmux `train` (started by `startup_script.sh` /
+  `_remote_redeploy.sh`) — already the convention.
+- **Watcher**: tmux `watcher` running a loop that (a) heartbeats
+  `state/last-step/last-val` to `gs://tinyaya-stage2-eu/watch/<run>-status.txt`
+  every ~2 min, (b) appends error context (Traceback / FATAL / non-finite /
+  RESOURCE_EXHAUSTED / hard-kill) to `…/<run>-errors.txt`, (c) marks DONE vs
+  EXITED-EARLY using **fresh-timestamp exit markers only** (the append-mode
+  `/tmp/train.log` still contains previous runs' endings — naive greps
+  false-positive). Reference implementation: the anneal-leg watcher
+  (`vm_watcher.sh` pattern, 2026-07-20).
+- Anyone can check status without SSH:
+  `gcloud storage cat gs://tinyaya-stage2-eu/watch/<run>-status.txt`.
+- Workstation-local loops are permitted only as redundant conveniences.
+
 ## Sweeps (multi-host)
 
 On a single v6e-16 the 4 hosts form **one** 16-chip mesh, so a plain per-host `wandb agent`

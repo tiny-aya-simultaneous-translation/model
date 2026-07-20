@@ -59,6 +59,9 @@ SWEEP_DATA_GS_URI=gs://tinyaya-stage2-eu/data/full-corpus-ta-20260708.tar.gz \
 bash scripts/tpu/launch_spot.sh
 # babysit the QR for the whole run (local tmux):
 #   QR_NAME=... ZONE=europe-west4-a LAUNCH_ENV_FILE=launch.env bash scripts/tpu/qr_watch.sh
+# DURABLE MONITORING RULE: run/error watchers for multi-hour work go in tmux
+# ON the TPU VM (scripts/tpu/vm_watcher.sh -> GCS status file), never as
+# workstation-local loops — see docs/tpu-runbook.md "Durable monitoring".
 
 # hot-redeploy code without recreating the QR
 bash scripts/tpu/hot_redeploy.sh
