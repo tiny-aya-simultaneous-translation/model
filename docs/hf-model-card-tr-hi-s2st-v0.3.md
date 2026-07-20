@@ -26,7 +26,7 @@ model-index:
                   # eval/subsets/* -- procedure in docs/evals-runbook.md
 ---
 
-# TinyAya — Turkish⇄Hindi Speech-to-Speech Translation (v0.3)
+# 🗣️🔁 TinyAya — Turkish⇄Hindi Speech-to-Speech Translation (v0.3)
 
 > ✅ **Training complete (2026-07-19).** The long-horizon run
 > ([`v0.3-long-horizon-mh-r2`](https://wandb.ai/cataluna84/tinyaya-stage2-tpu/runs/xzcb60bl))
@@ -51,7 +51,7 @@ earlier versions trained audio-only due to a loader bug, disclosed below.
 - **Languages:** Turkish (`tr`), Hindi (`hi`)
 - **Previous version:** [`tr-hi-s2st-v0.2`](https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.2)
 
-## Training run
+## ⚡ Training run
 
 **Run:** [`v0.3-long-horizon-mh-r2` (xzcb60bl)](https://wandb.ai/cataluna84/tinyaya-stage2-tpu/runs/xzcb60bl)
 — TPU **v6e-16** (4 hosts × 4 chips, multi-host data-parallel), global batch 32,
@@ -80,7 +80,7 @@ notes: `train/audio_loss` shows upward steps at the curriculum onsets
 `train/audio_loss_full` (unweighted all-codebook mean, logged natively) for the
 jump-free audio learning curve.
 
-## Listen: audio samples (click ▶ to play)
+## 🎧 Listen: audio samples (click ▶ to play)
 
 Inline audio demos generated **on the TPU during training** every 5,000 steps —
 4 s, greedy, free-running audio (text stream teacher-forced). Final milestone,
@@ -118,7 +118,7 @@ The same clips are browsable with a step slider in the
 [W&B run's](https://wandb.ai/cataluna84/tinyaya-stage2-tpu/runs/xzcb60bl)
 `audio/` media panels.
 
-## Checkpoints
+## 📦 Checkpoints
 
 All released checkpoints are browsable **directly in this repo's file tree**
 under [`checkpoints/`](https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3/tree/main/checkpoints)
@@ -128,7 +128,7 @@ under [`checkpoints/`](https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3
 
 | checkpoint | val composite ↓ | browse |
 |---|---|---|
-| **`best` (step 62,750)** | **2.9048** | [checkpoints/best](https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3/tree/main/checkpoints/best) |
+| 🏆 **`best` (step 62,750)** | **2.9048** | [checkpoints/best](https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3/tree/main/checkpoints/best) |
 | `step-65250` (final) | 2.9084 | [checkpoints/step-65250](https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3/tree/main/checkpoints/step-65250) |
 | `step-60000` | 2.9191 | [checkpoints/step-60000](https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3/tree/main/checkpoints/step-60000) |
 | `step-54000` | 2.9307 | [checkpoints/step-54000](https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3/tree/main/checkpoints/step-54000) |
@@ -146,7 +146,7 @@ programmatic loading — `revision="best"`, `revision="step-60000"`, etc. This
 is the interim ladder; the **full per-1,000 suite (78 checkpoints)** is
 published at the public flip.
 
-## Evaluation
+## 📊 Evaluation
 
 **Published so far: training-time validation metrics only** (the table above —
 teacher-forced, fixed 3,200-sample gate, synthetic references). The end-task
@@ -313,7 +313,7 @@ for earlier versions (v0.2 included) used the broken decoding and understate AR
 quality**. Fixed in `scripts/eval_checkpoint.py`; all v0.3 release numbers use the
 corrected loop.
 
-## Release design: the checkpoint suite you will get
+## 🚀 Release design: the checkpoint suite you will get
 
 This repo (**`tiny-aya-translate/tr-hi-s2st-v0.3`**, private during training,
 public at release) follows the Pythia/OLMo one-branch-per-checkpoint convention,
@@ -360,7 +360,7 @@ checkpoint gains teacher-forced text **chrF/BLEU** backfilled at its own step
 | Release evals (ASR-chrF++ / MOS / BLASER) | ☐ pending — harness ready (`scripts/eval_release.py`) |
 | Optional WSD anneal leg from best checkpoint | ☐ decision pending |
 
-## Acknowledgements
+## 🙏 Acknowledgements
 
 Trained on Cloud TPU **v6e-16** provided by **Google's TPU Research Cloud (TRC)**.
 
