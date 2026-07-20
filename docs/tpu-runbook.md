@@ -139,6 +139,16 @@ Full blocker chain + evidence: PR #10 comments (2026-07-08).
 
 ## Gotchas
 
+- **W&B "crashed" badge lies on resumed shared-mode runs.** A multi-host
+  (shared-mode) run that was finished and later resumed (e.g. an anneal leg)
+  flips its UI badge to "crashed" whenever the heartbeat gaps ~5 min — which
+  happens routinely during multi-GB `best_by_val` uploads and one-time XLA
+  save-graph compiles. The DATA keeps flowing the whole time. Source of truth:
+  the VM watcher's GCS status file (see *Durable monitoring*), or check that
+  charts' `global_step` is still advancing. The badge settles to "finished"
+  permanently once the run's final `wandb.finish()` executes. (Bit us 3x on
+  2026-07-20.)
+
 - **`uv` under `sudo`** is not on `PATH` on fresh TPU VMs — enumerate `/root/.local/bin/uv`.
 - **fd limit**: v6e init creates ~100k FDs; launch with `ulimit -n 1048576`.
 - **`pkill -f`/`pgrep -f` self-match**: use the `[s]cripts/...` bracket trick so the command
