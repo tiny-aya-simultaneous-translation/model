@@ -23,6 +23,17 @@ revision. Planned sections, sourced from the model card
 Evals + numbers get added later, after the GPU `eval_release.py` session —
 same `results.json` feeds card model-index and blog so they can't drift.
 
+### Add anneal-leg details + results to the model card (post-anneal) (2026-07-20)
+
+After the anneal leg completes (xzcb60bl continued 65,250 → 76,250, plan:
+`docs/v0.3-anneal-leg-plan.md`): update the model card with an anneal
+section (WSD schedule note: plateau early-stop + 11k linear LR→0
+continuation), the new `best_by_val` (vs plateau best 2.9048 @ 62,750),
+refreshed val-metrics table, updated checkpoints table/interim ladder
+(annealed bundles may swap in for 1–2 mid-run ones under the 50 GB cap),
+and new audio-demo rows (70k/75k). Extend eval targets per
+`docs/evals-runbook.md` anneal contingency.
+
 ### Live GPU verification of the v0.3 evals harness — UNBLOCKED (2026-07-20)
 
 The long-horizon run **completed 2026-07-19** (xzcb60bl, early stop 65,250,
