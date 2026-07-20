@@ -363,6 +363,17 @@ def test_log_noise_elimination_wiring():
         assert "TRANSFORMERS_VERBOSITY=error" in src
 
 
+def test_suite_main_folder_mode_wiring():
+    # --main-folder mirrors bundles into main:checkpoints/<label>/ for
+    # file-tree discoverability (visitors don't use the branch dropdown);
+    # branch mode stays the default (Pythia revision loading).
+    src = (REPO / "scripts" / "publish_checkpoint_suite.py").read_text()
+    assert '"--main-folder"' in src
+    assert 'path_in_repo=f"checkpoints/{branch}"' in src
+    assert 'revision="main"' in src
+    assert "push_checkpoint_to_hub(" in src  # branch mode still present
+
+
 def test_dedupe_repeats():
     path = REPO / "src" / "training" / "checkpointing.py"
     spec = importlib.util.spec_from_file_location("ckpt_dedupe", path)

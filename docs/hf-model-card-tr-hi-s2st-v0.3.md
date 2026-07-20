@@ -118,6 +118,34 @@ The same clips are browsable with a step slider in the
 [W&B run's](https://wandb.ai/cataluna84/tinyaya-stage2-tpu/runs/xzcb60bl)
 `audio/` media panels.
 
+## Checkpoints
+
+All released checkpoints are browsable **directly in this repo's file tree**
+under [`checkpoints/`](https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3/tree/main/checkpoints)
+— no branch dropdown needed. Each folder is a complete weights-only bundle
+(`peft_adapter/` + projection / depth-decoder / embeddings / audio heads +
+`metadata.json` with full provenance):
+
+| checkpoint | val composite ↓ | browse |
+|---|---|---|
+| **`best` (step 62,750)** | **2.9048** | [checkpoints/best](https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3/tree/main/checkpoints/best) |
+| `step-65250` (final) | 2.9084 | [checkpoints/step-65250](https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3/tree/main/checkpoints/step-65250) |
+| `step-60000` | 2.9191 | [checkpoints/step-60000](https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3/tree/main/checkpoints/step-60000) |
+| `step-54000` | 2.9307 | [checkpoints/step-54000](https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3/tree/main/checkpoints/step-54000) |
+| `step-48000` | 2.9486 | [checkpoints/step-48000](https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3/tree/main/checkpoints/step-48000) |
+| `step-42000` | 2.9679 | [checkpoints/step-42000](https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3/tree/main/checkpoints/step-42000) |
+| `step-36000` | 2.9897 | [checkpoints/step-36000](https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3/tree/main/checkpoints/step-36000) |
+| `step-30000` | 3.0203 | [checkpoints/step-30000](https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3/tree/main/checkpoints/step-30000) |
+| `step-24000` | 3.0693 | [checkpoints/step-24000](https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3/tree/main/checkpoints/step-24000) |
+| `step-18000` | 3.1292 | [checkpoints/step-18000](https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3/tree/main/checkpoints/step-18000) |
+| `step-12000` | 3.2263 | [checkpoints/step-12000](https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3/tree/main/checkpoints/step-12000) |
+| `step-6000` | 3.9410 | [checkpoints/step-6000](https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3/tree/main/checkpoints/step-6000) |
+
+The same bundles are also available as git revisions (Pythia convention) for
+programmatic loading — `revision="best"`, `revision="step-60000"`, etc. This
+is the interim ladder; the **full per-1,000 suite (78 checkpoints)** is
+published at the public flip.
+
 ## Evaluation
 
 **Published so far: training-time validation metrics only** (the table above —
@@ -174,17 +202,6 @@ alignment files live at the dataset root (not `encoded/`) under names that diffe
 the split manifests' `src_align_path`/`tgt_align_path` fields — v0.1–v0.2 missed them
 entirely because of this (silently zero text loss); our loader maps the names
 (`src/data/dataset.py::_resolve_alignment`).
-
-### ⚠️ The honest mistake this fixes
-
-**v0.2 was trained on the wrong dataset.** It used the **`fleurs-`**-prefixed
-*sibling* repo — [`fleurs-tr-hi-mimi-encoded`](https://huggingface.co/datasets/tiny-aya-translate/fleurs-tr-hi-mimi-encoded)
-(Mimi-encoded **FLEURS** read speech: real FLEURS audio + TTS over FLEURS text) —
-because the training launcher's `HF_DATASET` default pointed there. So v0.2's
-experimental setup did **not** match the FLORES/OPUS-100/conversational synthetic
-corpus described in our write-up. v0.3 repoints the data loader to
-`tr-hi-mimi-encoded` so the run and the description agree. We're documenting this
-openly rather than silently re-labeling v0.2.
 
 ## Recipe (capacity-sweep winner)
 
@@ -329,17 +346,6 @@ codebook-collapse instrument), perplexities, tokens-seen axes, MFU estimate,
 per-chip HBM for all 16 chips, and the audio demos. Post-hoc, each published
 checkpoint gains teacher-forced text **chrF/BLEU** backfilled at its own step
 (`eval/*`, via `scripts/eval_translation_proxy.py`).
-
-## Dress rehearsals (pre-launch validation, 2026-07-14/15)
-
-The exact long-horizon stack was rehearsed end-to-end on the full corpus with
-the run's WSD trajectory replayed exactly:
-
-| rehearsal | W&B | result |
-|---|---|---|
-| 2,000 steps | [7pj1dkht](https://wandb.ai/cataluna84/tinyaya-stage2-tpu/runs/7pj1dkht) | text CE 10.90→2.92, audio 7.85→5.85; all param groups training; zero non-finite gradients |
-| 5,000 steps | [m3rmohn5](https://wandb.ai/cataluna84/tinyaya-stage2-tpu/runs/m3rmohn5) | loss 10.03→6.09; cb0 prediction entropy 8.71 bits / 64.7% active codes; TF text chrF 41.6 @ 0.14 epoch |
-| audio smoke | [xxbchrr6](https://wandb.ai/cataluna84/tinyaya-stage2-tpu/runs/xxbchrr6) | inline TPU AR audio demos: 48 s cold / 29 s warm, WAVs in W&B |
 
 ## Status checklist
 

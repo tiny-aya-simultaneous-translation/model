@@ -89,6 +89,13 @@ def main() -> None:
     ap.add_argument("--repo-id", required=True, help="target HF repo, e.g. org/name")
     ap.add_argument("--include-best", action="store_true", help="also push best_by_val -> branch 'best'")
     ap.add_argument("--only-steps", default="", help="comma list to restrict which steps to push")
+    ap.add_argument(
+        "--main-folder",
+        action="store_true",
+        help="mirror into main:checkpoints/<label>/ instead of a step-N branch "
+        "(file-tree discoverability: visitors browse Files & Versions, not the "
+        "branch dropdown; Xet dedup makes same-bytes mirrors ~storage-free)",
+    )
     ap.add_argument("--dry-run", action="store_true", help="list what would be pushed, upload nothing")
     args = ap.parse_args()
 
@@ -107,7 +114,8 @@ def main() -> None:
     print(f"[suite] {len(plan)} checkpoints -> https://huggingface.co/{args.repo_id}")
     for d, step in plan:
         branch = f"step-{step}" if isinstance(step, int) else str(step)
-        print(f"[suite] {d} -> {args.repo_id}@{branch}")
+        dest = f" main:checkpoints/{branch}" if args.main_folder else f"@{branch}"
+        print(f"[suite] {d} -> {args.repo_id}{dest}")
         if args.dry_run:
             continue
         stage = Path(tempfile.mkdtemp(prefix="suite_"))
@@ -116,10 +124,21 @@ def main() -> None:
             if not read_checkpoint_metadata(str(stage)):
                 print(f"[suite]   SKIP {branch}: no metadata (incomplete)")
                 continue
-            push_checkpoint_to_hub(
-                str(stage), args.repo_id, commit_message=f"checkpoint {branch}",
-                token=token, revision=branch,
-            )
+            if args.main_folder:
+                from huggingface_hub import HfApi
+
+                HfApi(token=token).upload_folder(
+                    folder_path=str(stage),
+                    repo_id=args.repo_id,
+                    path_in_repo=f"checkpoints/{branch}",
+                    revision="main",
+                    commit_message=f"checkpoints/{branch} (main-tree mirror)",
+                )
+            else:
+                push_checkpoint_to_hub(
+                    str(stage), args.repo_id, commit_message=f"checkpoint {branch}",
+                    token=token, revision=branch,
+                )
         finally:
             shutil.rmtree(stage, ignore_errors=True)
     print("[suite] done")
