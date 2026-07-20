@@ -4,12 +4,14 @@ Moshi-style **speech-to-speech translation with a text inner-monologue** for
 Turkish↔Hindi, built on a LoRA-fine-tuned Cohere2 backbone (3B) with a **frozen** Moshi
 depth decoder producing 8 RVQ Mimi codebooks.
 
-> **Status (v0.3):** recipe frozen, pipeline-validated, and the 110,463-step (≈3-epoch)
-> **long-horizon run** on multi-host v6e-16 is fully rehearsed and launch-ready (2000-
-> and 5000-step dress rehearsals PASS; live dashboards:
-> [W&B release view](https://wandb.ai/cataluna84/tinyaya-stage2-tpu?nw=bg2vkino3r4)).
-> Eval numbers land when the run completes. This is a research checkpoint
-> for low-resource S2ST, not a production translator. See
+> **Status (v0.3): training complete.** The long-horizon run on multi-host v6e-16
+> ([W&B `v0.3-long-horizon-mh-r2`](https://wandb.ai/cataluna84/tinyaya-stage2-tpu/runs/xzcb60bl))
+> ended by designed early stopping at **step 65,250** (best val composite **2.9048**
+> @ step 62,750; all metrics improved monotonically). Checkpoints + playable audio
+> samples: [`tiny-aya-translate/tr-hi-s2st-v0.3`](https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3)
+> (interim 12-point ladder; full 78-checkpoint suite at public flip). Release evals
+> (ASR-chrF++/MOS/BLASER via `scripts/eval_release.py`) are pending. This is a research
+> checkpoint for low-resource S2ST, not a production translator. See
 > [`docs/v0.3-public-release-plan.md`](docs/v0.3-public-release-plan.md) for the honest
 > release narrative.
 
@@ -171,5 +173,17 @@ custom `projection.pt` / `depth_decoder.pt` / `audio_heads.pt` / `text_embed.pt`
 - [`sound-quality-check`](https://github.com/tiny-aya-simulatenous-translation/sound-quality-check) — 4-stage audio QC pipeline
 
 ## License
-Apache 2.0 (trained deltas + our code). Base weights from Cohere and Moshi/Mimi carry
-their own licenses — see [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+
+- **Code (this repository): Apache-2.0** (see [`LICENSE`](LICENSE)).
+- **Released weights** (LoRA adapters + trained embeddings/projection at
+  [`tiny-aya-translate/tr-hi-s2st-v0.3`](https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3)):
+  **CC-BY-NC-4.0** — they are derivatives of `CohereLabs/tiny-aya-base`
+  (CC-BY-NC-4.0) and inherit its non-commercial terms; Moshi/Mimi components
+  are CC-BY-4.0 (attribution given). Details in
+  [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+
+## Acknowledgements
+
+Training compute (Cloud TPU v6e) provided by **Google's TPU Research Cloud (TRC)**.
+Built on [Cohere Labs tiny-aya](https://huggingface.co/CohereLabs/tiny-aya-base) and
+[kyutai's Moshi/Mimi](https://github.com/kyutai-labs/moshi).

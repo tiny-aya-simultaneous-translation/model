@@ -1,0 +1,16 @@
+cff-version: 1.2.0
+message: "If you use this model or codebase, please cite it as below."
+title: "TinyAya: Turkish-Hindi Speech-to-Speech Translation (v0.3)"
+authors:
+  - name: "tiny-aya-translate"
+type: software
+year: 2026
+url: "https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3"
+repository-code: "https://github.com/tiny-aya-simultaneous-translation/model"
+license: Apache-2.0
+notes: >-
+  Cohere2 backbone + frozen Moshi depth decoder, LoRA (r=32, +MLP, rsLoRA);
+  text+audio S2ST over Mimi codes on a synthetic FLORES/OPUS/conversational
+  corpus. Trained on Cloud TPU v6e via Google's TPU Research Cloud (TRC).
+  Code Apache-2.0; released weights CC-BY-NC-4.0 (derivative of
+  CohereLabs/tiny-aya-base).

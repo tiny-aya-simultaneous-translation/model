@@ -2,7 +2,9 @@
 language:
   - tr
   - hi
-license: apache-2.0
+# Weights are a derivative of CohereLabs/tiny-aya-base (CC-BY-NC-4.0) -> the
+# model inherits NC. The training/eval CODE is Apache-2.0 (GitHub repo).
+license: cc-by-nc-4.0
 library_name: peft
 pipeline_tag: audio-to-audio
 tags:
@@ -26,11 +28,15 @@ model-index:
 
 # TinyAya — Turkish⇄Hindi Speech-to-Speech Translation (v0.3)
 
-> 🚧 **Held — recipe frozen, weights pending.** The 110,463-step (≈3-epoch) long-horizon
-> run is validated and launch-ready but has not yet completed, so weights and downstream
-> metrics are **not yet published**. This card documents the dataset, the recipe-as-frozen,
-> and the release design, for transparency; it will be updated with checkpoints and
-> evaluation once the run finishes.
+> ✅ **Training complete (2026-07-19).** The long-horizon run
+> ([`v0.3-long-horizon-mh-r2`](https://wandb.ai/cataluna84/tinyaya-stage2-tpu/runs/xzcb60bl))
+> ended by **designed early stopping at step 65,250** of the 110,463-step horizon
+> (10 validation cycles without improvement), with **best val composite 2.9048 at
+> step 62,750** — every metric improved monotonically to the end of its budget.
+> An optional WSD anneal leg from the best checkpoint is under consideration.
+> **Checkpoints are live in this repo** as an interim 12-point ladder (see
+> *Release design*); the full 78-checkpoint suite and the end-task release evals
+> (ASR-chrF++, MOS, BLASER) land at the public flip.
 
 Moshi-style **speech-to-speech translation with a text inner-monologue** for
 **Turkish ⇄ Hindi**: a LoRA-fine-tuned **Cohere2** backbone fused with a **frozen Moshi
@@ -44,6 +50,116 @@ earlier versions trained audio-only due to a loader bug, disclosed below.
 - **Model type:** parallel two-stream S2ST (Cohere2 + LoRA → CB0; frozen Moshi depth decoder → CB1–7)
 - **Languages:** Turkish (`tr`), Hindi (`hi`)
 - **Previous version:** [`tr-hi-s2st-v0.2`](https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.2)
+
+## Training run
+
+**Run:** [`v0.3-long-horizon-mh-r2` (xzcb60bl)](https://wandb.ai/cataluna84/tinyaya-stage2-tpu/runs/xzcb60bl)
+— TPU **v6e-16** (4 hosts × 4 chips, multi-host data-parallel), global batch 32,
+~1.45 s/step, **zero spot preemptions**, config
+`configs/tpu/stage2_tpu_v6e16_full_v03_mh.yaml`. Ended by designed early stop at
+**step 65,250** (patience 10 val cycles); 261 validation cycles over the run.
+
+**Validation metrics** (teacher-forced, fixed 3,200-sample val gate — *not* the
+end-task release evals, which are pending; see *Evaluation*):
+
+| metric | step 250 | best (step 62,750) |
+|---|---|---|
+| val composite (0.4·text + 0.6·audio) | 6.719 | **2.9048** |
+| val text loss / perplexity | 4.328 / 75.8 | **0.486 / 1.63** |
+| val audio loss | 8.313 | **4.518** |
+| val text token accuracy | 25.6% | **94.4%** |
+| val cb0 (semantic codebook) accuracy | 10.4% | **40.4%** |
+| val cb1–7 accuracies | 10.5 → 0.1% | **21.0 / 17.4 / 11.5 / 8.8 / 7.2 / 6.1 / 5.9%** |
+
+Every deep codebook is alive and far above the 0.05% chance floor — the
+deep-codebook collapse that capped v0.2 (cb0 ~14%, cb1–7 <4%) is resolved
+(coarse→fine unmask curriculum + per-codebook loss weights). Chart-reading
+notes: `train/audio_loss` shows upward steps at the curriculum onsets
+(cb2–cb7 activate at steps 1,579/3,157/4,735/6,313/7,891/9,469 — the metric's
+*definition* grows; per-codebook CEs actually **drop** at each onset). Use
+`train/audio_loss_full` (unweighted all-codebook mean, logged natively) for the
+jump-free audio learning curve.
+
+## Listen: audio samples (click ▶ to play)
+
+Inline audio demos generated **on the TPU during training** every 5,000 steps —
+4 s, greedy, free-running audio (text stream teacher-forced). Final milestone,
+full trio:
+
+**Step 65,000 — source (Turkish):**
+<audio controls src="https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3/resolve/main/samples/step_065000/source.wav"></audio>
+
+**Step 65,000 — ground-truth target (Hindi, synthetic TTS):**
+<audio controls src="https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3/resolve/main/samples/step_065000/target_gt.wav"></audio>
+
+**Step 65,000 — model-generated translation:**
+<audio controls src="https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3/resolve/main/samples/step_065000/generated.wav"></audio>
+
+**Hear it learn** — the same fixed sample generated at every 5,000-step
+milestone (source/target links per row):
+
+| step | generated | source / target |
+|---|---|---|
+| 5,000 | <audio controls src="https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3/resolve/main/samples/step_005000/generated.wav"></audio> | [src](https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3/resolve/main/samples/step_005000/source.wav) / [tgt](https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3/resolve/main/samples/step_005000/target_gt.wav) |
+| 10,000 | <audio controls src="https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3/resolve/main/samples/step_010000/generated.wav"></audio> | [src](https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3/resolve/main/samples/step_010000/source.wav) / [tgt](https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3/resolve/main/samples/step_010000/target_gt.wav) |
+| 15,000 | <audio controls src="https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3/resolve/main/samples/step_015000/generated.wav"></audio> | [src](https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3/resolve/main/samples/step_015000/source.wav) / [tgt](https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3/resolve/main/samples/step_015000/target_gt.wav) |
+| 20,000 | <audio controls src="https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3/resolve/main/samples/step_020000/generated.wav"></audio> | [src](https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3/resolve/main/samples/step_020000/source.wav) / [tgt](https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3/resolve/main/samples/step_020000/target_gt.wav) |
+| 25,000 | <audio controls src="https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3/resolve/main/samples/step_025000/generated.wav"></audio> | [src](https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3/resolve/main/samples/step_025000/source.wav) / [tgt](https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3/resolve/main/samples/step_025000/target_gt.wav) |
+| 30,000 | <audio controls src="https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3/resolve/main/samples/step_030000/generated.wav"></audio> | [src](https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3/resolve/main/samples/step_030000/source.wav) / [tgt](https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3/resolve/main/samples/step_030000/target_gt.wav) |
+| 35,000 | <audio controls src="https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3/resolve/main/samples/step_035000/generated.wav"></audio> | [src](https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3/resolve/main/samples/step_035000/source.wav) / [tgt](https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3/resolve/main/samples/step_035000/target_gt.wav) |
+| 40,000 | <audio controls src="https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3/resolve/main/samples/step_040000/generated.wav"></audio> | [src](https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3/resolve/main/samples/step_040000/source.wav) / [tgt](https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3/resolve/main/samples/step_040000/target_gt.wav) |
+| 45,000 | <audio controls src="https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3/resolve/main/samples/step_045000/generated.wav"></audio> | [src](https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3/resolve/main/samples/step_045000/source.wav) / [tgt](https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3/resolve/main/samples/step_045000/target_gt.wav) |
+| 50,000 | <audio controls src="https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3/resolve/main/samples/step_050000/generated.wav"></audio> | [src](https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3/resolve/main/samples/step_050000/source.wav) / [tgt](https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3/resolve/main/samples/step_050000/target_gt.wav) |
+| 55,000 | <audio controls src="https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3/resolve/main/samples/step_055000/generated.wav"></audio> | [src](https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3/resolve/main/samples/step_055000/source.wav) / [tgt](https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3/resolve/main/samples/step_055000/target_gt.wav) |
+| 60,000 | <audio controls src="https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3/resolve/main/samples/step_060000/generated.wav"></audio> | [src](https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3/resolve/main/samples/step_060000/source.wav) / [tgt](https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3/resolve/main/samples/step_060000/target_gt.wav) |
+| 65,000 | <audio controls src="https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3/resolve/main/samples/step_065000/generated.wav"></audio> | [src](https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3/resolve/main/samples/step_065000/source.wav) / [tgt](https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3/resolve/main/samples/step_065000/target_gt.wav) |
+
+The same clips are browsable with a step slider in the
+[W&B run's](https://wandb.ai/cataluna84/tinyaya-stage2-tpu/runs/xzcb60bl)
+`audio/` media panels.
+
+## Evaluation
+
+**Published so far: training-time validation metrics only** (the table above —
+teacher-forced, fixed 3,200-sample gate, synthetic references). The end-task
+**release evals are pending** and will be produced by the repo's 8-stage
+harness (`scripts/eval_release.py`) over frozen, digest-verified subsets:
+ASR-chrF++/BLEU/WER per direction **with the ground-truth-audio topline**
+(same judge on GT target audio — the TTS+Mimi+ASR ceiling), DNSMOS/Distill-MOS
+reported as Δ(generated − GT), BLASER-2.0 QE/Ref, an LLM adequacy judge, and
+RTF/first-audio latency. Subsets: `v03-val-500` (in-domain) and
+`v03-fleurs-200` (real human recordings — an **acoustic** domain-shift set
+only; its texts overlap the training corpus 200/200 via FLORES, audited and
+disclosed). References throughout are **machine-translation-synthetic**;
+chrF++ is primary (BLEU is unreliable at these ranges). Numbers land in
+`model-index` and this section when the eval pass completes.
+
+## Intended use & limitations
+
+- **Intended:** research on speech-to-speech translation, training-dynamics
+  study over the checkpoint trajectory, and TR↔HI S2ST prototyping.
+  **Non-commercial only** (CC-BY-NC-4.0, inherited from the base model).
+- **Not intended:** production/commercial use, surveillance, or speaker
+  impersonation. Training speech is **synthetic multi-voice TTS** (kokoro /
+  XTTS-v2 / chatterbox) — no real-speaker cloning data — and output voices are
+  those synthetic voices.
+- **Limitations:** Turkish↔Hindi only; translation references are
+  MT-synthetic (quality ceilings reflect that); Mimi operates at 12.5 Hz
+  frames (80 ms granularity); the training-time demos use a 4 s generation
+  window; release-eval quality numbers are not yet published (see above).
+
+## License & attribution
+
+- **Weights (this repo): CC-BY-NC-4.0** — derivative of
+  [`CohereLabs/tiny-aya-base`](https://huggingface.co/CohereLabs/tiny-aya-base)
+  (CC-BY-NC-4.0). Depth-decoder and Mimi components derive from
+  [kyutai's Moshi](https://huggingface.co/kyutai/moshiko-pytorch-bf16)
+  (CC-BY-4.0; attribution hereby given).
+- **Training/eval code: Apache-2.0** — the
+  [GitHub repository](https://github.com/tiny-aya-simultaneous-translation/model).
+- Some evaluation tools referenced by the harness (BLASER-2.0/SONAR, CometKiwi)
+  are CC-BY-NC and are used for evaluation only; nothing from them ships in
+  the weights.
 
 ## Dataset (corrected from v0.2)
 
@@ -183,14 +299,19 @@ corrected loop.
 ## Release design: the checkpoint suite you will get
 
 This repo (**`tiny-aya-translate/tr-hi-s2st-v0.3`**, private during training,
-public at release) receives artifacts **live during the run**:
+public at release) follows the Pythia/OLMo one-branch-per-checkpoint convention,
+weights-only (optimizer/scheduler/RNG stay in archival storage):
 
-- **One branch per checkpoint** (Pythia/OLMo convention): log-spaced early steps
-  `{1,2,4,…,512}` + every 1000 steps + `best` — ~122 revisions, weights-only
-  (optimizer/scheduler/RNG stay in GCS). Consume any point of the trajectory:
+- **Currently live: a 12-point interim ladder** — `best` (step 62,750),
+  `step-65250` (final), and `step-{6000,12000,…,60000}` (every 6,000).
+  *Ops disclosure:* the run saved **every** checkpoint (log-spaced early steps
+  `{1,2,4,…,512}` + every 1,000 — 78 in total, all safe in GCS), but
+  private-repo storage limits (~50 GB) capped what could be hosted here during
+  the private phase; the **full 78-checkpoint suite is published at the public
+  flip**. Consume any live point of the trajectory:
   ```python
   model = AutoModel.from_pretrained("tiny-aya-translate/tr-hi-s2st-v0.3",
-                                    revision="step-12000")
+                                    revision="step-60000")
   ```
 - **`samples/step_NNNNNN/`** on `main`: source / ground-truth-target / generated
   WAVs from the inline audio demo that runs on the TPU every 5000 steps — you
@@ -200,9 +321,10 @@ public at release) receives artifacts **live during the run**:
   deployed code, dataset digest `rows/pt/al/md5`, seed, global batch) and a
   byte-exact file manifest.
 
-Live telemetry is public on W&B: the
-[release dashboard](https://wandb.ai/cataluna84/tinyaya-stage2-tpu?nw=bg2vkino3r4)
-streams losses, per-codebook prediction **entropy + active-code fraction** (the
+Full telemetry is on W&B — the completed run
+[`v0.3-long-horizon-mh-r2`](https://wandb.ai/cataluna84/tinyaya-stage2-tpu/runs/xzcb60bl)
+(also via the [release dashboard](https://wandb.ai/cataluna84/tinyaya-stage2-tpu?nw=bg2vkino3r4))
+carries losses, per-codebook prediction **entropy + active-code fraction** (the
 codebook-collapse instrument), perplexities, tokens-seen axes, MFU estimate,
 per-chip HBM for all 16 chips, and the audio demos. Post-hoc, each published
 checkpoint gains teacher-forced text **chrF/BLEU** backfilled at its own step
@@ -226,9 +348,11 @@ the run's WSD trajectory replayed exactly:
 | Data source repointed to `tr-hi-mimi-encoded` | ✅ |
 | Capacity sweep → recipe frozen (r=32/+MLP/rsLoRA) | ✅ |
 | Pipeline validated (all 8 codebooks memorize) | ✅ |
-| Long-horizon training run (110,463 steps ≈ 3 epochs) | ☐ validated + launch-ready |
-| Checkpoints published | ☐ pending |
-| Per-codebook acc / ASR-BLEU / DNSMOS eval | ☐ pending |
+| Long-horizon training run | ✅ completed 2026-07-19 (early stop @65,250; best val composite 2.9048 @62,750) |
+| Checkpoints published | ✅ interim 12-point ladder live · ☐ full 78-checkpoint suite at public flip |
+| Audio samples + training log on `main` | ✅ (13 milestones, playable above) |
+| Release evals (ASR-chrF++ / MOS / BLASER) | ☐ pending — harness ready (`scripts/eval_release.py`) |
+| Optional WSD anneal leg from best checkpoint | ☐ decision pending |
 
 ## Acknowledgements
 
