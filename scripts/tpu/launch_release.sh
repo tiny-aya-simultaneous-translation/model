@@ -48,13 +48,13 @@ echo "[release] $(date -Is) training exited status $STATUS" | tee -a "$LOG"
 # --- sanitize + upload the log to GCS (audit items #5, #12) -------------
 SANITIZED=/tmp/train_15k.log
 python3 - "$LOG" "$SANITIZED" <<'PY'
-import re, sys
+import os, re, sys
 raw = open(sys.argv[1]).read()
 for pat in (r"hf_[A-Za-z0-9]{20,}", r"\b[0-9a-f]{40}\b",
             r"(?i)(api[_-]?key|token|secret|password|kaggle_key)\s*[=:]\s*\S+",
             r"(?i)bearer\s+[A-Za-z0-9._-]{20,}"):
     raw = re.sub(pat, "***REDACTED***", raw)
-raw = raw.replace("/home/cataluna84", "/home/USER")
+raw = raw.replace(os.path.expanduser("~"), "/home/USER")
 open(sys.argv[2], "w").write(raw)
 print(f"[release] sanitized log -> {sys.argv[2]} ({len(raw)} bytes)")
 PY
