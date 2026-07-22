@@ -175,7 +175,7 @@ mech-interp study, not just the final weights.
 ## 📊 Evaluation — a data-efficiency study of S2ST emergence
 
 End-task release evals are **complete**. Full report + reproducibility:
-[`docs/v0.3-eval-report.md`](https://github.com/tiny-aya-simultaneous-translation/model/blob/main/docs/v0.3-eval-report.md).
+[`docs/v0.3-eval-report.md`](https://github.com/tiny-aya-simultaneous-translation/model/blob/feat/v0.3-implementation/docs/v0.3-eval-report.md).
 
 **The question v0.3 answers** (from the [blog](https://labscommunity.cohere.com/blog/2026/adapting-moshi-low-resource-speech-translation/),
 written on a 26K-sample pilot): *how much training on the full 840K dataset
@@ -424,7 +424,7 @@ checkpoint gains teacher-forced text **chrF/BLEU** backfilled at its own step
 | WSD anneal leg (65,250 → 76,250, linear LR→0) | ✅ completed 2026-07-20 — **best val composite 2.8199 @76,000** |
 | Repo public + full checkpoint suite (~87 points) | ✅ (branches + `checkpoints/` tree) |
 | Audio samples + training log on `main` | ✅ (13 milestones, playable above) |
-| Release evals (ASR-chrF++ / MOS / BLASER / GEMBA / RTF) | ✅ complete 2026-07-22 — data-efficiency study; `@best` (76,000) released; report [`docs/v0.3-eval-report.md`](https://github.com/tiny-aya-simultaneous-translation/model/blob/main/docs/v0.3-eval-report.md) |
+| Release evals (ASR-chrF++ / MOS / BLASER / GEMBA / RTF) | ✅ complete 2026-07-22 — data-efficiency study; `@best` (76,000) released; report [`docs/v0.3-eval-report.md`](https://github.com/tiny-aya-simultaneous-translation/model/blob/feat/v0.3-implementation/docs/v0.3-eval-report.md) |
 
 ## 🙏 Acknowledgements
 
