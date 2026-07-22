@@ -13,11 +13,22 @@ stack). Model source: `tiny-aya-translate/tr-hi-s2st-v0.3` —
 
 ```bash
 git clone https://github.com/tiny-aya-simultaneous-translation/model.git && cd model
-uv sync --extra eval
+# GPU box uses the CUDA torch build (cu128). The `cuda` dependency-group +
+# cu128-routed torch/torchaudio are pinned in pyproject.toml/uv.lock, so this
+# reproduces byte-for-byte. `--no-default-groups` drops the TPU-only default
+# group (torch-xla/libtpu); `--group cuda` brings torch 2.9.0+cu128.
+uv sync --no-default-groups --group cuda --extra eval
 export HF_TOKEN=...          # gated tiny-aya-base + hub pushes
 export WANDB_API_KEY=...     # backfill into run xzcb60bl
 export GEMINI_API_KEY=...    # referee + GEMBA judge   (env only, NEVER print)
 ```
+
+> **Run every eval command through the same group flags** so `uv run`'s
+> pre-sync does not revert to the default (CPU/TPU) torch. Either add
+> `--no-default-groups --group cuda --extra eval` to each `uv run`, or define
+> once in `~/.eval_env`:
+> `evalpy() { uv run --no-default-groups --group cuda --extra eval python "$@"; }`
+> and use `evalpy scripts/eval_release.py ...` for every invocation below.
 
 ## 1. Data staging (hub-only)
 

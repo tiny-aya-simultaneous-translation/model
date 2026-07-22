@@ -10,29 +10,13 @@ authors = [
 license = { text = "Apache-2.0" }
 
 dependencies = [
-    # TPU stack: torch/torch-xla move in lockstep with each other and
-    # with libtpu. torch-xla's latest release is 2.9.0, which pins
-    # torch==2.9.0, so this trio stays at 2.9.0 (already newest usable).
-    "torch==2.9.0",
-    "torch-xla[tpu]==2.9.0",
-    # torch_xla's scan backward under SPMD traces jax.experimental.shard_alike
-    # via xb.call_jax (scan.py:472 wraps backward in _backward_shard_alike
-    # whenever runtime.is_spmd()). Without jax the first scanned backward dies
-    # with ModuleNotFoundError. CPU wheels suffice -- jax only traces to
-    # StableHLO here, it never touches the TPU. Pins match torch_xla 2.9.0's
-    # own `pallas` extra (jax==0.7.1/jaxlib==0.7.1).
-    "jax==0.7.1",
-    "jaxlib==0.7.1",
-    # xb.call_jax also hard-requires torchax (xla_builder.py: `if jax is None
-    # or tx is None: raise AssertionError('Jax is required...')`) -- the jax
-    # pins alone still fail with that same message. Proven live on the scan2
-    # smoke 2026-07-08.
-    "torchax==0.0.13",
-    # torchax imports flax at module import time but does not declare it
-    # (`import torchax` -> ModuleNotFoundError: No module named 'flax',
-    # proven live on the scan3 smoke 2026-07-08). CPU-only tracing use, same
-    # as jax above.
-    "flax>=0.10",
+    # torch itself is NOT declared here -- it lives in the mutually-exclusive
+    # `tpu` (CPU wheels, default) and `cuda` (cu128 wheels, GPU eval box)
+    # dependency-groups below so the SAME lock reproduces both environments
+    # (uv routes torch/torchaudio to the right index per active group). Base
+    # consumers (peft/accelerate) still pull torch transitively; the active
+    # group pins its version + variant. See [dependency-groups] + [tool.uv].
+    #
     # Pinned to the validated 4.49 line. The model code is coupled to
     # transformers' Cohere2 + Moshi internals, and live v6e-8 smoke runs
     # proved newer lines break it in multiple places:
@@ -64,7 +48,9 @@ dependencies = [
 eval = [
     "speechmos>=0.0.1",
     "datasets>=5.0",
-    "torchaudio==2.9.0",
+    # torchaudio is NOT here -- it must track the torch wheel variant, so it
+    # lives in the `cuda` group (GPU eval box) alongside cu128 torch. The mos
+    # stage that needs it only runs on that box.
     "jiwer>=3.0",             # WER/CER (text_metrics)
     "faster-whisper>=1.0",    # optional CUDA ASR path (asr_judge)
     "distillmos>=0.1",        # Distill-MOS predictor (mos)
@@ -79,6 +65,48 @@ dev = [
     "pytest>=9.0",
 ]
 
+# Backend-specific torch stacks as mutually-exclusive dependency-groups.
+# `tpu` is the DEFAULT (see [tool.uv].default-groups) so bare `uv sync`,
+# `uv sync --frozen --extra eval` (TPU host startup), and dev installs are
+# UNCHANGED. The GPU eval box (Lambda A100) opts into `cuda` instead:
+#   uv sync --no-default-groups --group cuda --extra eval
+# One uv.lock reproduces both -- torch/torchaudio route to the CPU or cu128
+# index by which group is active (see [tool.uv.sources]).
+[dependency-groups]
+# TPU stack: torch/torch-xla move in lockstep with each other and with
+# libtpu. torch-xla's latest release is 2.9.0, which pins torch==2.9.0, so
+# this trio stays at 2.9.0 (already newest usable). CPU wheels -- TPU host
+# CPUs do not need CUDA.
+tpu = [
+    "torch==2.9.0",
+    "torch-xla[tpu]==2.9.0",
+    # torch_xla's scan backward under SPMD traces jax.experimental.shard_alike
+    # via xb.call_jax (scan.py:472 wraps backward in _backward_shard_alike
+    # whenever runtime.is_spmd()). Without jax the first scanned backward dies
+    # with ModuleNotFoundError. CPU wheels suffice -- jax only traces to
+    # StableHLO here, it never touches the TPU. Pins match torch_xla 2.9.0's
+    # own `pallas` extra (jax==0.7.1/jaxlib==0.7.1).
+    "jax==0.7.1",
+    "jaxlib==0.7.1",
+    # xb.call_jax also hard-requires torchax (xla_builder.py: `if jax is None
+    # or tx is None: raise AssertionError('Jax is required...')`) -- the jax
+    # pins alone still fail with that same message. Proven live on the scan2
+    # smoke 2026-07-08.
+    "torchax==0.0.13",
+    # torchax imports flax at module import time but does not declare it
+    # (`import torchax` -> ModuleNotFoundError: No module named 'flax',
+    # proven live on the scan3 smoke 2026-07-08). CPU-only tracing use.
+    "flax>=0.10",
+]
+# CUDA build for the GPU release-eval box (Lambda A100, driver 580 / CUDA 13).
+# Same torch VERSION as the tpu group (2.9.0) so metrics/model code behave
+# identically; only the wheel variant differs (cu128). torchaudio (declared
+# in the `eval` extra) rides the same per-group index routing below.
+cuda = [
+    "torch==2.9.0",
+    "torchaudio==2.9.0",
+]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
@@ -86,18 +114,34 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["src"]
 
-# uv-specific configuration
-# torch_xla[tpu] pulls libtpu from Google's index.
-# torch is taken from PyTorch's CPU-only index (TPU host CPUs do not need CUDA).
+# uv-specific configuration. torch_xla[tpu] pulls libtpu from Google's index.
 [tool.uv]
 find-links = ["https://storage.googleapis.com/libtpu-releases/index.html"]
+default-groups = ["tpu"]
+# torch cannot be both the CPU and the cu128 wheel in one resolution -- these
+# groups are mutually exclusive, so `--group cuda` auto-drops the tpu default.
+conflicts = [[{ group = "tpu" }, { group = "cuda" }]]
 
+# Route torch + torchaudio to the CPU index under the tpu group and the cu128
+# index under the cuda group. The active group is the ONLY discriminator, so
+# each build variant resolves cleanly without ambiguity.
 [tool.uv.sources]
-torch = { index = "pytorch-cpu" }
+torch = [
+    { index = "pytorch-cpu", group = "tpu" },
+    { index = "pytorch-cu128", group = "cuda" },
+]
+torchaudio = [
+    { index = "pytorch-cu128", group = "cuda" },
+]
 
 [[tool.uv.index]]
 name = "pytorch-cpu"
 url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
 explicit = true
 
 [tool.ruff]
