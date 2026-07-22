@@ -724,7 +724,13 @@ def load_checkpoint(model, optimizer, scheduler, load_dir: str) -> int:
 
     with open(os.path.join(load_dir, "metadata.json")) as f:
         meta = json.load(f)
-    step = meta["step"]
+    # Real checkpoints always carry a scalar `step`. A LAWA average
+    # (save_kind == "lawa_average") intentionally omits it -- fall back to the
+    # window end so loading an average for eval/export does not KeyError.
+    if "step" in meta:
+        step = int(meta["step"])
+    else:
+        step = int(max(meta.get("averaged_steps") or [0]))
 
     peft_dir = os.path.join(load_dir, "peft_adapter")
     if os.path.isdir(peft_dir):
