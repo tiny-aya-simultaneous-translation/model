@@ -71,7 +71,15 @@ def judge_adequacy(
                 resp = client.models.generate_content(
                     model=model_name,
                     contents=prompt,
-                    config={"temperature": 0.0, "max_output_tokens": 4},
+                    # gemini-3.x flash is a THINKING model: thinking tokens
+                    # count against max_output_tokens, so the old cap of 4 was
+                    # consumed before any rating was emitted -> resp.text=None
+                    # -> every score null. (thinking_config={"thinking_budget":0}
+                    # is rejected 400 for this model.) The cap is a ceiling, not
+                    # a target -- generation stops right after the single digit
+                    # -- so a generous budget only costs tokens when thinking
+                    # actually runs long. Verified live: 4 -> None, 1024 -> "1".
+                    config={"temperature": 0.0, "max_output_tokens": 1024},
                 )
                 r = _parse_rating(resp.text)
                 if r is not None:
