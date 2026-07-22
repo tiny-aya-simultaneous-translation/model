@@ -4,21 +4,23 @@ Operating manual for the evals program (design: `docs/v0.3-evals-plan.md`).
 
 ## Post-run state (2026-07-20)
 
-The long-horizon run is **COMPLETE** (run
-[`xzcb60bl`](https://wandb.ai/cataluna84/tinyaya-stage2-tpu/runs/xzcb60bl),
-early stop @ 65,250; best val composite 2.9048 @ **step 62,750**), so the
-GPU session is UNBLOCKED (rent on user word — `docs/do.md`). Checkpoint
-access routes for every command below:
+The long-horizon run is **COMPLETE incl. anneal** (run
+[`xzcb60bl`](https://wandb.ai/cataluna84/tinyaya-stage2-tpu/runs/xzcb60bl):
+plateau early-stop @ 65,250 then anneal 65,250→76,250; **best val composite
+2.8199 @ step 76,000**, final @ 76,250), so the GPU session is UNBLOCKED (rent
+on user word — `docs/do.md`). The repo is **public** with the full suite;
+checkpoint access routes for every command below:
 
-1. **GCS (all 78, incl. LAWA window per-1000):**
+1. **GCS (all ~89 dirs, full optimizer state — LAWA + resume):**
    `gs://tinyaya-stage2-eu/checkpoints/stage2-v6e16-mh-v03-r2/step_0NNNNN`
-   + `.../best_by_val` (= step 62,750)
-2. **Hub revisions (12):** `hub:tiny-aya-translate/tr-hi-s2st-v0.3@best`,
-   `@step-65250`, `@step-{6000,12000,…,60000}`
+   + `.../best_by_val` (= **step 76,000**)
+2. **Hub revisions (all ~89, weights-only):**
+   `hub:tiny-aya-translate/tr-hi-s2st-v0.3@best` (=76,000), `@step-76250`,
+   `@step-{1000,…,76000}`
 3. **Hub main tree (browsing):** `main:checkpoints/<label>/`
 
-If the optional WSD anneal leg runs, extend every eval target list to its
-checkpoints and re-run the paired bootstrap with the annealed candidates.
+Eval targets are the **annealed** best (76,000) + final (76,250) + LAWA
+candidate; the plateau best (62,750) is optional ablation context.
 
 ## What runs where
 
@@ -98,7 +100,7 @@ uv run python scripts/eval_release.py \
     --subset eval/subsets/v03-val-500.jsonl \
     --val_jsonl /data/splits/val.jsonl --encoded_dir /data/encoded \
     --device cuda --gemini_referee 25 \
-    --output_dir eval_out/best-62750 \
+    --output_dir eval_out/best-76000 \
     --wandb_run cataluna84/tinyaya-stage2-tpu/xzcb60bl \
     --hub_repo tiny-aya-translate/tr-hi-s2st-v0.3
 ```
@@ -120,13 +122,13 @@ a killed run continues with the same command.
 
 ## Eval targets (run complete — the cadence is now a concrete list)
 
-- **Tier 1 (CPU, run now):** all 78 GCS checkpoints, or minimally the
-  12-point interim ladder, with `--subset v03-val-500`.
-- **Tier 2 (GPU):** `best_by_val` (62,750), `step_065250` (final), the
-  per-6000 ladder {6k…60k}, and the **LAWA average**
-  (`scripts/average_checkpoints.py` over the late per-1000 GCS window, e.g.
-  55k–65k). Compare LAWA-vs-best-vs-final with
-  `src/evaluation/text_metrics.paired_bootstrap` (report p-values).
+- **Tier 1 (CPU, run now):** all ~89 GCS/hub checkpoints (or a coarse
+  ladder) with `--subset v03-val-500`.
+- **Tier 2 (GPU):** `best_by_val` (**76,000**), `step_076250` (final), a span
+  ladder, and the **LAWA average** (`scripts/average_checkpoints.py` over the
+  late per-1000 window, e.g. **65k–76k** — the anneal descent). Compare
+  LAWA-vs-best-vs-final with `src/evaluation/text_metrics.paired_bootstrap`
+  (report p-values).
 - **Tier 3:** release candidates only (best, final, LAWA) + the FLEURS
   acoustic-shift pass.
 

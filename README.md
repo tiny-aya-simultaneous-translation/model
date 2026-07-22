@@ -4,14 +4,17 @@ Moshi-style **speech-to-speech translation with a text inner-monologue** for
 Turkish↔Hindi, built on a LoRA-fine-tuned Cohere2 backbone (3B) with a **frozen** Moshi
 depth decoder producing 8 RVQ Mimi codebooks.
 
-> **Status (v0.3): training complete.** The long-horizon run on multi-host v6e-16
+> **Status (v0.3): training complete (plateau + anneal).** The long-horizon run
+> on multi-host v6e-16
 > ([W&B `v0.3-long-horizon-mh-r2`](https://wandb.ai/cataluna84/tinyaya-stage2-tpu/runs/xzcb60bl))
-> ended by designed early stopping at **step 65,250** (best val composite **2.9048**
-> @ step 62,750; all metrics improved monotonically). Checkpoints + playable audio
-> samples: [`tiny-aya-translate/tr-hi-s2st-v0.3`](https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3)
-> (interim 12-point ladder; full 78-checkpoint suite at public flip). Release evals
-> (ASR-chrF++/MOS/BLASER via `scripts/eval_release.py`) are pending. This is a research
-> checkpoint for low-resource S2ST, not a production translator. See
+> early-stopped on the WSD plateau at step 65,250 (2.9048), then completed its
+> 11k-step linear LR→0 **anneal leg** to step 76,250 — **best val composite
+> 2.8199 @ step 76,000**. The **public** repo
+> [`tiny-aya-translate/tr-hi-s2st-v0.3`](https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3)
+> carries the **full ~89-checkpoint suite** (branches + `checkpoints/` tree) +
+> playable audio samples. Release evals (ASR-chrF++/MOS/BLASER via
+> `scripts/eval_release.py`) are pending. This is a research checkpoint for
+> low-resource S2ST, not a production translator. See
 > [`docs/v0.3-public-release-plan.md`](docs/v0.3-public-release-plan.md) for the honest
 > release narrative.
 

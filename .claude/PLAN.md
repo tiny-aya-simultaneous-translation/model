@@ -44,8 +44,14 @@ suite trained by the 110,463-step long-horizon run on multi-host v6e-16.
 - [x] **Anneal leg DONE 2026-07-20** (user go): 65,250 → 76,250, linear
       LR→0; best val composite **2.8199 @ 76,000** (vs plateau 2.9048);
       zero preemptions; plan docs/v0.3-anneal-leg-plan.md + PR #10
-- [ ] **DECISION: v6e-16 slice teardown** (idle since run end; TRC spot
-      capacity; used for hub backfills — tear down on user word)
+- [x] Repo PUBLIC + full ~89-checkpoint suite DONE 2026-07-20 (branches +
+      main:checkpoints/, ~340 GB via publish_suite_rate_aware.py); card
+      pushed with anneal results (2.8199); GCS pruned (attempt-1 + xla-cache
+      deleted, r2 411 GB suite kept, complaints bucket removed)
+- [ ] **DECISION: delete the SUSPENDED QR** (slice preempted post-run — QR
+      tinyaya-v6e16-eu-qr SUSPENDED, node gone; all work finished. Teardown =
+      `gcloud compute tpus queued-resources delete tinyaya-v6e16-eu-qr
+      --zone=europe-west4-a` on user word)
 - [ ] Tier-1 eval proxy sweeps on saved checkpoints (CPU, actionable NOW —
       docs/evals-runbook.md "Post-run state")
 - [ ] GPU eval session (UNBLOCKED — do.md; rent on user word):
@@ -53,13 +59,9 @@ suite trained by the 110,463-step long-horizon run on multi-host v6e-16.
       best-vs-LAWA-vs-final
 - [ ] Blog revision (USER-OWNED, do.md): training run / curriculum / infra
       tables / checkpoint story; evals numbers after the GPU session
-- [x] Repo FLIPPED PUBLIC 2026-07-20 (user go; 50 GB private cap was the
-      blocker); full ~87-checkpoint backfill running from the VM
-      (branches + --main-folder; status: gs://…/watch/fullsuite-status.txt);
-      card updated with anneal results
-- [ ] Remaining for full release: model-index eval numbers (GPU session),
-      W&B project visibility, release notes / GitHub release promotion
-      (obsolete: 1021mlne audio_loss_full backfill — superseded run)
+- [ ] Remaining for full release: model-index eval numbers (GPU session on
+      annealed best 76,000/final/LAWA), W&B project visibility,
+      release notes / GitHub v0.3 release promotion
 
 ## Definition of Done
 Public HF repo with the full revision suite + audio + logs, model card with eval

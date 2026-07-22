@@ -19,6 +19,22 @@ Format per entry:
 
 Status: `info | done | fail | block`
 
+## 2026-07-20T23:30:00Z | feat/v0.3-implementation@5d78d1a | done | release
+Anneal leg complete + repo PUBLIC + full suite + prune + preemption
+
+- WSD anneal leg ran 65,250 → 76,250 (linear LR→0 from the plateau early-stop);
+  **best val composite 2.8199 @ step 76,000** (vs 2.9048 plateau; ppl 1.489,
+  text acc 96.6%). Resumed weights+Adam+RNG; same W&B run xzcb60bl.
+- Repo `tr-hi-s2st-v0.3` flipped PUBLIC (50 GB private cap escaped); full
+  ~89-checkpoint suite published (branches + `main:checkpoints/`, ~340 GB) via
+  the rate-aware resumable publisher; model card updated + pushed (2.8199).
+- Durable VM-side watcher (`scripts/tpu/vm_watcher.sh`) + W&B "crashed"-badge
+  gotcha documented (heartbeat gaps on resumed shared-mode runs).
+- Slice PREEMPTED post-run (QR SUSPENDED, all work done). GCS pruned:
+  attempt-1 + xla-cache deleted, r2 411 GB suite kept, empty complaints bucket
+  removed. NEXT: delete QR; GPU eval session (annealed best/final + LAWA);
+  eval numbers → card; W&B public; GitHub release promote.
+
 ## 2026-07-20T05:30:00Z | feat/v0.3-implementation@241a52c | done | release
 Long-horizon run COMPLETE + hub/card/docs release wave
 
@@ -62,6 +78,608 @@ moved to `.claude/archive/PROGRESS-YYYY-Qn.md` by the
 > The summary below is the current state; new entries append under it.
 
 ---
+
+## 2026-07-22T05:19:24Z | feat/v0.3-implementation@5d78d1a | done | exec
+cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-22T05:19:12Z | feat/v0.3-implementation@5d78d1a | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/.claude/PLAN.md`
+
+
+## 2026-07-22T05:19:00Z | feat/v0.3-implementation@5d78d1a | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/.claude/PLAN.md`
+
+
+## 2026-07-22T05:18:38Z | feat/v0.3-implementation@5d78d1a | done | edit
+edited `/home/cataluna84/.claude/projects/-home-cataluna84-Workspace-tinyaya-stage2-scale/memory/v03-long-horizon-launch.md`
+
+
+## 2026-07-22T05:18:25Z | feat/v0.3-implementation@5d78d1a | done | edit
+edited `/home/cataluna84/.claude/projects/-home-cataluna84-Workspace-tinyaya-stage2-scale/memory/v03-long-horizon-launch.md`
+
+
+## 2026-07-22T05:18:13Z | feat/v0.3-implementation@5d78d1a | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/.claude/PROGRESS.md`
+
+
+## 2026-07-22T05:17:50Z | feat/v0.3-implementation@5d78d1a | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/.claude/memories.md`
+
+
+## 2026-07-22T05:17:30Z | feat/v0.3-implementation@5d78d1a | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/docs/v0.3-evals-plan.md`
+
+
+## 2026-07-22T05:17:15Z | feat/v0.3-implementation@5d78d1a | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/docs/tpu-capacity-log.md`
+
+
+## 2026-07-22T05:17:00Z | feat/v0.3-implementation@5d78d1a | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/docs/do.md`
+
+
+## 2026-07-22T05:16:43Z | feat/v0.3-implementation@5d78d1a | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/docs/evals-runbook.md`
+
+
+## 2026-07-22T05:16:32Z | feat/v0.3-implementation@5d78d1a | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/docs/evals-runbook.md`
+
+
+## 2026-07-22T05:16:24Z | feat/v0.3-implementation@5d78d1a | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/docs/evals-runbook.md`
+
+
+## 2026-07-22T05:16:06Z | feat/v0.3-implementation@5d78d1a | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/docs/v0.3-reval-report.md`
+
+
+## 2026-07-22T05:15:47Z | feat/v0.3-implementation@5d78d1a | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/docs/v0.3-public-release-plan.md`
+
+
+## 2026-07-22T05:15:25Z | feat/v0.3-implementation@5d78d1a | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/README.md`
+
+
+## 2026-07-22T05:13:19Z | feat/v0.3-implementation@5d78d1a | done | edit
+created `/home/cataluna84/.claude/plans/delightful-greeting-perlis.md`
+
+
+## 2026-07-22T05:12:09Z | feat/v0.3-implementation@5d78d1a | done | exec
+cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-22T05:11:30Z | feat/v0.3-implementation@5d78d1a | done | exec
+cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-22T05:09:27Z | feat/v0.3-implementation@5d78d1a | fail | verify
+verify: 11 passed, 1 failed out of 12 on Stop
+
+FAIL [1] # the TPU↔GPU seam holds: torch_xla must NOT leak into shared model/data code
+    src/model/scan_utils.py:479:    from torch_xla.experimental.scan_layers import (
+
+
+## 2026-07-22T05:07:57Z | feat/v0.3-implementation@5d78d1a | fail | verify
+verify: 11 passed, 1 failed out of 12 on Stop
+
+FAIL [1] # the TPU↔GPU seam holds: torch_xla must NOT leak into shared model/data code
+    src/model/scan_utils.py:479:    from torch_xla.experimental.scan_layers import (
+
+
+## 2026-07-22T05:07:43Z | feat/v0.3-implementation@5d78d1a | done | exec
+for b in complaints-bucket-007 llm-architectures-eu llm-architectures-us; do
+
+
+## 2026-07-22T05:03:34Z | feat/v0.3-implementation@5d78d1a | fail | verify
+verify: 11 passed, 1 failed out of 12 on Stop
+
+FAIL [1] # the TPU↔GPU seam holds: torch_xla must NOT leak into shared model/data code
+    src/model/scan_utils.py:479:    from torch_xla.experimental.scan_layers import (
+
+
+## 2026-07-22T04:45:01Z | feat/v0.3-implementation@5d78d1a | fail | verify
+verify: 11 passed, 1 failed out of 12 on Stop
+
+FAIL [1] # the TPU↔GPU seam holds: torch_xla must NOT leak into shared model/data code
+    src/model/scan_utils.py:479:    from torch_xla.experimental.scan_layers import (
+
+
+## 2026-07-22T04:44:25Z | feat/v0.3-implementation@5d78d1a | done | edit
+edited `/home/cataluna84/.claude/projects/-home-cataluna84-Workspace-tinyaya-stage2-scale/memory/MEMORY.md`
+
+
+## 2026-07-22T04:43:53Z | feat/v0.3-implementation@5d78d1a | done | exec
+cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-22T04:43:17Z | feat/v0.3-implementation@5d78d1a | done | exec
+cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-22T04:42:49Z | feat/v0.3-implementation@5d78d1a | done | exec
+cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-22T04:39:53Z | feat/v0.3-implementation@5d78d1a | info | session
+SessionEnd (resume): 5 item(s) carried forward
+
+Next steps:
+- **DECISION: v6e-16 slice teardown** (idle since run end; TRC spot
+- Tier-1 eval proxy sweeps on saved checkpoints (CPU, actionable NOW —
+- GPU eval session (UNBLOCKED — do.md; rent on user word):
+- Blog revision (USER-OWNED, do.md): training run / curriculum / infra
+- Remaining for full release: model-index eval numbers (GPU session),
+
+
+## 2026-07-20T19:51:23Z | feat/v0.3-implementation@5d78d1a | info | session
+SessionEnd (other): 5 item(s) carried forward
+
+Next steps:
+- **DECISION: v6e-16 slice teardown** (idle since run end; TRC spot
+- Tier-1 eval proxy sweeps on saved checkpoints (CPU, actionable NOW —
+- GPU eval session (UNBLOCKED — do.md; rent on user word):
+- Blog revision (USER-OWNED, do.md): training run / curriculum / infra
+- Remaining for full release: model-index eval numbers (GPU session),
+
+
+## 2026-07-20T19:29:55Z | feat/v0.3-implementation@5d78d1a | done | exec
+cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-20T19:28:57Z | feat/v0.3-implementation@5d78d1a | done | exec
+cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-20T19:28:04Z | feat/v0.3-implementation@a5ffa8d | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/publish_suite_rate_aware.py`
+
+
+## 2026-07-20T19:27:55Z | feat/v0.3-implementation@a5ffa8d | done | exec
+cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-20T19:27:45Z | feat/v0.3-implementation@a5ffa8d | done | exec
+cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-20T19:25:14Z | feat/v0.3-implementation@a5ffa8d | done | edit
+created `/home/cataluna84/Workspace/tinyaya-stage2-scale/scripts/publish_suite_rate_aware.py`
+
+
+## 2026-07-20T19:21:50Z | feat/v0.3-implementation@a5ffa8d | fail | verify
+verify: 11 passed, 1 failed out of 12 on Stop
+
+FAIL [1] # the TPU↔GPU seam holds: torch_xla must NOT leak into shared model/data code
+    src/model/scan_utils.py:479:    from torch_xla.experimental.scan_layers import (
+
+
+## 2026-07-20T19:19:15Z | feat/v0.3-implementation@a5ffa8d | info | session
+SessionEnd (resume): 5 item(s) carried forward
+
+Next steps:
+- **DECISION: v6e-16 slice teardown** (idle since run end; TRC spot
+- Tier-1 eval proxy sweeps on saved checkpoints (CPU, actionable NOW —
+- GPU eval session (UNBLOCKED — do.md; rent on user word):
+- Blog revision (USER-OWNED, do.md): training run / curriculum / infra
+- Remaining for full release: model-index eval numbers (GPU session),
+
+
+## 2026-07-20T19:19:01Z | feat/v0.3-implementation@a5ffa8d | info | session
+SessionEnd (other): 5 item(s) carried forward
+
+Next steps:
+- **DECISION: v6e-16 slice teardown** (idle since run end; TRC spot
+- Tier-1 eval proxy sweeps on saved checkpoints (CPU, actionable NOW —
+- GPU eval session (UNBLOCKED — do.md; rent on user word):
+- Blog revision (USER-OWNED, do.md): training run / curriculum / infra
+- Remaining for full release: model-index eval numbers (GPU session),
+
+
+## 2026-07-20T19:19:01Z | feat/v0.3-implementation@a5ffa8d | info | session
+SessionEnd (other): 5 item(s) carried forward
+
+Next steps:
+- **DECISION: v6e-16 slice teardown** (idle since run end; TRC spot
+- Tier-1 eval proxy sweeps on saved checkpoints (CPU, actionable NOW —
+- GPU eval session (UNBLOCKED — do.md; rent on user word):
+- Blog revision (USER-OWNED, do.md): training run / curriculum / infra
+- Remaining for full release: model-index eval numbers (GPU session),
+
+
+## 2026-07-20T19:09:33Z | feat/v0.3-implementation@a5ffa8d | fail | verify
+verify: 11 passed, 1 failed out of 12 on Stop
+
+FAIL [1] # the TPU↔GPU seam holds: torch_xla must NOT leak into shared model/data code
+    src/model/scan_utils.py:479:    from torch_xla.experimental.scan_layers import (
+
+
+## 2026-07-20T19:08:59Z | feat/v0.3-implementation@a5ffa8d | done | exec
+cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-20T19:08:28Z | feat/v0.3-implementation@d62af33 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/docs/hf-model-card-tr-hi-s2st-v0.3.md`
+
+
+## 2026-07-20T19:08:17Z | feat/v0.3-implementation@d62af33 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/docs/hf-model-card-tr-hi-s2st-v0.3.md`
+
+
+## 2026-07-20T19:08:03Z | feat/v0.3-implementation@d62af33 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/docs/hf-model-card-tr-hi-s2st-v0.3.md`
+
+
+## 2026-07-20T19:07:40Z | feat/v0.3-implementation@d62af33 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/docs/hf-model-card-tr-hi-s2st-v0.3.md`
+
+
+## 2026-07-20T19:07:26Z | feat/v0.3-implementation@d62af33 | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/docs/hf-model-card-tr-hi-s2st-v0.3.md`
+
+
+## 2026-07-20T19:07:08Z | feat/v0.3-implementation@d62af33 | done | exec
+cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-20T19:06:16Z | feat/v0.3-implementation@d62af33 | done | exec
+cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-20T19:05:26Z | feat/v0.3-implementation@d62af33 | done | edit
+created `/tmp/claude-1000/-home-cataluna84-Workspace-tinyaya-stage2-scale/2908a7e9-afe7-47af-8e1a-9e132b7ba923/scratchpad/vm_fullsuite.sh`
+
+
+## 2026-07-20T19:05:08Z | feat/v0.3-implementation@d62af33 | done | exec
+cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-20T19:03:08Z | feat/v0.3-implementation@d62af33 | done | exec
+cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-20T19:00:17Z | feat/v0.3-implementation@d62af33 | info | session
+SessionEnd (resume): 6 item(s) carried forward
+
+Next steps:
+- **DECISION: anneal leg** (`_mh_anneal.yaml` from best 62,750 — round-3
+- **DECISION: v6e-16 slice teardown** (idle since run end; TRC spot
+- Tier-1 eval proxy sweeps on saved checkpoints (CPU, actionable NOW —
+- GPU eval session (UNBLOCKED — do.md; rent on user word):
+- Blog revision (USER-OWNED, do.md): training run / curriculum / infra
+- Release flip: full 78-checkpoint backfill (branches + --main-folder),
+
+
+## 2026-07-20T13:55:52Z | feat/v0.3-implementation@d62af33 | info | session
+SessionEnd (other): 6 item(s) carried forward
+
+Next steps:
+- **DECISION: anneal leg** (`_mh_anneal.yaml` from best 62,750 — round-3
+- **DECISION: v6e-16 slice teardown** (idle since run end; TRC spot
+- Tier-1 eval proxy sweeps on saved checkpoints (CPU, actionable NOW —
+- GPU eval session (UNBLOCKED — do.md; rent on user word):
+- Blog revision (USER-OWNED, do.md): training run / curriculum / infra
+- Release flip: full 78-checkpoint backfill (branches + --main-folder),
+
+
+## 2026-07-20T13:43:45Z | feat/v0.3-implementation@d62af33 | fail | verify
+verify: 11 passed, 1 failed out of 12 on Stop
+
+FAIL [1] # the TPU↔GPU seam holds: torch_xla must NOT leak into shared model/data code
+    src/model/scan_utils.py:479:    from torch_xla.experimental.scan_layers import (
+
+
+## 2026-07-20T13:41:47Z | feat/v0.3-implementation@d62af33 | fail | verify
+verify: 11 passed, 1 failed out of 12 on Stop
+
+FAIL [1] # the TPU↔GPU seam holds: torch_xla must NOT leak into shared model/data code
+    src/model/scan_utils.py:479:    from torch_xla.experimental.scan_layers import (
+
+
+## 2026-07-20T13:41:34Z | feat/v0.3-implementation@d62af33 | done | exec
+cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-20T13:35:45Z | feat/v0.3-implementation@af34d47 | fail | verify
+verify: 11 passed, 1 failed out of 12 on Stop
+
+FAIL [1] # the TPU↔GPU seam holds: torch_xla must NOT leak into shared model/data code
+    src/model/scan_utils.py:479:    from torch_xla.experimental.scan_layers import (
+
+
+## 2026-07-20T13:34:46Z | feat/v0.3-implementation@af34d47 | done | exec
+cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-20T13:34:05Z | feat/v0.3-implementation@9476e7f | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/AGENTS.md`
+
+
+## 2026-07-20T13:33:56Z | feat/v0.3-implementation@9476e7f | done | exec
+cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-20T13:33:49Z | feat/v0.3-implementation@9476e7f | done | exec
+cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-20T13:33:32Z | feat/v0.3-implementation@9476e7f | done | edit
+edited `/home/cataluna84/Workspace/tinyaya-stage2-scale/docs/tpu-runbook.md`
+
+
+## 2026-07-20T13:33:18Z | feat/v0.3-implementation@9476e7f | done | exec
+cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-20T13:33:13Z | feat/v0.3-implementation@9476e7f | done | exec
+cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-20T13:33:03Z | feat/v0.3-implementation@9476e7f | done | exec
+cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-20T13:32:13Z | feat/v0.3-implementation@9476e7f | done | edit
+created `/tmp/claude-1000/-home-cataluna84-Workspace-tinyaya-stage2-scale/2908a7e9-afe7-47af-8e1a-9e132b7ba923/scratchpad/vm_watcher.sh`
+
+
+## 2026-07-20T13:28:09Z | feat/v0.3-implementation@9476e7f | fail | verify
+verify: 11 passed, 1 failed out of 12 on Stop
+
+FAIL [1] # the TPU↔GPU seam holds: torch_xla must NOT leak into shared model/data code
+    src/model/scan_utils.py:479:    from torch_xla.experimental.scan_layers import (
+
+
+## 2026-07-20T13:27:52Z | feat/v0.3-implementation@9476e7f | done | exec
+for i in $(seq 1 16); do
+
+
+## 2026-07-20T13:27:21Z | feat/v0.3-implementation@9476e7f | done | exec
+timeout 75 gcloud compute tpus tpu-vm ssh tinyaya-v6e16-eu --zone=europe-west4-a --project=ml-pipelines-315702 --worker=0 --command='
+
+
+## 2026-07-20T13:24:45Z | feat/v0.3-implementation@9476e7f | info | session
+SessionEnd (resume): 6 item(s) carried forward
+
+Next steps:
+- **DECISION: anneal leg** (`_mh_anneal.yaml` from best 62,750 — round-3
+- **DECISION: v6e-16 slice teardown** (idle since run end; TRC spot
+- Tier-1 eval proxy sweeps on saved checkpoints (CPU, actionable NOW —
+- GPU eval session (UNBLOCKED — do.md; rent on user word):
+- Blog revision (USER-OWNED, do.md): training run / curriculum / infra
+- Release flip: full 78-checkpoint backfill (branches + --main-folder),
+
+
+## 2026-07-20T13:10:49Z | feat/v0.3-implementation@9476e7f | info | session
+SessionEnd (other): 6 item(s) carried forward
+
+Next steps:
+- **DECISION: anneal leg** (`_mh_anneal.yaml` from best 62,750 — round-3
+- **DECISION: v6e-16 slice teardown** (idle since run end; TRC spot
+- Tier-1 eval proxy sweeps on saved checkpoints (CPU, actionable NOW —
+- GPU eval session (UNBLOCKED — do.md; rent on user word):
+- Blog revision (USER-OWNED, do.md): training run / curriculum / infra
+- Release flip: full 78-checkpoint backfill (branches + --main-folder),
+
+
+## 2026-07-20T08:00:26Z | feat/v0.3-implementation@9476e7f | fail | verify
+verify: 11 passed, 1 failed out of 12 on Stop
+
+FAIL [1] # the TPU↔GPU seam holds: torch_xla must NOT leak into shared model/data code
+    src/model/scan_utils.py:479:    from torch_xla.experimental.scan_layers import (
+
+
+## 2026-07-20T07:56:37Z | feat/v0.3-implementation@9476e7f | fail | verify
+verify: 11 passed, 1 failed out of 12 on Stop
+
+FAIL [1] # the TPU↔GPU seam holds: torch_xla must NOT leak into shared model/data code
+    src/model/scan_utils.py:479:    from torch_xla.experimental.scan_layers import (
+
+
+## 2026-07-20T07:56:23Z | feat/v0.3-implementation@9476e7f | done | exec
+for i in $(seq 1 45); do
+
+
+## 2026-07-20T07:54:35Z | feat/v0.3-implementation@9476e7f | info | session
+SessionEnd (resume): 6 item(s) carried forward
+
+Next steps:
+- **DECISION: anneal leg** (`_mh_anneal.yaml` from best 62,750 — round-3
+- **DECISION: v6e-16 slice teardown** (idle since run end; TRC spot
+- Tier-1 eval proxy sweeps on saved checkpoints (CPU, actionable NOW —
+- GPU eval session (UNBLOCKED — do.md; rent on user word):
+- Blog revision (USER-OWNED, do.md): training run / curriculum / infra
+- Release flip: full 78-checkpoint backfill (branches + --main-folder),
+
+
+## 2026-07-20T07:51:00Z | feat/v0.3-implementation@9476e7f | info | session
+SessionEnd (logout): 6 item(s) carried forward
+
+Next steps:
+- **DECISION: anneal leg** (`_mh_anneal.yaml` from best 62,750 — round-3
+- **DECISION: v6e-16 slice teardown** (idle since run end; TRC spot
+- Tier-1 eval proxy sweeps on saved checkpoints (CPU, actionable NOW —
+- GPU eval session (UNBLOCKED — do.md; rent on user word):
+- Blog revision (USER-OWNED, do.md): training run / curriculum / infra
+- Release flip: full 78-checkpoint backfill (branches + --main-folder),
+
+
+## 2026-07-20T07:50:29Z | feat/v0.3-implementation@9476e7f | info | session
+SessionEnd (resume): 6 item(s) carried forward
+
+Next steps:
+- **DECISION: anneal leg** (`_mh_anneal.yaml` from best 62,750 — round-3
+- **DECISION: v6e-16 slice teardown** (idle since run end; TRC spot
+- Tier-1 eval proxy sweeps on saved checkpoints (CPU, actionable NOW —
+- GPU eval session (UNBLOCKED — do.md; rent on user word):
+- Blog revision (USER-OWNED, do.md): training run / curriculum / infra
+- Release flip: full 78-checkpoint backfill (branches + --main-folder),
+
+
+## 2026-07-20T07:48:52Z | feat/v0.3-implementation@9476e7f | info | session
+SessionEnd (other): 6 item(s) carried forward
+
+Next steps:
+- **DECISION: anneal leg** (`_mh_anneal.yaml` from best 62,750 — round-3
+- **DECISION: v6e-16 slice teardown** (idle since run end; TRC spot
+- Tier-1 eval proxy sweeps on saved checkpoints (CPU, actionable NOW —
+- GPU eval session (UNBLOCKED — do.md; rent on user word):
+- Blog revision (USER-OWNED, do.md): training run / curriculum / infra
+- Release flip: full 78-checkpoint backfill (branches + --main-folder),
+
+
+## 2026-07-20T07:32:44Z | feat/v0.3-implementation@9476e7f | info | session
+SessionEnd (resume): 6 item(s) carried forward
+
+Next steps:
+- **DECISION: anneal leg** (`_mh_anneal.yaml` from best 62,750 — round-3
+- **DECISION: v6e-16 slice teardown** (idle since run end; TRC spot
+- Tier-1 eval proxy sweeps on saved checkpoints (CPU, actionable NOW —
+- GPU eval session (UNBLOCKED — do.md; rent on user word):
+- Blog revision (USER-OWNED, do.md): training run / curriculum / infra
+- Release flip: full 78-checkpoint backfill (branches + --main-folder),
+
+
+## 2026-07-20T07:32:20Z | feat/v0.3-implementation@9476e7f | info | session
+SessionEnd (other): 6 item(s) carried forward
+
+Next steps:
+- **DECISION: anneal leg** (`_mh_anneal.yaml` from best 62,750 — round-3
+- **DECISION: v6e-16 slice teardown** (idle since run end; TRC spot
+- Tier-1 eval proxy sweeps on saved checkpoints (CPU, actionable NOW —
+- GPU eval session (UNBLOCKED — do.md; rent on user word):
+- Blog revision (USER-OWNED, do.md): training run / curriculum / infra
+- Release flip: full 78-checkpoint backfill (branches + --main-folder),
+
+
+## 2026-07-20T07:32:08Z | feat/v0.3-implementation@9476e7f | info | session
+SessionEnd (prompt_input_exit): 6 item(s) carried forward
+
+Next steps:
+- **DECISION: anneal leg** (`_mh_anneal.yaml` from best 62,750 — round-3
+- **DECISION: v6e-16 slice teardown** (idle since run end; TRC spot
+- Tier-1 eval proxy sweeps on saved checkpoints (CPU, actionable NOW —
+- GPU eval session (UNBLOCKED — do.md; rent on user word):
+- Blog revision (USER-OWNED, do.md): training run / curriculum / infra
+- Release flip: full 78-checkpoint backfill (branches + --main-folder),
+
+
+## 2026-07-20T06:50:43Z | feat/v0.3-implementation@9476e7f | done | exec
+timeout 70 gcloud compute tpus tpu-vm ssh tinyaya-v6e16-eu --zone=europe-west4-a --project=ml-pipelines-315702 --worker=0 --command='
+
+
+## 2026-07-20T06:49:13Z | feat/v0.3-implementation@9476e7f | done | exec
+cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-20T06:48:40Z | feat/v0.3-implementation@9476e7f | done | exec
+timeout 70 gcloud compute tpus tpu-vm ssh tinyaya-v6e16-eu --zone=europe-west4-a --project=ml-pipelines-315702 --worker=0 --command='
+
+
+## 2026-07-20T06:04:54Z | feat/v0.3-implementation@9476e7f | fail | verify
+verify: 11 passed, 1 failed out of 12 on Stop
+
+FAIL [1] # the TPU↔GPU seam holds: torch_xla must NOT leak into shared model/data code
+    src/model/scan_utils.py:479:    from torch_xla.experimental.scan_layers import (
+
+
+## 2026-07-20T05:37:37Z | feat/v0.3-implementation@9476e7f | fail | verify
+verify: 11 passed, 1 failed out of 12 on Stop
+
+FAIL [1] # the TPU↔GPU seam holds: torch_xla must NOT leak into shared model/data code
+    src/model/scan_utils.py:479:    from torch_xla.experimental.scan_layers import (
+
+
+## 2026-07-20T05:37:16Z | feat/v0.3-implementation@9476e7f | done | exec
+for i in $(seq 1 55); do
+
+
+## 2026-07-20T05:36:38Z | feat/v0.3-implementation@9476e7f | done | exec
+sleep 1500
+
+
+## 2026-07-20T05:36:22Z | feat/v0.3-implementation@9476e7f | done | exec
+for i in $(seq 1 55); do
+
+
+## 2026-07-20T05:35:39Z | feat/v0.3-implementation@9476e7f | done | exec
+timeout 70 gcloud compute tpus tpu-vm ssh tinyaya-v6e16-eu --zone=europe-west4-a --project=ml-pipelines-315702 --worker=0 --command='
+
+
+## 2026-07-20T05:35:06Z | feat/v0.3-implementation@9476e7f | fail | verify
+verify: 11 passed, 1 failed out of 12 on Stop
+
+FAIL [1] # the TPU↔GPU seam holds: torch_xla must NOT leak into shared model/data code
+    src/model/scan_utils.py:479:    from torch_xla.experimental.scan_layers import (
+
+
+## 2026-07-20T05:34:37Z | feat/v0.3-implementation@9476e7f | done | exec
+for i in $(seq 1 25); do
+
+
+## 2026-07-20T05:34:23Z | feat/v0.3-implementation@9476e7f | done | exec
+cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-20T05:33:30Z | feat/v0.3-implementation@9476e7f | done | exec
+cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-20T05:33:15Z | feat/v0.3-implementation@9476e7f | done | exec
+cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-20T05:32:45Z | feat/v0.3-implementation@9476e7f | done | exec
+cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-20T05:31:55Z | feat/v0.3-implementation@9476e7f | done | exec
+cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-20T05:31:16Z | feat/v0.3-implementation@148024c | done | exec
+cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-20T05:31:01Z | feat/v0.3-implementation@148024c | done | exec
+cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-20T05:29:47Z | feat/v0.3-implementation@148024c | done | edit
+edited `/home/cataluna84/.claude/plans/fix-the-sweep-startegy-linear-flask.md`
+
+
+## 2026-07-20T05:22:21Z | feat/v0.3-implementation@148024c | done | edit
+created `/home/cataluna84/.claude/plans/fix-the-sweep-startegy-linear-flask.md`
+
+
+## 2026-07-20T05:21:18Z | feat/v0.3-implementation@148024c | done | exec
+cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-20T05:18:55Z | feat/v0.3-implementation@148024c | done | exec
+cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-20T05:15:44Z | feat/v0.3-implementation@148024c | fail | verify
+verify: 11 passed, 1 failed out of 12 on Stop
+
+FAIL [1] # the TPU↔GPU seam holds: torch_xla must NOT leak into shared model/data code
+    src/model/scan_utils.py:479:    from torch_xla.experimental.scan_layers import (
+
+
+## 2026-07-20T05:15:23Z | feat/v0.3-implementation@148024c | fail | verify
+verify: 11 passed, 1 failed out of 12 on Stop
+
+FAIL [1] # the TPU↔GPU seam holds: torch_xla must NOT leak into shared model/data code
+    src/model/scan_utils.py:479:    from torch_xla.experimental.scan_layers import (
+
+
+## 2026-07-20T05:14:50Z | feat/v0.3-implementation@148024c | done | exec
+cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+
 
 ## 2026-07-20T05:14:25Z | feat/v0.3-implementation@241a52c | done | exec
 cd /home/cataluna84/Workspace/tinyaya-stage2-scale

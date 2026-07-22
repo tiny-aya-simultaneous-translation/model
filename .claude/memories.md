@@ -128,17 +128,21 @@
   semantic stage; everything else in the `[eval]` extra. GPU eval session
   SHELVED until the long-horizon run completes (docs/do.md).
 
-## Long-horizon outcome + next phase (2026-07-20)
+## Long-horizon outcome + next phase (2026-07-20, post-anneal)
 
-- Run `xzcb60bl` (v0.3-long-horizon-mh-r2) COMPLETED 2026-07-19 by designed
-  early stop @ 65,250/110,463 (patience 10); best val composite 2.9048 @
-  step 62,750; zero preemptions. GCS keep-all suite complete (78 dirs).
-- Hub `tr-hi-s2st-v0.3`: interim 12-checkpoint ladder (per-6000 + best +
-  final) as branches AND `main:checkpoints/` mirror (Xet dedup ~free);
-  HF private-storage cap (~50 GB) was the constraint (403'd per-1000 pushes
-  from step-5000 during the run). Full 78 backfill at public flip.
-- Model card refreshed: run results, playable samples, checkpoints table,
-  license corrected to CC-BY-NC-4.0 (base tiny-aya is NC), blog link.
-- OPEN DECISIONS (user word): WSD anneal leg from best 62,750; v6e-16 slice
-  teardown. NEXT: Tier-1 CPU proxy sweeps; GPU eval_release.py session
-  (UNBLOCKED, do.md); blog revision (user-owned).
+- Run `xzcb60bl` (v0.3-long-horizon-mh-r2) DONE: plateau early-stop @ 65,250
+  (2.9048 @ 62,750) THEN WSD **anneal leg** 65,250 → 76,250 (linear LR→0) →
+  **best val composite 2.8199 @ step 76,000** (−0.085; ppl 1.489, text acc
+  96.6%, cb0 41.5%). Zero preemptions during training.
+- Hub `tr-hi-s2st-v0.3` now **PUBLIC** (private 50 GB cap escaped) with the
+  **full ~89-checkpoint suite** as branches AND `main:checkpoints/` folders
+  (Xet dedup; backfilled ~340 GB via the rate-aware resumable publisher
+  `scripts/publish_suite_rate_aware.py`). Model card updated + pushed (2.8199).
+- Slice `tinyaya-v6e16-eu` **PREEMPTED** post-run (QR SUSPENDED; node gone) —
+  after all work finished, nothing lost. GCS pruned: attempt-1 + xla-cache
+  deleted; the 411 GB r2 suite (full optimizer state) KEPT per user; empty
+  `complaints-bucket-007` bucket deleted.
+- OPEN DECISIONS (user word): delete the SUSPENDED QR (teardown). NEXT: GPU
+  `eval_release.py` session on the annealed best/final + LAWA (UNBLOCKED,
+  do.md); land eval numbers in card model-index; flip W&B project public;
+  promote GitHub v0.3 release; blog revision (user-owned).

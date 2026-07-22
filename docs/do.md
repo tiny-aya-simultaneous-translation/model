@@ -25,18 +25,19 @@ same `results.json` feeds card model-index and blog so they can't drift.
 
 ### Live GPU verification of the v0.3 evals harness — UNBLOCKED (2026-07-20)
 
-The long-horizon run **completed 2026-07-19** (xzcb60bl, early stop 65,250,
-best 2.9048 @ 62,750), so the GPU session is no longer shelved — it runs on
-the user's word (rented H100/A100). Procedure: install the `eval` extra, run
-`scripts/eval_release.py` (full stages) over `v03-val-500` + `v03-fleurs-200`
-→ results.json + W&B backfill. Checkpoint sources: GCS
-`gs://tinyaya-stage2-eu/checkpoints/stage2-v6e16-mh-v03-r2/` (all 78 incl.
-`best_by_val`), or hub `tiny-aya-translate/tr-hi-s2st-v0.3` (12 revisions +
-`main:checkpoints/`). Sanity gates: GT-audio topline ≫ model score,
-ASR-judge floor consistent with corpus QC (86% pass @ WER ≤ 0.20), DNSMOS(GT)
-≈ codec ceiling. Record wall-clock + $ cost per checkpoint sweep in
-`docs/evals-runbook.md`. Note: if the anneal leg runs first, extend the eval
-targets to its checkpoints.
+The long-horizon run **completed incl. anneal 2026-07-20** (xzcb60bl; plateau
+early-stop 65,250 then anneal → best **2.8199 @ step 76,000**, final 76,250),
+so the GPU session is no longer shelved — it runs on the user's word (rented
+H100/A100). Procedure: install the `eval` extra, run `scripts/eval_release.py`
+(full stages) over `v03-val-500` + `v03-fleurs-200` → results.json + W&B
+backfill. **Eval targets: annealed best (76,000) + final (76,250) + LAWA.**
+Checkpoint sources (repo is now PUBLIC): GCS
+`gs://tinyaya-stage2-eu/checkpoints/stage2-v6e16-mh-v03-r2/` (all ~89 incl.
+`best_by_val`=76,000, full optimizer state), or hub
+`tiny-aya-translate/tr-hi-s2st-v0.3` (all ~89 revisions + `main:checkpoints/`).
+Sanity gates: GT-audio topline ≫ model score, ASR-judge floor consistent with
+corpus QC (86% pass @ WER ≤ 0.20), DNSMOS(GT) ≈ codec ceiling. Record
+wall-clock + $ cost per checkpoint sweep in `docs/evals-runbook.md`.
 
 ### eval_checkpoint ASR needs a CPU path before release eval (2026-07-09; scope narrowed 2026-07-20)
 

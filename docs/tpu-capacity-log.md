@@ -220,11 +220,15 @@ do not budget less than 5h wall time for first-canary compile.
 - Val×4 (`val_per_chip_batch: 8`, same 3200-sample gate): cycle ~210 s → ~41–60 s
   measured warm on the rehearsals.
 
-## v0.3 long-horizon run complete — slice idle (2026-07-19/20)
+## v0.3 long-horizon run complete — slice preempted post-run (2026-07-19/20)
 
 - `tinyaya-v6e16-eu` (v6e-16 spot, europe-west4-a) ran the full long-horizon
-  leg with ZERO preemptions (2026-07-17 → 07-19, early stop @ 65,250).
-- Since run end the slice is IDLE (reused briefly for hub backfills — fast
-  datacenter uplink pushed 12 × 3.77 GB bundles in ~7 min). Teardown pending
-  an explicit user decision (also gates the optional anneal leg, which would
-  reuse it).
+  leg with ZERO preemptions during training: plateau (2026-07-17 → 07-19,
+  early stop @ 65,250) **then the WSD anneal leg** 65,250 → 76,250 (07-20;
+  best val 2.8199 @ 76,000). Slice also drove the hub backfills (12 × 3.77 GB
+  in ~7 min; then the full ~89-ckpt public suite, ~340 GB, via the rate-aware
+  resumable publisher).
+- **Preempted after all work finished:** QR `tinyaya-v6e16-eu-qr` is now
+  SUSPENDED (node gone). Nothing was lost — training + backfills were already
+  done. Teardown = `gcloud compute tpus queued-resources delete
+  tinyaya-v6e16-eu-qr --zone=europe-west4-a` (pending user go).
