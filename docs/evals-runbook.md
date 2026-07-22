@@ -2,6 +2,8 @@
 
 Operating manual for the evals program (design: `docs/v0.3-evals-plan.md`).
 
+**Session quick-start:** the pruned Lambda checklist is [`eval-session-plan.md`](eval-session-plan.md).
+
 ## Post-run state (2026-07-20)
 
 The long-horizon run is **COMPLETE incl. anneal** (run
