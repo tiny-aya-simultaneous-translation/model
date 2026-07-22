@@ -1,7 +1,11 @@
+# GPU reproduction template — Stage-2 on the 26k-parallel subset (the pilot recipe).
+# Fill in the placeholder paths / hub id below for your environment, then run:
+#   torchrun --standalone --nproc_per_node=<N> scripts/train_hierarchical.py \
+#            --config configs/gpu/stage2_26k_parallel.yaml
 data:
-  train_split: /home/alperiox/training_data_full/splits/train_26k.jsonl
-  val_split: /home/alperiox/training_data_full/splits/val_500.jsonl
-  encoded_dir: /home/alperiox/training_data_full/encoded
+  train_split: data/splits/train_26k.jsonl   # <- point at your staged splits
+  val_split: data/splits/val_500.jsonl
+  encoded_dir: data/encoded                  # <- point at your Mimi-encoded corpus
   max_frames: 300
   audio_frame_rate: 12.5
   num_workers: 4
@@ -47,5 +51,5 @@ logging:
   wandb_project: tinyaya-s2s
   wandb_run_name: 26k_parallel_moshi_full
   use_wandb: true
-  push_to_hub: true
-  hub_repo_id: alperiox/tinyaya-s2s-stage2
+  push_to_hub: false                         # <- set true + your repo below to push
+  hub_repo_id: your-hf-username/tinyaya-s2s-stage2

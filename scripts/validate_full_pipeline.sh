@@ -132,9 +132,9 @@ rm -rf "$CKPT_DIR"
 # Write config: 10 steps, save every 5
 cat > "$CONFIG" << 'YAML'
 data:
-  train_split: /home/alperiox/training_data_full/splits/small/train_20.jsonl
-  val_split: /home/alperiox/training_data_full/splits/small/val_20.jsonl
-  encoded_dir: /home/alperiox/training_data_full/encoded
+  train_split: data/splits/small/train_20.jsonl
+  val_split: data/splits/small/val_20.jsonl
+  encoded_dir: data/encoded
   max_frames: 300
   audio_frame_rate: 12.5
   num_workers: 0
