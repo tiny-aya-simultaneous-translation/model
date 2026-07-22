@@ -61,6 +61,16 @@ class WhisperJudge:
         self._model = WhisperForConditionalGeneration.from_pretrained(
             self.model_id, torch_dtype=dtype
         ).to(self.device).eval()
+        # vasista22/whisper-hindi-large-v2 ships an EMPTY suppress_tokens.
+        # transformers' _prepare_decoder_input_ids reads suppress_tokens[-2]
+        # (the prev_start_of_text sentinel) and IndexErrors on a size-0 tensor.
+        # None == "suppress nothing" (matches the empty intent) and takes the
+        # safe `is None` branch. Only touch a degenerate/too-short config so
+        # large-v3's real suppression list is left untouched.
+        _gc = self._model.generation_config
+        _st = getattr(_gc, "suppress_tokens", None)
+        if _st is not None and len(_st) < 2:
+            _gc.suppress_tokens = None
         # forced_decoder_ids path: survives the vasista22 stale
         # generation_config that breaks generate(language=...).
         self._forced_ids = self._processor.tokenizer.get_decoder_prompt_ids(
