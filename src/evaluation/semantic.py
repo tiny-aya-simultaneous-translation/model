@@ -118,24 +118,31 @@ def blaser_scores(
         out["cosine_src_mt_mean"] = float(cos.mean())
 
         if ref_texts:
-            txt_enc = TextToEmbeddingModelPipeline(
-                encoder="text_sonar_basic_encoder",
-                tokenizer="text_sonar_basic_encoder",
-                device=dev,
-            )
-            ref_emb = txt_enc.predict(ref_texts, source_lang=_TEXT_LANG[tgt_lang])
-            ref_m = _load_blaser("ref").to(dev)
-            ref_scores = [
-                float(
-                    ref_m(
-                        src=s.unsqueeze(0).to(dev),
-                        ref=r.unsqueeze(0).to(dev),
-                        mt=m.unsqueeze(0).to(dev),
-                    ).item()
+            # Ref-mode needs the SONAR *text* encoder; isolate it so a text-
+            # encoder failure (e.g. a corrupt fairseq2 asset) does not discard
+            # the QE + cosine scores, which only use the speech encoders and are
+            # the headline ASR-free signal.
+            try:
+                txt_enc = TextToEmbeddingModelPipeline(
+                    encoder="text_sonar_basic_encoder",
+                    tokenizer="text_sonar_basic_encoder",
+                    device=dev,
                 )
-                for s, r, m in zip(src_emb, ref_emb, gen_emb, strict=True)
-            ]
-            out["blaser_ref_mean"] = sum(ref_scores) / len(ref_scores)
+                ref_emb = txt_enc.predict(ref_texts, source_lang=_TEXT_LANG[tgt_lang])
+                ref_m = _load_blaser("ref").to(dev)
+                ref_scores = [
+                    float(
+                        ref_m(
+                            src=s.unsqueeze(0).to(dev),
+                            ref=r.unsqueeze(0).to(dev),
+                            mt=m.unsqueeze(0).to(dev),
+                        ).item()
+                    )
+                    for s, r, m in zip(src_emb, ref_emb, gen_emb, strict=True)
+                ]
+                out["blaser_ref_mean"] = sum(ref_scores) / len(ref_scores)
+            except Exception as e:  # noqa: BLE001 - keep QE+cosine on ref failure
+                out["blaser_ref_skipped"] = str(e)
     return out
 
 
