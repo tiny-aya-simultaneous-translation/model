@@ -38,7 +38,12 @@ def resolve_git_sha() -> str:
 
 
 def ckpt_step(checkpoint: str) -> int:
-    """The checkpoint's own global step, from its metadata.json (local/gs://)."""
+    """The checkpoint's own global step, from its metadata.json (local/gs://).
+
+    A LAWA average (``save_kind == "lawa_average"``) has no single ``step`` --
+    fall back to the max of ``averaged_steps`` (the window end) so downstream
+    labeling anchors at the latest constituent checkpoint; 0 if neither exists.
+    """
     uri = os.path.join(checkpoint, "metadata.json")
     if checkpoint.startswith("gs://"):
         raw = subprocess.run(
@@ -47,7 +52,11 @@ def ckpt_step(checkpoint: str) -> int:
     else:
         with open(uri) as f:
             raw = f.read()
-    return int(json.loads(raw)["step"])
+    meta = json.loads(raw)
+    if "step" in meta:
+        return int(meta["step"])
+    steps = meta.get("averaged_steps") or []
+    return int(max(steps)) if steps else 0
 
 
 def metric_lib_versions() -> dict[str, str]:
