@@ -93,7 +93,7 @@ class WhisperJudge:
 def transcribe_gemini(
     wav_paths: list[str],
     language: str,
-    model_name: str = "gemini-2.5-flash",
+    model_name: str = "gemini-3.6-flash",
     max_workers: int = 8,
     max_retries: int = 3,
 ) -> list[str | None]:

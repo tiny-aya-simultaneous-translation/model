@@ -47,7 +47,7 @@ def judge_adequacy(
     pairs: list[tuple[str, str]],
     src_lang: str,
     tgt_lang: str,
-    model_name: str = "gemini-2.5-flash",
+    model_name: str = "gemini-3.6-flash",
     passes: int = 2,
     max_workers: int = 8,
     max_retries: int = 3,
