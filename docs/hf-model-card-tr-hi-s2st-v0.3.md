@@ -20,10 +20,25 @@ base_model: CohereLabs/tiny-aya-base
 datasets:
   - tiny-aya-translate/tr-hi-mimi-encoded
 model-index:
+  # The model's OWN end-task scores on the frozen v03-val-500 subset (greedy,
+  # MT-synthetic refs). The GT-audio topline (the codec+ASR ceiling: 92.1/86.6
+  # chrF++) is shown beside these in the Evaluation section, not here, so a
+  # scraper never mistakes the ceiling for the model. chrF++ is primary.
   - name: tr-hi-s2st-v0.3
-    results: []   # TODO: filled post-run by scripts/eval_release.py (ASR-chrF++/BLEU/WER
-                  # vs GT-audio topline, MOS deltas, BLASER-2.0) over the frozen
-                  # eval/subsets/* -- procedure in docs/evals-runbook.md
+    results:
+      - task: { type: audio-to-audio, name: Speech-to-Speech Translation (HI->TR) }
+        dataset: { type: tiny-aya-translate/tr-hi-mimi-encoded, name: v03-val-500 (in-domain; MT-synthetic refs) }
+        metrics:
+          - { type: chrf, name: ASR-chrF++ HI->TR (generated audio, greedy), value: 3.7 }
+          - { type: chrf, name: free-run text chrF++ HI->TR, value: 25.7 }
+      - task: { type: audio-to-audio, name: Speech-to-Speech Translation (TR->HI) }
+        dataset: { type: tiny-aya-translate/tr-hi-mimi-encoded, name: v03-val-500 (in-domain; MT-synthetic refs) }
+        metrics:
+          - { type: chrf, name: ASR-chrF++ TR->HI (generated audio, greedy), value: 9.6 }
+          - { type: chrf, name: free-run text chrF++ TR->HI, value: 25.1 }
+          - { type: other, name: BLASER-2.0 QE (ASR-free speech-semantic, 1-5), value: 2.5 }
+          - { type: other, name: DNSMOS delta (generated - GT), value: -1.34 }
+          - { type: other, name: RTF (A100, greedy), value: 0.95 }
 ---
 
 # 🗣️🔁 TinyAya — Turkish⇄Hindi Speech-to-Speech Translation (v0.3)
@@ -35,8 +50,10 @@ model-index:
 > improving validation on essentially every cycle of the descent to a final
 > **val composite 2.8199** (text ppl 1.489, text acc 96.6%). Best = step 76,000
 > ≈ final. **The repo is public and carries the FULL checkpoint suite**
-> (~87 training points as branches and under `checkpoints/`). End-task release
-> evals (ASR-chrF++, MOS, BLASER) are still pending — see *Evaluation*.
+> (~87 training points as branches and under `checkpoints/`). **End-task release
+> evals are complete** — a data-efficiency / emergence study (the model learns
+> text translation ~25 chrF++ but audio synthesis is the next frontier); see
+> *Evaluation*.
 
 Moshi-style **speech-to-speech translation with a text inner-monologue** for
 **Turkish ⇄ Hindi**: a LoRA-fine-tuned **Cohere2** backbone fused with a **frozen Moshi
@@ -155,21 +172,67 @@ Trajectory landmarks (val composite): step 6,000 → 3.941 · 24,000 → 3.069 �
 descent are all visible across the suite — built for training-dynamics and
 mech-interp study, not just the final weights.
 
-## 📊 Evaluation
+## 📊 Evaluation — a data-efficiency study of S2ST emergence
 
-**Published so far: training-time validation metrics only** (the table above —
-teacher-forced, fixed 3,200-sample gate, synthetic references). The end-task
-**release evals are pending** and will be produced by the repo's 8-stage
-harness (`scripts/eval_release.py`) over frozen, digest-verified subsets:
-ASR-chrF++/BLEU/WER per direction **with the ground-truth-audio topline**
-(same judge on GT target audio — the TTS+Mimi+ASR ceiling), DNSMOS/Distill-MOS
-reported as Δ(generated − GT), BLASER-2.0 QE/Ref, an LLM adequacy judge, and
-RTF/first-audio latency. Subsets: `v03-val-500` (in-domain) and
-`v03-fleurs-200` (real human recordings — an **acoustic** domain-shift set
-only; its texts overlap the training corpus 200/200 via FLORES, audited and
-disclosed). References throughout are **machine-translation-synthetic**;
-chrF++ is primary (BLEU is unreliable at these ranges). Numbers land in
-`model-index` and this section when the eval pass completes.
+End-task release evals are **complete**. Full report + reproducibility:
+[`docs/v0.3-eval-report.md`](https://github.com/tiny-aya-simultaneous-translation/model/blob/main/docs/v0.3-eval-report.md).
+
+**The question v0.3 answers** (from the [blog](https://labscommunity.cohere.com/blog/2026/adapting-moshi-low-resource-speech-translation/),
+written on a 26K-sample pilot): *how much training on the full 840K dataset
+before translation quality emerges, not just language identity?* v0.3 is that
+full-corpus run (**2.07 epochs · 76,250 steps · 6.59B tokens**). The answer:
+capability emerges in a clear order — **language identity (early) → text
+translation (strong) → audio synthesis (the remaining frontier).**
+
+![Emergence of translation quality over training — teacher-forced text accuracy
+reaches 96.6% and free-run text chrF++ ~25 while generated-audio ASR-chrF++ stays
+low; language identity then text translation emerge, audio synthesis is the
+frontier.](https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3/resolve/main/assets/v0.3/emergence-curve.png)
+
+Interactive training charts: **W&B run
+[`xzcb60bl`](https://wandb.ai/cataluna84/tinyaya-stage2-tpu/runs/xzcb60bl)**.
+
+**Disclosures:** greedy decoding; frozen digest-verified subsets `v03-val-500`
+(in-domain) + `v03-fleurs-200` (**acoustic shift only** — texts 200/200 seen,
+*not* held-out); references are **MT-synthetic**; **chrF++ primary** (BLEU
+unreliable < ~5); MOS as **Δ(gen − GT) only**; judges hi
+`vasista22/whisper-hindi-large-v2` · tr `openai/whisper-large-v3`; every model
+ASR score is shown **beside its GT-audio topline** (the codec+ASR ceiling).
+
+**End-task `@best` (step 76,000 · 500-row `v03-val-500` · greedy):**
+
+| metric | hi→tr | tr→hi | reads as |
+|---|---|---|---|
+| free-run **text** chrF++ (inner-monologue) | **25.7** | **25.1** | the model *translates* |
+| generated-audio **ASR-chrF++** | 3.7 | 9.6 | speech not yet ASR-intelligible |
+| **GT-audio topline** chrF++ | 92.1 | 86.6 | ceiling intact → pipeline sound |
+| **BLASER-2.0 QE** (ASR-free, 1–5) | 2.53 | 2.49 | real, weak speech-semantic signal |
+| **GEMBA** adequacy (gemini-3.6-flash, 1–5) | 1.08 | 1.10 | transcript ≈ no meaning |
+| **DNSMOS** Δ(gen − GT) | −1.34 | −1.34 | low perceptual quality |
+| **RTF** / TTFA | 0.95 / 76 ms | | faster than real-time (A100) |
+
+**What this means — honestly.** The **text inner-monologue** learns the
+translation *mapping* data-efficiently (96.6% teacher-forced, ~25 free-run
+chrF++). The generated **audio** carries a **genuine but weak** translation
+signal — BLASER-2.0 QE **2.5/5** is *higher* than the ASR/GEMBA metrics imply, so
+the audio is acoustically degraded rather than semantically empty. What has
+**not** yet emerged at this data/compute budget is **intelligible speech
+synthesis** (ASR-chrF++ 3.7–9.6 vs an 86–92 ceiling; DNSMOS −1.34) — the
+bottleneck is audio-codebook generation, **bounded by the frozen Moshi depth
+decoder, not the translation understanding.** Release checkpoint = **`@best`
+(76,000)**: `@final` is a statistical tie and LAWA gives no gain (paired
+bootstrap). On **FLEURS** (real human speech, acoustic shift) even the text
+stream collapses to ~8 chrF++ → v0.3 is **distribution-bound** to its
+synthetic-TTS training acoustics. This is a first full-corpus run framed as what
+it is: a **data-efficiency / emergence** result and a training-dynamics study
+artifact, with speech-synthesis fidelity as the concrete next frontier.
+
+**See it learn** — mel-spectrograms of the generated audio across training
+(companion to *Hear it learn* above; acoustic structure develops even before it
+is ASR-intelligible):
+
+![Mel-spectrograms of the generated audio at each 5k-step milestone, cycling —
+the acoustic structure develops over training.](https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3/resolve/main/assets/v0.3/see-it-learn.gif)
 
 ## Intended use & limitations
 
@@ -361,7 +424,7 @@ checkpoint gains teacher-forced text **chrF/BLEU** backfilled at its own step
 | WSD anneal leg (65,250 → 76,250, linear LR→0) | ✅ completed 2026-07-20 — **best val composite 2.8199 @76,000** |
 | Repo public + full checkpoint suite (~87 points) | ✅ (branches + `checkpoints/` tree) |
 | Audio samples + training log on `main` | ✅ (13 milestones, playable above) |
-| Release evals (ASR-chrF++ / MOS / BLASER) | ☐ pending — harness ready (`scripts/eval_release.py`) |
+| Release evals (ASR-chrF++ / MOS / BLASER / GEMBA / RTF) | ✅ complete 2026-07-22 — data-efficiency study; `@best` (76,000) released; report [`docs/v0.3-eval-report.md`](https://github.com/tiny-aya-simultaneous-translation/model/blob/main/docs/v0.3-eval-report.md) |
 
 ## 🙏 Acknowledgements
 

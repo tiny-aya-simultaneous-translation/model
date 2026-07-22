@@ -7,6 +7,13 @@ the backlog of loose ends. Delete an item when it's done.
 
 ### Cohere Labs blog revision — v0.3 backend specifics (2026-07-20)
 
+**✅ v0.3 revision DRAFTED 2026-07-22** — branch `post/tinyaya-v0.3-full-corpus`
+on `Cohere-Labs-Community/blog` (a NEW PR; original PR #10 is merged), **prepared
+for review, not pushed**. Answers the post's own open question via the
+data-efficiency / emergence finding + 5 v0.3 figures + 3 new citations; numbers
+from [`v0.3-eval-report.md`](v0.3-eval-report.md). Push + `gh pr create` on the
+land-it pass. (Original section plan below, superseded by the drafted post.)
+
 USER-OWNED. The team blog
 ([Adapting Moshi for Low-Resource Speech Translation](https://labscommunity.cohere.com/blog/2026/adapting-moshi-low-resource-speech-translation/))
 has had multiple iterations; the user is contributing the backend/training
@@ -24,6 +31,13 @@ Evals + numbers get added later, after the GPU `eval_release.py` session —
 same `results.json` feeds card model-index and blog so they can't drift.
 
 ### Live GPU verification of the v0.3 evals harness — UNBLOCKED (2026-07-20)
+
+**✅ COMPLETE 2026-07-22** (Lambda A100) — full end-task eval on best/final/LAWA
++ FLEURS + an empirical emergence sweep (6k/18k/36k/60k). Framing, numbers,
+subset digests, disclosures, and the 8 eval-harness fixes are in
+[`v0.3-eval-report.md`](v0.3-eval-report.md); model-card Evaluation + `model-index`
+populated. W&B `eval/*` backfill + hub `eval/` push held for the land-it pass
+(prepare-for-review). Historical procedure below.
 
 The long-horizon run **completed incl. anneal 2026-07-20** (xzcb60bl; plateau
 early-stop 65,250 then anneal → best **2.8199 @ step 76,000**, final 76,250),
