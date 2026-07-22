@@ -1,7 +1,7 @@
 # TPU v6e-16 PRODUCTION run v0.3: text+audio, reval winner (arm D), 3 epochs.
 #
 # RECIPE PROVENANCE (2026-07-09): the v03-5k-reval-ta sweep (6 arms x 5,000
-# full-corpus text+audio steps, docs/v0.3-reval-report.md) re-picked the
+# full-corpus text+audio steps) re-picked the
 # recipe. Winner = arm D: the r=32/lr=1.716e-4/+MLP/rsLoRA base with
 # lora_exclude_top: 0 (adapters on ALL 36 layers) -- gates-clean at every
 # composite weighting; the old frozen champion (exclude_top=2) finished LAST.

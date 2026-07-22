@@ -20,8 +20,6 @@
 # Usage (single-host v6e-8 spot, europe-west4-a):
 #   TPU_STRATEGY=fsdpv2_lora uv run python scripts/train_hierarchical.py \
 #       --config configs/stage2_tpu_v6e_v2.yaml --resume auto
-#
-# See also: docs/tpu-trc-allocation.md (TRC quotas)
 
 backend: tpu
 
