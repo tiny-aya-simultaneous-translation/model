@@ -41,8 +41,8 @@ export GEMINI_API_KEY=...    # referee + GEMBA judge   (env only, NEVER print)
 ## 2. Smoke (~10 min — MANDATORY before anything else)
 
 ```bash
-uv run python scripts/eval_release.py \
-  --checkpoint hub:tiny-aya-translate/tr-hi-s2st-v0.3@step-1000 \
+evalpy scripts/eval_release.py \
+  --checkpoint hub:tiny-aya-translate/tr-hi-s2st-v0.3@best \
   --subset eval/subsets/v03-val-500.jsonl \
   --val_jsonl <val.jsonl> --encoded_dir <encoded> \
   --device cuda --limit 8 --n_bootstrap 1 \
@@ -50,6 +50,12 @@ uv run python scripts/eval_release.py \
 ```
 Verifies: hub weights-only bundle loads (peft_adapter present), CUDA path,
 both Whisper judges, wav dumps. Stages are RESUMABLE (per-stage jsonl).
+⚠️ Smoke on `@best` (or `@step-76250`), NOT `@step-1000`: the early per-1000
+branches were published during the 50 GB private-cap era and are missing
+`peft_adapter/adapter_model.safetensors` (not loadable). `best` / `step-76000`
+/ `step-76250` are complete 3.77 GB bundles. `_stage_checkpoint` now ignores
+the per-branch `checkpoints/` mirror + `samples/` so staging pulls 3.77 GB,
+not the 51 GB full-suite mirror.
 
 ## 3. Tier-2 full passes (GPU)
 

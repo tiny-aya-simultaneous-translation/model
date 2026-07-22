@@ -55,13 +55,24 @@ MIMI_V = 2048
 
 
 def _stage_checkpoint(arg: str) -> str:
-    """hub:REPO@REV -> local snapshot; local/gs:// pass through."""
+    """hub:REPO@REV -> local snapshot; local/gs:// pass through.
+
+    Each published revision top-level carries ONLY that checkpoint's own
+    weights-only bundle (~3.77 GB: peft_adapter/ + depth_decoder/text_embed/
+    heads .pt + metadata.json). But every branch also mirrors the full
+    ``checkpoints/`` file-tree-discoverability folder (all ~89 depth_decoders,
+    ~51 GB) and demo ``samples/`` wavs + ``logs/`` -- none of which the loader
+    reads. Ignore them so staging one checkpoint pulls 3.77 GB, not 51 GB.
+    """
     if arg.startswith("hub:"):
         repo, _, rev = arg[4:].partition("@")
         from huggingface_hub import snapshot_download
 
-        path = snapshot_download(repo_id=repo, revision=rev or "main",
-                                 token=os.environ.get("HF_TOKEN"))
+        path = snapshot_download(
+            repo_id=repo, revision=rev or "main",
+            token=os.environ.get("HF_TOKEN"),
+            ignore_patterns=["checkpoints/*", "samples/*", "logs/*"],
+        )
         print(f"[eval] staged {arg} -> {path}", flush=True)
         return path
     return arg
