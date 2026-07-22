@@ -161,8 +161,8 @@ DATA_DIGEST="$(cat "$DATA_DIR/.data_digest" 2>/dev/null || echo '')"
 # transatlantic route to us.gcp.cdn.hf.co. Prefetch them through a Cloudflare WARP
 # SOCKS proxy BEFORE the rendezvous barrier so no host launches (or writes its
 # ready-marker) without its backbones present. Idempotent -- skips when the boot
-# disk already holds them. See scripts/tpu/prefetch_backbones.sh +
-# docs/v0.3-mh-hf-cdn-unblock.md. Opt out with metadata prefetch-backbones=0.
+# disk already holds them. See scripts/tpu/prefetch_backbones.sh.
+# Opt out with metadata prefetch-backbones=0.
 if [ "$(read_meta prefetch-backbones 1)" = "1" ]; then
     echo "[startup] prefetching model backbones via WARP proxy"
     chmod +x "$REPO_DIR/scripts/tpu/prefetch_backbones.sh" 2>/dev/null || true

@@ -7,8 +7,8 @@ precisely so the released model does not have to be a single point on the
 trajectory: averaging the last K checkpoints (LAWA) or a window around
 ``best_by_val`` recovers most of the benefit of a full LR anneal — the
 mechanism that rescues an early-stopped run whose schedule never finished
-decaying. This script was planned in docs/v0.3-reval-sweep-plan.md Phase 4
-and never written until the 2026-07-12 long-horizon plan made it load-bearing.
+decaying. This script was written for the 2026-07-12 long-horizon plan,
+which made it load-bearing.
 
 Method: uniform average of every tensor, accumulated in fp32 and cast back
 to the original dtype. Frozen tensors are identical across checkpoints, so

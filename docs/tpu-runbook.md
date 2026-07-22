@@ -12,8 +12,7 @@ history). Companion: [`AGENTS.md`](../AGENTS.md) (seam rules + doc style),
 | **v6e-16** | 4 hosts × 4 chips = one 16-chip SPMD mesh | v0.3 production | `europe-west4-a` |
 | **v6e-8** | 1 host × 8 chips | smoke / overfit / eval | `europe-west4-a` |
 
-Both are **spot** under Google TRC. Free zones: `europe-west4-a` and `us-east1-d` (see
-[`tpu-trc-allocation.md`](tpu-trc-allocation.md)). 32 GiB HBM/chip. **GCS bucket
+Both are **spot** under Google TRC. Free zones: `europe-west4-a` and `us-east1-d`. 32 GiB HBM/chip. **GCS bucket
 `gs://tinyaya-stage2-eu` (europe-west4)** — keep it co-located with the TPUs (a
 cross-region bucket makes every checkpoint write pay egress).
 

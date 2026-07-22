@@ -2,15 +2,13 @@
 
 Operating manual for the evals program (design: `docs/v0.3-evals-plan.md`).
 
-**Session quick-start:** the pruned Lambda checklist is [`eval-session-plan.md`](eval-session-plan.md).
-
 ## Post-run state (2026-07-20)
 
 The long-horizon run is **COMPLETE incl. anneal** (run
 [`xzcb60bl`](https://wandb.ai/cataluna84/tinyaya-stage2-tpu/runs/xzcb60bl):
 plateau early-stop @ 65,250 then anneal 65,250→76,250; **best val composite
 2.8199 @ step 76,000**, final @ 76,250), so the GPU session is UNBLOCKED (rent
-on user word — `docs/do.md`). The repo is **public** with the full suite;
+on user word). The repo is **public** with the full suite;
 checkpoint access routes for every command below:
 
 1. **GCS (all ~89 dirs, full optimizer state — LAWA + resume):**
@@ -168,7 +166,7 @@ a killed run continues with the same command.
 
 ## Sanity gates for the (shelved) live verification
 
-From `docs/do.md`: GT-audio topline ≫ model score; whisper-judge floor
+GT-audio topline ≫ model score; whisper-judge floor
 consistent with corpus QC; DNSMOS(GT) ≈ codec ceiling; Gemini-vs-whisper
 referee agreement high on GT audio. Record wall-clock + $ per sweep here
 afterwards.

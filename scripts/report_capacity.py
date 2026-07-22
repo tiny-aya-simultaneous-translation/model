@@ -4,7 +4,7 @@ WHY THIS EXISTS
 ---------------
 The v0.3 recipe was frozen from a 1,500-step / 200K-subset sweep; before the
 14,532-step full-corpus production run we re-validate six recipe arms at a
-5,000-step horizon (docs/v0.3-reval-sweep-plan.md). Picking LoRA rank without
+5,000-step horizon. Picking LoRA rank without
 knowing the tokens-per-trainable-parameter budget is guesswork, so this script
 prints, per arm: the analytic trainable-parameter breakdown (backbone LoRA,
 embedding adapters, always-trainable heads, depth-decoder I/O) and the

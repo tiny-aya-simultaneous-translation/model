@@ -3,7 +3,7 @@
 #
 # WHY THIS EXISTS
 # ---------------
-# docs/v0.3-reval-sweep-plan.md re-validates the frozen v0.3 recipe at a
+# The v0.3 re-validation exercised the frozen recipe at a
 # 5,000-step full-corpus horizon across SIX parallel single-host v6e-8 slices.
 # The startup script runs exactly ONE config file per slice with no extra-args
 # passthrough, so each arm needs a self-contained config. This script overlays

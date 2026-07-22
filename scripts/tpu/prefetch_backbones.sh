@@ -15,7 +15,6 @@
 # transport (Xet) downloads measured 146-219 MB/s from the same hosts. So
 # DIRECT is primary again; WARP stays as the fallback because route
 # regressions of this class recur and a fresh boot must never be blocked.
-# Full write-up: docs/v0.3-mh-hf-cdn-unblock.md.
 #
 # A fresh boot (initial provision or QR-death recovery) pays this once
 # (~2-4 min direct; ~8 min if the WARP fallback engages); a warm reboot with a

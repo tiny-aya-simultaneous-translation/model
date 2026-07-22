@@ -53,8 +53,7 @@ constraints, not narration. `ruff` is the formatter/linter of record.
 ## What needs evidence
 
 - **Recipe changes** (LR, LoRA config, batch, schedule, loss weights): the
-  current recipe is the winner of a multi-arm sweep + probe program
-  (`docs/v0.3-reval-report.md`). PRs that touch it need comparable sweep
+  current recipe is the winner of a multi-arm sweep + probe program. PRs that touch it need comparable sweep
   evidence, not vibes.
 - **Trainer changes that could affect numerics**: cite a smoke run (the
   configs under `configs/tpu/` with `max_steps` ≤ 2000) or a memorization

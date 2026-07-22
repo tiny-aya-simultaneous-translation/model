@@ -6,7 +6,7 @@
 # TRC v6e is SPOT-only, so the current v6e-16 production path (and every
 # other v6e/v5e slice) is provisioned here, not via the on-demand launch_qr.sh.
 # This wrapper makes picking a slice a single-knob operation: the `TRC_PROFILE`
-# environment variable (source of truth: `docs/tpu-trc-allocation.md`).
+# environment variable `TRC_PROFILE`.
 #
 # Usage:
 #   bash scripts/tpu/launch_spot.sh                            # default = v6e-16-eu (production)
@@ -18,7 +18,7 @@
 # NODE_ID, etc.) are forwarded to launch_qr.sh unchanged. SPOT is
 # pinned to 1 because that is the whole point of this wrapper.
 #
-# TRC_PROFILE legend (see docs/tpu-trc-allocation.md):
+# TRC_PROFILE legend:
 #   v6e-16-eu    -> 16 chips spot v6e  in europe-west4-a  (current production, default)
 #   v6e-8-eu     -> 8 chips spot v6e   in europe-west4-a  (smoke / overfit / eval)
 #   v4-32-uc2b   -> 32 chips spot v4   in us-central2-b   (legacy fallback)
@@ -89,7 +89,6 @@ case "$TRC_PROFILE" in
     *)
         echo "ERROR: unknown TRC_PROFILE '$TRC_PROFILE'" >&2
         echo "Valid profiles: v6e-16-eu v6e-8-eu v4-32-uc2b v5e-64-ew4b v5e-64-uc1a v6e-64-ew4a v6e-64-ue1d" >&2
-        echo "See docs/tpu-trc-allocation.md for the source of truth." >&2
         exit 2
         ;;
 esac

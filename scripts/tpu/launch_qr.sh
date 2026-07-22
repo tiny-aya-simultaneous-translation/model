@@ -5,7 +5,7 @@
 # Run from your local workstation (after setup_gcp.sh has succeeded).
 #
 # Default behaviour: legacy **on-demand v4-64 in us-central2-b** (the only
-# on-demand quota in the TRC grant — see docs/tpu-trc-allocation.md). TRC v6e
+# on-demand quota in the TRC grant). TRC v6e
 # is SPOT-only, so the current v6e-16 production path goes through
 # launch_spot.sh (`TRC_PROFILE=v6e-16-eu`), which wraps this script with
 # profile-aware defaults and SPOT=1. Keep these v4 hardware defaults as-is;

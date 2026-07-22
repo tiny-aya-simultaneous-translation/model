@@ -97,8 +97,7 @@ horizon in the pre-registered **11,000-step linear LR descent 1.716e-4 → 0**
 (the shape and length our round-3 probe validated against cosine and plateau).
 Everything else stayed byte-identical; the same W&B run continues across both
 legs. The descent improved validation on essentially every 250-step cycle —
-the WSD "harvest" phase working as the literature predicts. Full plan +
-rationale: `docs/v0.3-anneal-leg-plan.md` (also on PR #10).
+the WSD "harvest" phase working as the literature predicts.
 
 Every deep codebook is alive and far above the 0.05% chance floor — the
 deep-codebook collapse that capped v0.2 (cb0 ~14%, cb1–7 <4%) is resolved
@@ -308,8 +307,7 @@ multi-host data-parallel), **WSD schedule** (linear warmup 1100 → peak plateau
 
 Before the long-horizon run, the recipe was re-validated as **text+audio** on the full 1.24 M-pair
 corpus — 6 arms × 5,000 steps (≈1 epoch) at a *nominal* global batch 256 (batch-semantics
-note¹ — real 32), one v6e-8 per arm. Full
-report: [`v0.3-reval-report.md`](v0.3-reval-report.md). Winner: **arm D,
+note¹ — real 32), one v6e-8 per arm. Winner: **arm D,
 `lora_exclude_top: 0`** — adapters on all 36 layers. The previously frozen champion
 (exclude_top=2) placed **last at every composite weighting**; the ranking
 E ≺ D ≺ C ≺ F ≺ B ≺ A is unanimous across text/audio weightings {0.2/0.8, 0.4/0.6,
