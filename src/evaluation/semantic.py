@@ -47,6 +47,37 @@ def _load_blaser(kind: str):
     raise last  # type: ignore[misc]
 
 
+def _prep_wavs(paths: list[str], sr_out: int = 16000) -> list[str]:
+    """Normalize wavs for the SONAR speech encoders (16 kHz mono, |x| <= 1).
+
+    Mimi-decoded wavs are 24 kHz and can exceed unit amplitude, which SONAR's
+    audio validator rejects ("values must be between -1 and 1"). Peak-normalize
+    (only when clipping) + resample to 16 kHz into temp files; return their
+    paths (delete=False -- they outlive this call and are reaped at process
+    exit, fine for a one-shot eval).
+    """
+    import tempfile
+
+    import librosa
+    import numpy as np
+    import soundfile as sf
+
+    out: list[str] = []
+    for p in paths:
+        wav, sr = sf.read(p, dtype="float32")
+        if wav.ndim > 1:
+            wav = wav.mean(axis=1)
+        peak = float(np.abs(wav).max()) if wav.size else 0.0
+        if peak > 1.0:
+            wav = wav / peak
+        if sr != sr_out:
+            wav = librosa.resample(wav, orig_sr=sr, target_sr=sr_out)
+        tf = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
+        sf.write(tf.name, wav, sr_out)
+        out.append(tf.name)
+    return out
+
+
 def blaser_scores(
     src_wavs: list[str],
     gen_wavs: list[str],
@@ -62,6 +93,8 @@ def blaser_scores(
     from sonar.inference_pipelines.text import TextToEmbeddingModelPipeline
 
     dev = torch.device(device)
+    src_wavs = _prep_wavs(src_wavs)
+    gen_wavs = _prep_wavs(gen_wavs)
     src_enc = SpeechToEmbeddingModelPipeline(
         encoder=f"sonar_speech_encoder_{_SPEECH_LANG3[src_lang]}", device=dev
     )
