@@ -79,7 +79,7 @@ earlier versions trained audio-only due to a loader bug, disclosed below.
 **step 65,250** (patience 10 val cycles); 261 validation cycles over the run.
 
 **Validation metrics** (teacher-forced, fixed 3,200-sample val gate — *not* the
-end-task release evals, which are pending; see *Evaluation*):
+end-task release evals, which are reported in *Evaluation* below):
 
 | metric | step 250 | plateau best (62,750) | **annealed (76,000 = best ≈ final)** |
 |---|---|---|---|
@@ -245,7 +245,7 @@ the acoustic structure develops over training.](https://huggingface.co/tiny-aya-
 - **Limitations:** Turkish↔Hindi only; translation references are
   MT-synthetic (quality ceilings reflect that); Mimi operates at 12.5 Hz
   frames (80 ms granularity); the training-time demos use a 4 s generation
-  window; release-eval quality numbers are not yet published (see above).
+  window; the end-task release-eval numbers are reported in *Evaluation* above.
 
 ## License & attribution
 
@@ -404,7 +404,8 @@ the Pythia/OLMo one-branch-per-checkpoint convention, weights-only
 
 Full telemetry is on W&B — the completed run
 [`v0.3-long-horizon-mh-r2`](https://wandb.ai/cataluna84/tinyaya-stage2-tpu/runs/xzcb60bl)
-(also via the [release dashboard](https://wandb.ai/cataluna84/tinyaya-stage2-tpu?nw=bg2vkino3r4))
+(also via the [release dashboard](https://wandb.ai/cataluna84/tinyaya-stage2-tpu?nw=bg2vkino3r4)
+and the [**emergence report**](https://wandb.ai/cataluna84/tinyaya-stage2-tpu/reports/TinyAya-v0.3-Emergence-and-Data-Efficiency--VmlldzoxNzU1OTU1NQ==))
 carries losses, per-codebook prediction **entropy + active-code fraction** (the
 codebook-collapse instrument), perplexities, tokens-seen axes, MFU estimate,
 per-chip HBM for all 16 chips, and the audio demos. Post-hoc, each published

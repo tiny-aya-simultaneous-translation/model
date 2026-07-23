@@ -19,7 +19,7 @@ datasets:
   - tiny-aya-translate/fleurs-tr-hi-mimi-encoded
 model-index:
   - name: tr-hi-s2st-v0.2
-    results: []   # TODO: ASR-BLEU / chrF / DNSMOS — to be filled after GPU eval
+    results: []   # v0.2 superseded by v0.3 (trained on the wrong FLEURS dataset); not separately evaluated
 ---
 
 # TinyAya — Turkish⇄Hindi Speech-to-Speech Translation (v0.2)
@@ -67,7 +67,7 @@ This recipe was selected by a proxy-first **W&B hyperparameter sweep** (8 Bayesi
 
 - **📊 Sweep:** https://wandb.ai/cataluna84/tinyaya-stage2-tpu/sweeps/9ba8h0ho
 - **📈 Training run:** https://wandb.ai/cataluna84/tinyaya-stage2-tpu/runs/t1840nkd
-- **Code:** the [training repo](https://github.com/tiny-aya-simulatenous-translation/model) (PR #8)
+- **Code:** the [training repo](https://github.com/tiny-aya-simultaneous-translation/model) (PR #8)
 
 ## Training procedure
 
@@ -149,7 +149,7 @@ This is a composite model (custom architecture), not a drop-in
 `transformers` pipeline. Load via the training repo's
 `src/model/composite.py`: base Cohere2 backbone + the LoRA adapter
 (`peft_adapter/`) + the `.pt` components, then decode Mimi codes to audio.
-See the [repo README](https://github.com/tiny-aya-simulatenous-translation/model)
+See the [repo README](https://github.com/tiny-aya-simultaneous-translation/model)
 for the loading + inference path. Use the **`best_by_val`** folder.
 
 ## Recommended next run (fixing the overfit)

@@ -57,8 +57,8 @@ checkpointing on, nominal batch 256 / real 32 — batch-semantics audit). `train
 args flat→nested (`lr_lora`→`optim`, `lora_r`/`lora_alpha_mult`→`lora`, etc.).
 
 > Note: `val/composite` is logged as a flat scalar (a prior `summary="min"` stored it as a
-> nested dict that broke parallel-coordinates; fixed). For the audio-only v0.3 data it
-> reduces to `val_audio`.
+> nested dict that broke parallel-coordinates; fixed). For the text+audio v0.3 data it
+> uses the composite `val/composite` (0.4·text + 0.6·audio).
 
 *Historical: the first v6e-8 proxy sweep (`9ba8h0ho`, r=64 winner) and the small-data
 regularization sweep predate the capacity sweep and are superseded — see W&B + git history.*

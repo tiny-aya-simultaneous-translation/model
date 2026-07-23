@@ -11,8 +11,8 @@ does **not** relicense any of them.
 
 | Component | Source | License | What you must know |
 |-----------|--------|---------|--------------------|
-| **Cohere `tiny-aya` backbone** | CohereLabs / Cohere | **Cohere model license** (NOT Apache-2.0) | This repo ships **LoRA adapter deltas only**, never the base weights. To run/train you must obtain the base model directly and comply with Cohere's license (including any non-commercial / acceptable-use terms). |
-| **Moshi / Mimi (depth decoder + audio codec)** | [kyutai-labs/moshi](https://github.com/kyutai-labs/moshi) | MIT | Retain the MIT copyright/permission notice when redistributing derived weights. |
+| **Cohere `tiny-aya` backbone** | CohereLabs / Cohere | **CC-BY-NC-4.0** (non-commercial) | This repo ships **LoRA adapter deltas only**, never the base weights. To run/train you must obtain the base model directly; its **CC-BY-NC-4.0 non-commercial terms are inherited by the released adapter weights**. |
+| **Moshi / Mimi (depth decoder + audio codec)** | [kyutai/moshiko](https://huggingface.co/kyutai/moshiko-pytorch-bf16) · [kyutai/mimi](https://huggingface.co/kyutai/mimi) | **CC-BY-4.0** (weights) | Attribution required when redistributing derived weights (the model weights are CC-BY-4.0; Kyutai's Moshi *code* is separately Apache-2.0). |
 | **Whisper (alignment, data pipeline)** | OpenAI | MIT | Used for forced alignment in the data pipeline. |
 
 ## Datasets

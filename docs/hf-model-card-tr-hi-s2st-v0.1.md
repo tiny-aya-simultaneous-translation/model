@@ -3,7 +3,7 @@ license: apache-2.0
 base_model: CohereLabs/tiny-aya-base
 base_model_relation: adapter
 library_name: peft
-new_version: tiny-aya-translate/tr-hi-s2st-v0.2
+new_version: tiny-aya-translate/tr-hi-s2st-v0.3
 datasets:
   - tiny-aya-translate/tr-hi-mimi-encoded
 language:
@@ -33,7 +33,7 @@ metrics:
 #           - { type: bleu, name: ASR-BLEU (hi->tr), value: TBD }
 ---
 
-> **Version:** `v0.1.0` — step-15000 checkpoint (first public release; eval pending).
+> **Version:** `v0.1.0` — step-15000 checkpoint (first public release; superseded by v0.3).
 > Versions are git tags in this repo; load a specific one with
 > `revision="v0.1.0"`. See **Version history** at the bottom.
 >
@@ -170,7 +170,7 @@ Mimi decode) lives in the training repo (`src/model/composite.py`).
   artifact (`tinyaya-stage2-tr-hi-v6e-v2:v0`).
 - **Checkpoints (GCS)**: `gs://tinyaya-stage2-eu/checkpoints/stage2-tpu-v6e-v2/`
 - **Dataset**: https://huggingface.co/datasets/tiny-aya-translate/tr-hi-mimi-encoded
-- **Code**: https://github.com/tiny-aya-simulatenous-translation/model
+- **Code**: https://github.com/tiny-aya-simultaneous-translation/model
 - **Next version**: https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.2
 
 ## Version history

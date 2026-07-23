@@ -7,8 +7,8 @@ Operating manual for the evals program (design: `docs/v0.3-evals-plan.md`).
 The long-horizon run is **COMPLETE incl. anneal** (run
 [`xzcb60bl`](https://wandb.ai/cataluna84/tinyaya-stage2-tpu/runs/xzcb60bl):
 plateau early-stop @ 65,250 then anneal 65,250→76,250; **best val composite
-2.8199 @ step 76,000**, final @ 76,250), so the GPU session is UNBLOCKED (rent
-on user word). The repo is **public** with the full suite;
+2.8199 @ step 76,000**, final @ 76,250), so the GPU release-eval **ran** —
+results in [`v0.3-eval-report.md`](v0.3-eval-report.md). The repo is **public** with the full suite;
 checkpoint access routes for every command below:
 
 1. **GCS (all ~89 dirs, full optimizer state — LAWA + resume):**
@@ -47,7 +47,7 @@ candidate; the plateau best (62,750) is optional ablation context.
   `--overlap_policy exclude|record`). New subsets get NEW names — never
   overwrite a frozen file.
 
-## GPU box bringup (when the session un-shelves)
+## GPU box bringup
 
 ```bash
 git clone <repo> && cd tinyaya-stage2-scale
@@ -164,7 +164,7 @@ a killed run continues with the same command.
   `scripts/wandb_audio_full_backfill.py --run <entity/project/run_id>
   --backfill` — it refuses while the run is live).
 
-## Sanity gates for the (shelved) live verification
+## Sanity gates for the live verification (executed)
 
 GT-audio topline ≫ model score; whisper-judge floor
 consistent with corpus QC; DNSMOS(GT) ≈ codec ceiling; Gemini-vs-whisper

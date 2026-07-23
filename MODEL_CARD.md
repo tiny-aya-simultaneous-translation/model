@@ -1,5 +1,5 @@
 ---
-license: apache-2.0
+license: cc-by-nc-4.0
 base_model: CohereLabs/tiny-aya-base
 base_model_relation: adapter
 library_name: peft
@@ -46,11 +46,13 @@ over `CohereLabs/tiny-aya-base` plus the custom projection / Moshi depth-decoder
 audio-head / embedding tensors.
 
 > ## ⚠️ License scope — read first
-> The **`apache-2.0`** license above covers **only the trained weights in this repo**
-> (the LoRA adapter + custom heads) and the authors' code. It does **NOT** relicense the
-> components this model builds on (see `THIRD_PARTY_NOTICES.md`):
-> - **`CohereLabs/tiny-aya-base`** → **Cohere model license** (NOT Apache; not included — obtain it from Cohere).
-> - **Moshi / Mimi** (depth decoder + audio codec) → **MIT**.
+> The **released weights** in this repo (the LoRA adapter + custom heads) are
+> **CC-BY-NC-4.0** — they are derivatives of `CohereLabs/tiny-aya-base` (CC-BY-NC-4.0)
+> and inherit its **non-commercial** terms. The authors' separate **training/eval code**
+> (the GitHub repo) is Apache-2.0. This does **NOT** relicense the components this model
+> builds on (see `THIRD_PARTY_NOTICES.md`):
+> - **`CohereLabs/tiny-aya-base`** → **CC-BY-NC-4.0** (not included — obtain it from Cohere; the released weights inherit its non-commercial terms).
+> - **Moshi / Mimi** (depth decoder + audio codec) → **CC-BY-4.0** (attribution given).
 > - **Source data**: FLORES (CC BY-SA 4.0), OPUS-100, conversational MT, and TTS-model outputs (per-source terms).
 
 ## What this is
@@ -137,8 +139,9 @@ Then attach the custom heads (`projection` / `depth_decoder` / `audio_heads` /
 
 ## Links
 
-- **Training (W&B)**: https://wandb.ai/cataluna84/tinyaya-stage2-tpu
+- **Training (W&B)**: https://wandb.ai/cataluna84/tinyaya-stage2-tpu/runs/xzcb60bl
 - **Emergence report (W&B)**: https://wandb.ai/cataluna84/tinyaya-stage2-tpu/reports/TinyAya-v0.3-Emergence-and-Data-Efficiency--VmlldzoxNzU1OTU1NQ==
+- **Blog**: [Adapting Moshi for Low-Resource Speech Translation](https://labscommunity.cohere.com/blog/2026/adapting-moshi-low-resource-speech-translation/)
 - **Checkpoints (GCS)**: `gs://tinyaya-stage2-eu/checkpoints/`
 - **Dataset**: https://huggingface.co/datasets/tiny-aya-translate/tr-hi-mimi-encoded
 - **Code**: https://github.com/tiny-aya-simultaneous-translation/model

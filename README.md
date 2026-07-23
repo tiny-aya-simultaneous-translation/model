@@ -12,8 +12,13 @@ depth decoder producing 8 RVQ Mimi codebooks.
 > 2.8199 @ step 76,000**. The **public** repo
 > [`tiny-aya-translate/tr-hi-s2st-v0.3`](https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3)
 > carries the **full ~89-checkpoint suite** (branches + `checkpoints/` tree) +
-> playable audio samples. Release evals (ASR-chrF++/MOS/BLASER via
-> `scripts/eval_release.py`) are pending. This is a research checkpoint for
+> playable audio samples. **Release eval complete**
+> ([`docs/v0.3-eval-report.md`](docs/v0.3-eval-report.md)): the inner-monologue
+> *translates* — free-run **text chrF++ 25.7 / 25.1** (hi→tr / tr→hi) — while
+> intelligible audio *synthesis* is the frontier (**ASR-chrF++ 3.7 / 9.6** vs a
+> **92 / 87** GT-audio topline). Explore the interactive
+> [**W&B emergence report**](https://wandb.ai/cataluna84/tinyaya-stage2-tpu/reports/TinyAya-v0.3-Emergence-and-Data-Efficiency--VmlldzoxNzU1OTU1NQ==).
+> This is a research checkpoint for
 > low-resource S2ST, not a production translator. See
 > [`docs/v0.3-public-release-plan.md`](docs/v0.3-public-release-plan.md) for the honest
 > release narrative.
@@ -83,7 +88,7 @@ runs and CPU-only tests never import it.
 
 ### Setup
 ```bash
-git clone https://github.com/tiny-aya-simulatenous-translation/model.git
+git clone https://github.com/tiny-aya-simultaneous-translation/model.git
 cd model
 uv sync
 ```
@@ -136,11 +141,14 @@ The v0.3 recipe was chosen by a **two-stage capacity sweep** on the full 1.24M c
    data-rich regime.
 2. **Stage 2 (Bayesian `lr × rank`)** — structure fixed to +MLP, rsLoRA on (`α=2r`).
 
-**Winner:**
+**Winner** — the capacity sweep picked +MLP / r=32 / `lr_lora 1.716e-4`; the later
+text+audio re-validation finalized **arm D** (`exclude_top: 0`, adapters on all 36
+layers):
 ```yaml
-lora:  { r: 32, alpha: 64, use_rslora: true }   # +MLP target modules, exclude_top: 2
+lora:  { r: 32, alpha: 64, use_rslora: true }   # +MLP target modules, exclude_top: 0
 optim: { lr_lora: 1.716e-4 }
-train: { max_steps: 14532, warmup_steps: 150 }   # 3 epochs over 1,178,302 train pairs
+loss:  { text_weight: 0.2, composite_text_w: 0.4 }   # text+audio (corrected 2026-07-08)
+train: { max_steps: 110463, warmup_steps: 150 }   # 3 epochs; trained to 76,250 (WSD early-stop + anneal)
 ```
 
 Pipeline validated end-to-end via an overfit gate (32-example train==val): **all 8
@@ -176,8 +184,8 @@ custom `projection.pt` / `depth_decoder.pt` / `audio_heads.pt` / `text_embed.pt`
 - [Model + checkpoints on Hugging Face](https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3)
 
 ## Related Repos
-- [`data-pipeline`](https://github.com/tiny-aya-simulatenous-translation/data-pipeline) — TTS generation, deployment, Mimi encoding
-- [`sound-quality-check`](https://github.com/tiny-aya-simulatenous-translation/sound-quality-check) — 4-stage audio QC pipeline
+- [`data-pipeline`](https://github.com/tiny-aya-simultaneous-translation/data-pipeline) — TTS generation, deployment, Mimi encoding
+- [`sound-quality-check`](https://github.com/tiny-aya-simultaneous-translation/sound-quality-check) — 4-stage audio QC pipeline
 
 ## License
 
