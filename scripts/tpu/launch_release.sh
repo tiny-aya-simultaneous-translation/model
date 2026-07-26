@@ -1,5 +1,5 @@
 #!/bin/bash
-# Release launcher for the public 15k-step v6e-8 run.
+# Release launcher for the v0.3 production run (v6e-16, 14,532 steps / 3 epochs).
 #
 # Differs from the canary/spot launchers by adding the release
 # instrumentation the public run needs (audit items #5, #6, #12):
@@ -21,9 +21,9 @@ export GIT_DIRTY="$(cat .git_dirty 2>/dev/null || echo unknown)"
 # Dataset revision pinned at staging time (optional).
 export DATASET_REVISION="${DATASET_REVISION:-$(cat .dataset_revision 2>/dev/null || echo unknown)}"
 
-CONFIG="${1:-configs/tpu/stage2_tpu_v6e_v2.yaml}"
+CONFIG="${1:-configs/tpu/stage2_tpu_v6e16_full_v03.yaml}"
 LOG=/tmp/train.log
-GCS_PREFIX="${GCS_LOG_PREFIX:-gs://tinyaya-stage2-tpu/checkpoints/stage2-tpu-v6e-v2}"
+GCS_PREFIX="${GCS_LOG_PREFIX:-gs://tinyaya-stage2-eu/checkpoints/stage2-tpu-v6e16-full-v03}"
 
 LIBPYTHON_DIR="$(dirname "$(find "$HOME/.local/share/uv/python" -name "libpython3.12.so.1.0" -type f 2>/dev/null | head -1)")"
 echo "[release] $(date -Is) start; GIT_SHA=$GIT_SHA dirty=$GIT_DIRTY config=$CONFIG" | tee "$LOG"
@@ -48,13 +48,13 @@ echo "[release] $(date -Is) training exited status $STATUS" | tee -a "$LOG"
 # --- sanitize + upload the log to GCS (audit items #5, #12) -------------
 SANITIZED=/tmp/train_15k.log
 python3 - "$LOG" "$SANITIZED" <<'PY'
-import re, sys
+import os, re, sys
 raw = open(sys.argv[1]).read()
 for pat in (r"hf_[A-Za-z0-9]{20,}", r"\b[0-9a-f]{40}\b",
             r"(?i)(api[_-]?key|token|secret|password|kaggle_key)\s*[=:]\s*\S+",
             r"(?i)bearer\s+[A-Za-z0-9._-]{20,}"):
     raw = re.sub(pat, "***REDACTED***", raw)
-raw = raw.replace("/home/cataluna84", "/home/USER")
+raw = raw.replace(os.path.expanduser("~"), "/home/USER")
 open(sys.argv[2], "w").write(raw)
 print(f"[release] sanitized log -> {sys.argv[2]} ({len(raw)} bytes)")
 PY

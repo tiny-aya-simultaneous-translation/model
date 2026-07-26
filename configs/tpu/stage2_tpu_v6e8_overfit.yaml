@@ -1,0 +1,126 @@
+# TPU v6e-8 OVERFIT / pipeline-validation config.
+#
+# WHY THIS EXISTS
+# ---------------
+# A classic pipeline-correctness gate: train on a TINY fixed set (32 examples,
+# train == val) for many epochs and confirm the model can MEMORIZE it. If the
+# data->model->loss->backprop->inference stack is correct, the teacher-forced
+# per-codebook accuracy (val/per_codebook_acc_*) must climb toward ~100% and the
+# loss toward ~0. If it can't, there is a bug (masking / targets / delay-indexing
+# / loss) that no amount of scale would fix.
+#
+# WHAT TO EXPECT (production freeze, depth_unfreeze_blocks=0):
+#   - CB0 is trained via the LoRA backbone + audio heads -> should overfit to
+#     >95% if the backbone/LoRA path is correct.
+#   - CB1-7 flow through the Moshi depth decoder whose transformer BLOCKS are
+#     FROZEN (only its I/O layers train). Their ceiling reflects the frozen
+#     decoder + conditioning, NOT a pipeline bug -- a plateau below 95% here is
+#     a finding about the frozen-depth ceiling, to be isolated later by
+#     unfreezing if needed.
+#
+# ALL regularization is stripped (dropout/wd/label_smoothing = 0) so loss can
+# reach ~0 and argmax accuracy ~100% -- this is a memorization test, not a
+# generalization run. Recipe otherwise matches the Stage-2 winner (r=32, +MLP,
+# rsLoRA) so it validates the REAL pipeline we will ship.
+#
+# Single-host v6e-8: global batch = batch_size(4) x grad_accum(1) x 8 chips = 32
+# = exactly the 32-example set, so one step is one full epoch over the mini-set.
+# The mini-split (/mnt/data/splits/{train,val}_overfit.jsonl) is created on the
+# VM as head -32 of the filtered full-corpus train split, copied to both
+# train_overfit.jsonl and val_overfit.jsonl (train == val).
+
+backend: tpu
+
+data:
+  encoded_dir: /mnt/data/encoded
+  train_split: /mnt/data/splits/train_overfit.jsonl
+  val_split: /mnt/data/splits/val_overfit.jsonl
+  max_frames: 300
+  audio_frame_rate: 12.5
+  num_workers: 8
+  pin_memory: false
+
+train:
+  weight_decay: 0.0               # OVERFIT: no regularization
+  num_codebooks: 8
+  batch_size: 4                   # per-chip; 4 x 1 x 8 chips = global 32 = the mini-set
+  grad_accum: 1
+  max_steps: 800                  # 800 epochs over the 32-example set
+  warmup_steps: 10
+  min_lr_ratio: 1.0               # OVERFIT: hold LR flat (no cosine decay) so it keeps memorizing
+  early_stop_patience: 0          # run the full budget
+  compile_warmup_steps: 1
+  enable_clip_grad_norm: true
+  clip_grad_norm: 10.0            # GENEROUS: clip 1.0 turned every update into a fixed lr-sized
+                                  # step (clipped-grad norm=1 x lr), overshooting the memorization
+                                  # basin -> loss oscillated at ~random with no descent. 10.0 only
+                                  # catches extreme spikes; normal updates stay gradient-scaled.
+  log_grad_norm: true
+  fsdp_barrier_hook: false
+  # Scan recipe: validate the SHIPPING stack (scan + micro graph breaks +
+  # depth_chunk 100) -- the same code path the arms and production use.
+  micro_mark_step: true
+  depth_chunk_size: 100
+  precision: bfloat16
+  use_scan_layers: true
+  xla_grad_checkpoint: true
+  final_canonical_save: false
+
+loss:
+  # TEXT+AUDIO (2026-07-09): gate the full shipping objective. On a memorized
+  # 32-example set the text CE must fall toward ~0 and val/text_acc toward
+  # ~100% -- a text stream that plateaus high means a text-path bug.
+  text_weight: 0.2
+  audio_weight: 1.0
+  text_weight_curriculum_frac: 0.0
+  composite_text_w: 0.4
+  composite_audio_w: 0.6
+  text_padding_weight: 0.01
+  zero_padding_weight: 0.0
+  label_smoothing: 0.0            # OVERFIT: let loss reach ~0 and argmax acc ~100%
+  per_codebook_multipliers: [1.0, 1.0, 1.5, 1.5, 2.0, 2.0, 2.0, 2.0]
+  progressive_unmask_fraction: 0.10
+  unmask_k0: 1
+
+lora:
+  r: 32                            # Stage-2 winner
+  alpha: 64                        # 2 x r
+  dropout: 0.0                     # OVERFIT: no dropout
+  use_rslora: true
+  target_modules: [q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, down_proj, embed_tokens]
+  lora_exclude_top: 2
+  num_full_ft_layers: 0
+  depth_unfreeze_blocks: 0         # PRODUCTION freeze (validate the real pipeline)
+
+optim:
+  # Moderate, STABLE LRs (the winner's proven values for projection/embeds/depth;
+  # lora slightly above the winner's 1.7e-4). The first attempt's flat 1e-3
+  # everywhere + clip=1.0 oscillated at random loss. Stable LR + generous clip
+  # lets the tiny set actually memorize.
+  lr_lora: 3.0e-4
+  lr_full_ft: 5.0e-5
+  lr_projection: 5.0e-4
+  lr_depth: 1.0e-4                 # depth I/O layers (blocks frozen)
+  lr_depth_blocks: 1.0e-5
+  lr_audio_embed: 5.0e-4
+  lr_text_embed: 5.0e-4
+
+logging:
+  log_every: 10
+  save_every: 300                 # a mid + final checkpoint for the inference step
+  audio_every: 1000000
+  val_every: 20                   # frequent: watch per-codebook accuracy climb
+  val_max_batches: 10             # covers all 32 examples (global batch 32)
+  val_on_tpu: true
+  diag_metrics: false
+  save_dir: gs://tinyaya-stage2-eu/checkpoints/stage2-tpu-v6e8-overfit-ta-scan
+  keep_last_n: 0
+  keep_local_checkpoints: false
+  use_wandb: true
+  wandb_project: tinyaya-stage2-tpu
+  wandb_run_name: v03-overfit-ta-scan
+
+perf:
+  enabled: true
+  warmup_skip_steps: 5
+  xprof_trace_labels: false

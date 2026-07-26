@@ -3,25 +3,25 @@
 #
 # WHY THIS EXISTS
 # ---------------
-# When the on-demand v4-64 quota in `us-central2-b` is busy, we fall
-# back to one of the spot quotas listed in the TRC welcome email
-# (archived in `docs/tpu-trc-allocation.md`).
-# This wrapper makes picking a slice a single-knob operation: the
-# `TRC_PROFILE` environment variable.
+# TRC v6e is SPOT-only, so the current v6e-16 production path (and every
+# other v6e/v5e slice) is provisioned here, not via the on-demand launch_qr.sh.
+# This wrapper makes picking a slice a single-knob operation: the `TRC_PROFILE`
+# environment variable `TRC_PROFILE`.
 #
 # Usage:
-#   TRC_PROFILE=v4-32-uc2b   bash scripts/tpu/launch_spot.sh   # default
-#   TRC_PROFILE=v6e-8-eu     bash scripts/tpu/launch_spot.sh   # current production
-#   TRC_PROFILE=v5e-64-ew4b  bash scripts/tpu/launch_spot.sh
+#   bash scripts/tpu/launch_spot.sh                            # default = v6e-16-eu (production)
+#   TRC_PROFILE=v6e-8-eu     bash scripts/tpu/launch_spot.sh   # smoke / overfit / eval
+#   TRC_PROFILE=v4-32-uc2b   bash scripts/tpu/launch_spot.sh   # legacy fallback
 #   TRC_PROFILE=v6e-64-ew4a  bash scripts/tpu/launch_spot.sh
 #
 # All other knobs (CONFIG_FILE, TPU_STRATEGY, PROBE_FIRST, QR_NAME,
 # NODE_ID, etc.) are forwarded to launch_qr.sh unchanged. SPOT is
 # pinned to 1 because that is the whole point of this wrapper.
 #
-# TRC_PROFILE legend (verbatim from docs/tpu-trc-allocation.md):
-#   v6e-8-eu     -> 8 chips spot v6e   in europe-west4-a  (current production)
-#   v4-32-uc2b   -> 32 chips spot v4   in us-central2-b   (legacy default)
+# TRC_PROFILE legend:
+#   v6e-16-eu    -> 16 chips spot v6e  in europe-west4-a  (current production, default)
+#   v6e-8-eu     -> 8 chips spot v6e   in europe-west4-a  (smoke / overfit / eval)
+#   v4-32-uc2b   -> 32 chips spot v4   in us-central2-b   (legacy fallback)
 #   v5e-64-ew4b  -> 64 chips spot v5e  in europe-west4-b
 #   v5e-64-uc1a  -> 64 chips spot v5e  in us-central1-a
 #   v6e-64-ew4a  -> 64 chips spot v6e  in europe-west4-a
@@ -34,9 +34,16 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-TRC_PROFILE="${TRC_PROFILE:-v4-32-uc2b}"
+TRC_PROFILE="${TRC_PROFILE:-v6e-16-eu}"
 
 case "$TRC_PROFILE" in
+    v6e-16-eu)
+        ACCEL_TYPE="${ACCEL_TYPE:-v6e-16}"
+        ZONE="${ZONE:-europe-west4-a}"
+        RUNTIME="${RUNTIME:-v2-alpha-tpuv6e}"
+        DEFAULT_QR="tinyaya-stage2-spot-v6e16-eu-qr"
+        DEFAULT_NODE="tinyaya-stage2-spot-v6e16-eu"
+        ;;
     v4-32-uc2b)
         ACCEL_TYPE="${ACCEL_TYPE:-v4-32}"
         ZONE="${ZONE:-us-central2-b}"
@@ -81,8 +88,7 @@ case "$TRC_PROFILE" in
         ;;
     *)
         echo "ERROR: unknown TRC_PROFILE '$TRC_PROFILE'" >&2
-        echo "Valid profiles: v4-32-uc2b v5e-64-ew4b v5e-64-uc1a v6e-8-eu v6e-64-ew4a v6e-64-ue1d" >&2
-        echo "See docs/tpu-trc-allocation.md for the source of truth." >&2
+        echo "Valid profiles: v6e-16-eu v6e-8-eu v4-32-uc2b v5e-64-ew4b v5e-64-uc1a v6e-64-ew4a v6e-64-ue1d" >&2
         exit 2
         ;;
 esac

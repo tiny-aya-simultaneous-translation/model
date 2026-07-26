@@ -82,6 +82,97 @@ def test_bounded_keeps_last_n_plus_best(tmp_path):
     assert (tmp_path / "best_by_val").exists()  # best survives pruning
 
 
+# ---- B1 resume: latest-checkpoint discovery + metadata reader ----
+
+def test_find_latest_checkpoint_picks_highest_step_not_best(tmp_path):
+    _make_ckpt_tree(tmp_path, [500, 1000, 1500], with_best=True)
+    latest = ckpt.find_latest_checkpoint(str(tmp_path))
+    assert latest is not None
+    assert latest.rstrip("/").endswith("step_001500")  # not best_by_val
+
+
+def test_get_checkpoint_dirs_excludes_best_and_sorts(tmp_path):
+    _make_ckpt_tree(tmp_path, [2000, 500, 1000], with_best=True)
+    dirs = ckpt.get_checkpoint_dirs(str(tmp_path))
+    names = [d.rstrip("/").rsplit("/", 1)[-1] for d in dirs]
+    assert names == ["step_000500", "step_001000", "step_002000"]  # sorted, no best
+
+
+def test_get_checkpoint_dirs_empty_when_absent(tmp_path):
+    assert ckpt.get_checkpoint_dirs(str(tmp_path / "nope")) == []
+
+
+def test_step_of_parses_and_defaults(tmp_path):
+    assert ckpt._step_of("gs://b/run/step_000750") == 750
+    assert ckpt._step_of("/x/step_000750/") == 750
+    assert ckpt._step_of("/x/best_by_val") == -1
+
+
+def test_read_checkpoint_metadata_local(tmp_path):
+    d = tmp_path / "step_000500"
+    d.mkdir()
+    (d / "metadata.json").write_text('{"step": 500, "wandb_run_id": "abc123"}')
+    meta = ckpt.read_checkpoint_metadata(str(d))
+    assert meta.get("wandb_run_id") == "abc123"
+    assert meta.get("step") == 500
+
+
+def test_read_checkpoint_metadata_missing_returns_empty(tmp_path):
+    d = tmp_path / "empty"
+    d.mkdir()
+    assert ckpt.read_checkpoint_metadata(str(d)) == {}
+
+
+# ---------------------------------------------------------------------------
+# _match_scan_namespace: the TPU grad-ckpt/scan proxy renames backbone blocks to
+# ``layers.layers_list.<i>.layer.<rest>``. A checkpoint saved under it must still
+# load onto a plain (eval/export) OR a scan-wrapped (resume) model. Before this
+# fix a TPU-saved adapter loaded 1/239 lora tensors onto a vanilla eval model
+# (backbone ran un-adapted -> teacher-forced acc read ~19% vs training's ~97%).
+# ---------------------------------------------------------------------------
+
+
+def test_match_scan_namespace_strips_wrapper_for_plain_model(tmp_path):
+    saved = {  # keys as written by save_pretrained under the scan proxy (no .default)
+        "base_model.model.model.layers.layers_list.0.layer.self_attn.q_proj.lora_A.weight": 1,
+        "base_model.model.model.layers.layers_list.33.layer.mlp.down_proj.lora_B.weight": 2,
+        "base_model.model.model.embed_tokens.lora_embedding_A": 3,  # no layers segment
+    }
+    plain_model_keys = [
+        "base_model.model.model.layers.0.self_attn.q_proj.lora_A.default.weight",
+        "base_model.model.model.layers.33.mlp.down_proj.lora_B.default.weight",
+    ]
+    out = ckpt._match_scan_namespace(saved, plain_model_keys)
+    assert "base_model.model.model.layers.0.self_attn.q_proj.lora_A.weight" in out
+    assert "base_model.model.model.layers.33.mlp.down_proj.lora_B.weight" in out
+    assert "base_model.model.model.embed_tokens.lora_embedding_A" in out  # untouched
+    assert not any("layers_list" in k for k in out)
+
+
+def test_match_scan_namespace_inserts_wrapper_for_scan_model(tmp_path):
+    saved = {  # a canonical/vanilla-saved adapter being loaded onto a scan-wrapped model
+        "base_model.model.model.layers.5.self_attn.v_proj.lora_A.weight": 9,
+        "base_model.model.model.embed_tokens.lora_embedding_A": 3,
+    }
+    scan_model_keys = [
+        "base_model.model.model.layers.layers_list.5.layer.self_attn.v_proj.lora_A.default.weight",
+    ]
+    out = ckpt._match_scan_namespace(saved, scan_model_keys)
+    assert (
+        "base_model.model.model.layers.layers_list.5.layer.self_attn.v_proj.lora_A.weight"
+        in out
+    )
+    assert "base_model.model.model.embed_tokens.lora_embedding_A" in out  # untouched
+
+
+def test_match_scan_namespace_noop_when_namespaces_agree(tmp_path):
+    saved = {"base_model.model.model.layers.layers_list.0.layer.x": 1}
+    model_keys = ["base_model.model.model.layers.layers_list.0.layer.x.default"]
+    assert ckpt._match_scan_namespace(saved, model_keys) is saved
+    plain = {"base_model.model.model.layers.0.x": 1}
+    assert ckpt._match_scan_namespace(plain, ["base_model.model.model.layers.0.x.default"]) is plain
+
+
 if __name__ == "__main__":
     import sys
     import tempfile

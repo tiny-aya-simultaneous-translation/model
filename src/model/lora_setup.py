@@ -27,14 +27,19 @@ class LoRAEmbedding(nn.Module):
     """Drop-in replacement for nn.Embedding that freezes the base table and
     learns a low-rank adapter on top (LoRA-style)."""
 
-    def __init__(self, base_embed: nn.Embedding, r: int = 16, alpha: int = 32):
+    def __init__(self, base_embed: nn.Embedding, r: int = 16, alpha: int = 32,
+                 use_rslora: bool = False):
         super().__init__()
         self.base_embed = base_embed
         self.base_embed.weight.requires_grad = False
         num_embeddings, embedding_dim = base_embed.weight.shape
         self.lora_A = nn.Embedding(num_embeddings, r)
         self.lora_B = nn.Linear(r, embedding_dim, bias=False)
-        self.scaling = alpha / r
+        # rsLoRA: alpha/sqrt(r) keeps the adapter contribution scale ~constant as
+        # r grows (vanilla alpha/r collapses high-rank gradients). Mirror the PEFT
+        # LoraConfig(use_rslora=...) convention here so the text_embed adapter
+        # scales the same way as the attention/MLP adapters.
+        self.scaling = alpha / (r ** 0.5) if use_rslora else alpha / r
         nn.init.normal_(self.lora_A.weight, std=1.0 / r)
         nn.init.zeros_(self.lora_B.weight)
 
@@ -53,6 +58,9 @@ def apply_lora(
     target_modules=None,
     num_full_ft_layers=0,
     lora_exclude_top=2,
+    lora_dropout=0.0,
+    use_rslora=False,
+    scan_homogeneous=False,
 ):
     """Apply LoRA to the TinyAya backbone (config-driven; sweepable).
 
@@ -75,6 +83,16 @@ def apply_lora(
     optimiser on a 36-layer/2048-hidden backbone), which strains HBM. The
     unfreeze is module-based (not param-name matching) and asserts it took
     effect, so it can never silently no-op.
+
+    ``scan_homogeneous`` (TPU + ``use_scan_layers`` only): ``scan_layers``
+    stacks per-layer parameter pytrees and hard-requires every layer to have
+    IDENTICAL keys, so leaving the top layers adapter-less
+    (``layers_to_transform``) breaks scan with "mismatched keys". When True,
+    adapters are instead applied to ALL layers and the top ``excluded``
+    layers' adapters are FROZEN. Mathematically identical to excluding them:
+    PEFT zero-inits ``lora_B``, so a frozen zero adapter contributes exactly
+    0 forever. Costs a negligible param overhead (the frozen adapters) and
+    keeps ``exclude_top``'s semantics intact under scan.
     """
     if target_modules is None:
         target_modules = ["q_proj", "v_proj", "embed_tokens"]
@@ -85,17 +103,51 @@ def apply_lora(
     # below). layers_to_transform=None would mean ALL layers (see HBM caveat).
     excluded = max(lora_exclude_top, num_full_ft_layers)
     lora_layers = list(range(num_layers - excluded)) if excluded > 0 else None
+    if scan_homogeneous:
+        # All layers get adapters (uniform pytree for scan); the top
+        # ``excluded`` layers' adapters are frozen below instead.
+        lora_layers = None
 
     lora_config = LoraConfig(
         r=r,
         lora_alpha=lora_alpha,
+        lora_dropout=lora_dropout,
         target_modules=target_modules,
         layers_to_transform=lora_layers,
         bias="none",
         task_type=TaskType.CAUSAL_LM,
+        use_rslora=use_rslora,
     )
 
     backbone.model = get_peft_model(backbone.model, lora_config)
+
+    # scan_homogeneous: freeze the top ``excluded`` layers' adapters (see
+    # docstring -- frozen zero-init adapters == excluded adapters, but the
+    # per-layer param pytree stays uniform for scan). Fail-loud if the name
+    # match finds nothing, mirroring the full-FT unfreeze below.
+    if scan_homogeneous and excluded > 0:
+        frozen_top = set(range(num_layers - excluded, num_layers))
+        n_frozen = 0
+        # NOTE on the regex: when the composite wraps the stack in the scan
+        # proxy (_ScannedLayerStack) BEFORE apply_lora runs, param names gain
+        # an extra hop: `...layers.layers_list.<i>.layer.<...>` instead of
+        # `...layers.<i>.<...>`. Match both, or this freeze finds 0 tensors
+        # and the fail-loud assert kills every scan run (seen live on arm-a
+        # 2026-07-08).
+        for pname, param in backbone.model.named_parameters():
+            m = re.search(r"\.layers(?:_list)?\.(\d+)\.", pname)
+            if m and int(m.group(1)) in frozen_top and "lora_" in pname:
+                param.requires_grad = False
+                n_frozen += 1
+        assert n_frozen > 0, (
+            f"scan_homogeneous exclude_top={excluded} froze 0 adapter tensors "
+            f"(name match failed for {num_layers}-layer backbone)"
+        )
+        print(
+            f"[lora] scan_homogeneous: adapters on ALL {num_layers} layers; "
+            f"froze {n_frozen} adapter tensors on top-{excluded} layers "
+            "(zero-init B => identical to exclude_top, uniform pytree for scan)"
+        )
 
     # Full fine-tune the top ``num_full_ft_layers`` blocks. Operate on the
     # layer MODULE objects (robust to PEFT name-mangling), then assert a
@@ -103,8 +155,11 @@ def apply_lora(
     unfrozen = 0
     if num_full_ft_layers > 0:
         targets = set(range(num_layers - num_full_ft_layers, num_layers))
+        # Same scan-proxy naming caveat as above: the layer module may be
+        # `...layers.layers_list.<i>` (its `.layer` child is the HF layer;
+        # recurse=True below reaches it either way).
         for mod_name, module in backbone.model.named_modules():
-            m = re.fullmatch(r".*\.layers\.(\d+)", mod_name)
+            m = re.fullmatch(r".*\.layers(?:_list)?\.(\d+)", mod_name)
             if m and int(m.group(1)) in targets:
                 for p in module.parameters(recurse=True):
                     if not p.requires_grad:
@@ -116,14 +171,19 @@ def apply_lora(
         )
 
     # Wrap text_embed with LoRA adapter (frozen base + trainable low-rank)
-    backbone.text_embed = LoRAEmbedding(backbone.text_embed, r=r, alpha=lora_alpha)
+    backbone.text_embed = LoRAEmbedding(
+        backbone.text_embed, r=r, alpha=lora_alpha, use_rslora=use_rslora
+    )
 
     # Ensure audio_heads are trainable
     for param in backbone.audio_heads.parameters():
         param.requires_grad = True
 
+    _scale_rule = f"alpha/sqrt(r)={lora_alpha / (r ** 0.5):.3f}" if use_rslora \
+        else f"alpha/r={lora_alpha / r:.3f}"
     print(
-        f"[lora] r={r} alpha={lora_alpha} targets={target_modules} "
+        f"[lora] r={r} alpha={lora_alpha} rslora={use_rslora} ({_scale_rule}) "
+        f"targets={target_modules} "
         f"lora_layers=0..{num_layers - excluded - 1} (exclude_top={excluded}) "
         f"num_full_ft_layers={num_full_ft_layers} (+{unfrozen / 1e6:.1f}M full-FT)"
     )
@@ -171,7 +231,10 @@ def get_parameter_groups(
             groups["text_embed"]["params"].append(param)
         elif "lora_" in name or "lora_embedding" in name:
             groups["lora"]["params"].append(param)
-        elif any(f"layers.{i}." in name for i in range(ft_start, num_layers)):
+        elif any(
+            f"layers.{i}." in name or f"layers_list.{i}." in name
+            for i in range(ft_start, num_layers)
+        ):
             groups["full_ft"]["params"].append(param)
         else:
             groups["lora"]["params"].append(param)

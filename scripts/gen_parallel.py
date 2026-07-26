@@ -11,9 +11,9 @@ from transformers import AutoTokenizer
 import soundfile as sf, os
 
 CKPT = "checkpoints/overfit_parallel/step_000300"
-SPLIT = "/home/alperiox/training_data_full/splits/small/train_20.jsonl"
-ENCODED = "/home/alperiox/training_data_full/encoded"
-OUT_DIR = "/home/alperiox/audio_parallel_v2"
+SPLIT = "data/splits/small/train_20.jsonl"     # <- point at your split
+ENCODED = "data/encoded"                        # <- point at your Mimi-encoded corpus
+OUT_DIR = "outputs/audio_parallel_v2"
 
 tokenizer = AutoTokenizer.from_pretrained("CohereLabs/tiny-aya-base", trust_remote_code=True)
 model = TinyAyaMoshiComposite(num_codebooks=8)

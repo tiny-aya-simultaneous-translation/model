@@ -62,7 +62,7 @@ session begins from the same snapshot of state.
 ## Failure modes
 
 - If any memory file is missing, do **not** silently continue. Surface
-  the gap and offer to recreate from `MEMORY-INSTALLATION.md`.
+  the gap and offer to recreate from `MEMORY-SYSTEM.md`.
 - If `AGENTS.md` is missing at root, refuse and instruct the user to
   install the memory system first.
 

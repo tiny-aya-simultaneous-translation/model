@@ -1,0 +1,105 @@
+# TPU v6e-16 SMOKE test, ARM A (Stage-2 sweep winner): r=32, lr=1.716e-4.
+#
+# WHY THIS EXISTS
+# ---------------
+# The Stage-1/2 capacity sweep only ever trained on the 200K GCS SUBSET for
+# 1,500 steps -- 0.31 epochs of the real 1.24M corpus. Before committing to
+# a full 3-epoch (14,532-step) production run on the winning recipe
+# (lr_lora=1.716e-4, lora_r=32, +MLP structure), this smoke test re-validates
+# it on the FULL corpus for ~5,000 steps (~1.04 epochs), in parallel with two
+# other Stage-2 candidates (r=8 and r=64) on separate TPU v6e-16 slices
+# across two TRC zones (europe-west4-a + us-east1-d).
+#
+# If this arm still wins on real full-corpus data diversity, it gets
+# EXTENDED IN PLACE: bump train.max_steps from 5000 to 14532 and re-run
+# --resume auto on the SAME slice/save_dir/W&B run -- no new config, no
+# restart. This file IS the production config once that happens.
+#
+# data.* paths are populated by scripts/tpu/startup_script.sh's plain
+# (non-sweep) branch -- MUST clear /mnt/data/encoded + /mnt/data/splits and
+# the sweep-data-gs-uri boot metadata first, or the host silently keeps the
+# stale 200K sweep subset (same .unpacked marker gates both paths).
+
+backend: tpu
+
+data:
+  encoded_dir: /mnt/data/encoded
+  train_split: /mnt/data/splits/train.jsonl
+  val_split: /mnt/data/splits/val.jsonl
+  max_frames: 300
+  audio_frame_rate: 12.5
+  num_workers: 32
+  pin_memory: false
+
+train:
+  weight_decay: 0.01              # de-regularized (overfitting isn't the constraint at this scale)
+  num_codebooks: 8
+  batch_size: 4                   # per-chip (validated safe); 4 x 4 x 16 = global 256
+  grad_accum: 4
+  max_steps: 5000                 # smoke horizon: ~1.04 epochs of the full 1.24M corpus
+  warmup_steps: 50                # ~1% of max_steps
+  min_lr_ratio: 0.0
+  early_stop_patience: 6          # 6 val cycles (1500 steps) no-improvement -> stop; safety net past the validated 0.31-epoch regime
+  compile_warmup_steps: 1
+  enable_clip_grad_norm: true
+  clip_grad_norm: 1.0
+  log_grad_norm: true
+  fsdp_barrier_hook: false
+  depth_chunk_size: 16
+  precision: bfloat16
+  use_scan_layers: false
+  xla_grad_checkpoint: true
+  final_canonical_save: false     # set true when this arm is extended to the full run (Part 2)
+
+loss:
+  # AUDIO-ONLY (corpus has no text alignments).
+  text_weight: 0.0
+  audio_weight: 1.0
+  text_weight_curriculum_frac: 0.0
+  composite_text_w: 0.0
+  composite_audio_w: 1.0
+  text_padding_weight: 0.01
+  zero_padding_weight: 0.0
+  label_smoothing: 0.1
+  per_codebook_multipliers: [1.0, 1.0, 1.5, 1.5, 2.0, 2.0, 2.0, 2.0]
+  progressive_unmask_fraction: 0.10
+  unmask_k0: 1
+
+lora:
+  r: 32                            # Stage-2 sweep winner
+  alpha: 64                        # 2 x r (rsLoRA convention)
+  dropout: 0.05                    # de-regularized
+  use_rslora: true                 # Stage-2 winner used rsLoRA (rank>=16)
+  target_modules: [q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, down_proj, embed_tokens]  # Stage-1 +MLP winner
+  lora_exclude_top: 2
+  num_full_ft_layers: 0
+  depth_unfreeze_blocks: 0
+
+optim:
+  lr_lora: 1.716e-4                # Stage-2 sweep winner (run a1bluw6u)
+  lr_full_ft: 5.0e-5
+  lr_projection: 5.0e-4
+  lr_depth: 1.0e-4
+  lr_depth_blocks: 1.0e-5
+  lr_audio_embed: 5.0e-4
+  lr_text_embed: 5.0e-4
+
+logging:
+  log_every: 25
+  save_every: 500                 # CHECKPOINT every 500 steps (resumable + retained)
+  audio_every: 1000000
+  val_every: 250
+  val_max_batches: 25
+  val_on_tpu: true
+  diag_metrics: false
+  save_dir: gs://tinyaya-stage2-eu/checkpoints/stage2-tpu-v6e16-smoke-r32
+  keep_last_n: 0                  # keep ALL checkpoints
+  keep_local_checkpoints: false
+  use_wandb: true
+  wandb_project: tinyaya-stage2-tpu
+  wandb_run_name: v0.3-smoke-r32
+
+perf:
+  enabled: true
+  warmup_skip_steps: 25
+  xprof_trace_labels: false

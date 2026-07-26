@@ -175,6 +175,12 @@ class TPUBackend(BackendBase):
             mesh_shape=(num_devices,),
             axis_names=("fsdp",),
         )
+        # Register as the process-global mesh so the multi-host minibatch
+        # input pipeline can build ``ShardingSpec``s against it via
+        # ``xs.get_global_mesh()`` without threading the backend everywhere.
+        import torch_xla.distributed.spmd as xs
+
+        xs.set_global_mesh(self._mesh)
         print(
             f"[tpu_backend] SPMD initialized: {num_devices} devices, "
             f"mesh_shape={self._mesh.mesh_shape}, axis=fsdp"
@@ -412,11 +418,12 @@ class TPUBackend(BackendBase):
         - For fsdpv2 / fsdpv2_lora: call optimizer.step() then
           xm.mark_step() to materialise.
         """
+        import torch_xla
         import torch_xla.core.xla_model as xm
 
         if self._strategy in ("fsdpv2", "fsdpv2_lora"):
             optimizer.step()
-            xm.mark_step()
+            torch_xla.sync()
         else:
             xm.optimizer_step(optimizer)
 
@@ -649,6 +656,61 @@ class TPUBackend(BackendBase):
             f"tpu-info returned no parseable hbm_usage output: {out.stdout[:160]!r}"
         )
 
+    @staticmethod
+    def _parse_tpu_info_hbm_table(text: str) -> list[tuple[int, float, float]]:
+        """Parse every chip row of a ``tpu-info --metric hbm_usage`` table.
+
+        Accepts both cell formats ("| 4 | 25.71 GiB / 31.25 GiB |" and the
+        newer bare-number "| 4 | 25.71 |"). Returns
+        ``[(chip_id, used_gib, limit_gib), ...]`` in table order; rows that
+        do not parse (headers, N/A) are skipped.
+        """
+        rows: list[tuple[int, float, float]] = []
+        for line in text.splitlines():
+            m = re.match(
+                r"^\|\s*(\d+)\s*\|\s*([0-9.]+)\s*(?:GiB)?"
+                r"(?:\s*/\s*([0-9.]+)\s*(?:GiB)?)?\s*\|",
+                line,
+            )
+            if m:
+                rows.append(
+                    (
+                        int(m.group(1)),
+                        float(m.group(2)),
+                        float(m.group(3)) if m.group(3) else 31.246,
+                    )
+                )
+        return rows
+
+    def hbm_per_chip(self) -> list[tuple[int, float, float]]:
+        """All LOCAL chips' ``(chip_id, used_gib, limit_gib)`` via tpu-info.
+
+        In-process HBM telemetry is unavailable under SPMD (the ``-1``
+        sentinel above), and libtpu's metrics endpoint only exposes THIS
+        host's chips (4 on a v6e host) — no host can see the whole slice.
+        The per-host W&B telemetry calls this on EVERY host and logs under
+        ``tpu/host{N}/...``; the union of the four panels covers all 16
+        chips. Returns ``[]`` on any failure (telemetry never raises).
+        """
+        import subprocess as _sp
+
+        tpu_info = self._find_tpu_info_binary()
+        if not tpu_info:
+            return []
+        try:
+            out = _sp.run(
+                [tpu_info, "--metric", "hbm_usage"],
+                capture_output=True,
+                text=True,
+                timeout=10,
+                env={**os.environ, "PJRT_DEVICE": "TPU"},
+            )
+        except Exception:  # noqa: BLE001 - telemetry, never blocks training
+            return []
+        if out.returncode != 0 or "N/A" in out.stdout:
+            return []
+        return self._parse_tpu_info_hbm_table(out.stdout)
+
     def get_memory_info(self) -> dict | None:
         """Return per-chip HBM usage in GB, or ``None`` on import failure.
 
@@ -710,6 +772,83 @@ class TPUBackend(BackendBase):
             "hbm_available": 1.0,
         }
 
+    def per_chip_metrics(self) -> dict[str, float]:
+        """Per-chip HBM + duty-cycle telemetry for W&B, all chips on this host.
+
+        WHY THIS EXISTS
+        ---------------
+        ``get_memory_info`` reports chip 0 only, which is fine under SPMD
+        replicated (chips are near-identical) but hides stragglers and makes
+        per-chip regressions invisible in W&B. This parses ONE plain
+        ``tpu-info`` run -- its "TPU Runtime Utilization" table carries both
+        HBM and duty cycle for every chip on the host::
+
+            | 0    | 22.37 GiB / 31.25 GiB | 0.00%      |
+
+        Returns
+        -------
+        dict[str, float]
+            Flat W&B-ready keys per chip: ``tpu/chip{i}/hbm_gib``,
+            ``tpu/chip{i}/hbm_peak_gib`` (host-side running max over this
+            process's samples -- libtpu exposes no true peak counter),
+            ``tpu/chip{i}/duty_pct``; plus ``tpu/hbm_max_gib`` /
+            ``tpu/hbm_min_gib`` across chips for cheap dashboarding.
+            Empty dict when telemetry is unavailable (never raises).
+
+        Notes
+        -----
+        TPU note: the subprocess costs ~1-2 s, so results are cached for
+        30 s -- call it every logging step and let the cache throttle.
+        Under multi-host (v6e-16+) this reports the CALLING host's chips
+        only; each host would need its own logger for full coverage.
+        """
+        import subprocess as _sp
+        import time as _time
+
+        now = _time.monotonic()
+        cached = getattr(self, "_per_chip_cache", None)
+        if cached is not None and now - cached[0] < 30.0:
+            return cached[1]
+
+        tpu_info = self._find_tpu_info_binary()
+        if not tpu_info:
+            return {}
+        try:
+            out = _sp.run(
+                [tpu_info],
+                capture_output=True,
+                text=True,
+                timeout=15,
+                env={**os.environ, "PJRT_DEVICE": "TPU"},
+            )
+        except Exception:
+            return {}
+
+        # Rows: | <chip> | <used> GiB / <limit> GiB | <duty>% |
+        row_re = re.compile(
+            r"^\|\s*(\d+)\s*\|\s*([0-9.]+)\s*GiB\s*/\s*[0-9.]+\s*GiB\s*\|"
+            r"\s*([0-9.]+)%\s*\|"
+        )
+        peaks: dict[int, float] = getattr(self, "_per_chip_peaks", {})
+        metrics: dict[str, float] = {}
+        used_vals: list[float] = []
+        for line in out.stdout.splitlines():
+            m = row_re.match(line.strip())
+            if not m:
+                continue
+            chip, used, duty = int(m.group(1)), float(m.group(2)), float(m.group(3))
+            peaks[chip] = max(peaks.get(chip, 0.0), used)
+            metrics[f"tpu/chip{chip}/hbm_gib"] = used
+            metrics[f"tpu/chip{chip}/hbm_peak_gib"] = peaks[chip]
+            metrics[f"tpu/chip{chip}/duty_pct"] = duty
+            used_vals.append(used)
+        if used_vals:
+            metrics["tpu/hbm_max_gib"] = max(used_vals)
+            metrics["tpu/hbm_min_gib"] = min(used_vals)
+        self._per_chip_peaks = peaks
+        self._per_chip_cache = (now, metrics)
+        return metrics
+
     def sync(self) -> None:
         """``torch_xla.sync()`` -- fence the lazy graph builder."""
         import torch_xla
@@ -730,6 +869,78 @@ class TPUBackend(BackendBase):
         import torch_xla.distributed.spmd as xs
 
         xs.mark_sharding(tensor, self._mesh, partition_spec)
+
+    def host_count(self) -> int:
+        """Number of host processes on this slice (v6e-8 = 1, v6e-16 = 4)."""
+        import torch_xla.runtime as xr
+
+        return int(xr.process_count())
+
+    def process_index(self) -> int:
+        """This host's rank in ``[0, host_count())`` -- the DistributedSampler
+        rank that makes each host draw DISTINCT rows for the multi-host
+        minibatch input pipeline."""
+        import torch_xla.runtime as xr
+
+        return int(xr.process_index())
+
+    def local_chip_count(self) -> int:
+        """Chips physically addressable by THIS host (v6e-16 = 4).
+
+        The minibatch pipeline requires the per-host batch to be divisible by
+        this (``xla_model.send_cpu_data_to_device``). Equals
+        ``world_size() // host_count()`` on a homogeneous slice.
+        """
+        import torch_xla.runtime as xr
+
+        return int(xr.addressable_runtime_device_count())
+
+    @property
+    def mesh(self):
+        """The process-global 1-D ``fsdp`` mesh spanning all chips.
+
+        Needed to build ``ShardingSpec``s for the multi-host minibatch
+        ``MpDeviceLoader``. Also registered via ``xs.set_global_mesh`` in
+        ``init_distributed`` so ``xs.get_global_mesh()`` returns it.
+        """
+        return self._mesh
+
+    def shard_to_device(self, cpu_tensor: torch.Tensor, partition_spec: tuple) -> torch.Tensor:
+        """Move a PER-HOST cpu batch to device as a shard of the GLOBAL batch.
+
+        The multi-host data-parallel primitive. Each host passes its own
+        ``per_host_batch`` rows (from a ``DistributedSampler``); the
+        ``minibatch=True`` ``ShardingSpec`` spans the global mesh, so XLA
+        places this host's rows on its local chips and assembles the global
+        ``per_host_batch x host_count`` logical tensor across hosts. Replaces
+        the single-host ``.to(device)`` + ``mark_sharding`` path (which has no
+        minibatch semantics and would treat each host's rows as the whole
+        global batch -- the proven "only host 0 survives" pathology).
+
+        ``partition_spec`` matches tensor rank: ``("fsdp", None)`` for 2-D
+        text/mask, ``("fsdp", None, None)`` for 3-D audio. Per-host batch must
+        be divisible by ``local_chip_count()`` (enforced by torch_xla).
+        """
+        import torch_xla.core.xla_model as xm
+        from torch_xla.distributed.spmd import ShardingSpec
+
+        spec = ShardingSpec(self._mesh, partition_spec, minibatch=True)
+        out = xm.send_cpu_data_to_device(cpu_tensor, self._device, spec)
+        while isinstance(out, (list, tuple)):
+            out = out[0]
+        return out
+
+    def get_sharding_spec(self, tensor: torch.Tensor) -> str:
+        """Return the XLA sharding annotation string for ``tensor``.
+
+        Pure graph metadata (e.g. ``{devices=[8,1]0,1,...}``) -- reading it
+        does NOT materialize the tensor or cut the traced graph, so it is
+        safe inside the macro-step. Used by the P0 batch-semantics audit to
+        show how the batch dim is really distributed across the mesh.
+        """
+        import torch_xla
+
+        return torch_xla._XLAC._get_xla_sharding_spec(tensor)
 
     def diagnose(self, tag: str = "diagnose") -> None:
         """Print mesh layout + per-chip HBM. Cheap; safe every N steps.

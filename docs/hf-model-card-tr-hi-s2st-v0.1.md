@@ -3,7 +3,7 @@ license: apache-2.0
 base_model: CohereLabs/tiny-aya-base
 base_model_relation: adapter
 library_name: peft
-new_version: tiny-aya-translate/tr-hi-s2st-v0.2
+new_version: tiny-aya-translate/tr-hi-s2st-v0.3
 datasets:
   - tiny-aya-translate/tr-hi-mimi-encoded
 language:
@@ -33,13 +33,24 @@ metrics:
 #           - { type: bleu, name: ASR-BLEU (hi->tr), value: TBD }
 ---
 
-> **Version:** `v0.1.0` — step-15000 checkpoint (first public release; eval pending).
+> **Version:** `v0.1.0` — step-15000 checkpoint (first public release; superseded by v0.3).
 > Versions are git tags in this repo; load a specific one with
 > `revision="v0.1.0"`. See **Version history** at the bottom.
 >
 > 🔜 **A newer version exists:** [`tr-hi-s2st-v0.2`](https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.2)
 > fixes the text stream (the Phase-0 padding-loss fix) so the inner-monologue
 > actually learns. If you want the later recipe, use v0.2.
+
+> ## 📒 Data clarification
+> This checkpoint was trained on the project's **synthetic** corpus —
+> [`tiny-aya-translate/tr-hi-mimi-encoded`](https://huggingface.co/datasets/tiny-aya-translate/tr-hi-mimi-encoded)
+> (FLORES + OPUS-100 + machine-translated conversational text, rendered with
+> multi-voice TTS; **1,178,302** train / 62,036 val pairs, verified from the
+> training log). Earlier wording in this card called the data "FLEURS" — that
+> was a mislabel: **FLORES** (parallel *text*) is not **FLEURS** (read-speech
+> audio), and no FLEURS audio is in this set. *(Note: the later v0.2 run
+> accidentally trained on a FLEURS sibling dataset; v0.1 here used the intended
+> synthetic data.)*
 
 # TinyAya Stage 2 — Turkish ↔ Hindi Speech-to-Speech Translation (LoRA)
 
@@ -65,7 +76,10 @@ custom projection / Moshi depth-decoder / audio-head / embedding tensors.
 >   (NOT Apache). Not included here; you must obtain it from Cohere and
 >   comply with its terms.
 > - **Moshi / Mimi** (depth decoder + audio codec) → **MIT**.
-> - **FLEURS** source data → **CC BY 4.0**.
+> - **Source data** (FLORES, OPUS-100, conversational MT) and the **TTS-generated
+>   audio** → see the [dataset card](https://huggingface.co/datasets/tiny-aya-translate/tr-hi-mimi-encoded)
+>   for per-source terms (e.g. FLORES is CC BY-SA 4.0; OPUS-100 sub-corpora and
+>   the TTS-model outputs carry their own licenses). Verify before redistribution.
 
 ## What this is
 
@@ -76,7 +90,7 @@ custom projection / Moshi depth-decoder / audio-head / embedding tensors.
 | Method | LoRA (+ trained projection/heads/embeds), bf16, FSDPv2 SPMD |
 | Hardware | Cloud TPU v6e-8 (single host), via Google TRC |
 | Steps | 15,000 (effective batch 256) |
-| Data | `tiny-aya-translate/tr-hi-mimi-encoded` (Mimi-encoded FLEURS TR/HI) |
+| Data | [`tiny-aya-translate/tr-hi-mimi-encoded`](https://huggingface.co/datasets/tiny-aya-translate/tr-hi-mimi-encoded) — Mimi-encoded **synthetic** TR↔HI parallel speech (FLORES + OPUS-100 + conversational MT, multi-voice TTS); ~1.18M train pairs |
 
 ## Training procedure
 
@@ -114,21 +128,18 @@ the YAML `model-index` + below.
 
 - **Intended**: research on low-resource speech-to-speech translation and
   simultaneous translation; a Stage-2 checkpoint, not a production system.
-- **Limitations**: trained on read-speech (FLEURS) — expect degradation on
-  spontaneous/noisy audio; two language directions only; **the text stream did
-  not learn in this version** (use v0.2 for text); generation is autoregressive
+- **Limitations**: trained on **synthetic multi-voice TTS** audio (FLORES /
+  OPUS-100 / conversational text) — expect degradation on real, spontaneous, or
+  noisy audio and on voices outside the TTS set; two language directions only;
+  **the text stream did
+  not learn in this version** (root cause found 2026-07-08: a loader path bug —
+  the corpus's word-level alignments ship under `{stem}.{src,tgt}.alignments.json`
+  at the dataset root, which the v0.1 loader never resolved, so text supervision
+  was silently all-padding; fixed in v0.3); generation is autoregressive
   and not optimized for latency here.
-- **History (transparency)**: the run was a spot v6e-8 (preemptible); an
-  earlier run had a checkpoint GCS-path bug (fixed) and three W&B metrics
-  (per-codebook loss, grad-norm, HBM) that logged as zero (fixed in this run).
-
-## Bias, risks & limitations
-
-Trained on FLEURS (read speech, limited speakers/domains); quality and fairness
-across dialects, accents, code-switching, and spontaneous speech are untested.
-Speech translation can mistranslate, omit, or fabricate content — outputs must
-not be relied upon for high-stakes communication. As noted above, the text /
-inner-monologue stream is not functional in this version.
+- **Bias & risks**: a fixed set of TTS voices — fairness across real speakers,
+  dialects, accents, code-switching, and spontaneous speech is untested. Speech
+  translation can mistranslate, omit, or fabricate content; not for high-stakes use.
 
 ## Inference quickstart
 
@@ -157,9 +168,9 @@ Mimi decode) lives in the training repo (`src/model/composite.py`).
 - **Training run (W&B)**: https://wandb.ai/cataluna84/tinyaya-stage2-tpu/runs/b7fr72u5
   — full config, loss curves, system/throughput metrics, and the model
   artifact (`tinyaya-stage2-tr-hi-v6e-v2:v0`).
-- **Checkpoints (GCS)**: `gs://tinyaya-stage2-tpu/checkpoints/stage2-tpu-v6e-v2/`
+- **Checkpoints (GCS)**: `gs://tinyaya-stage2-eu/checkpoints/stage2-tpu-v6e-v2/`
 - **Dataset**: https://huggingface.co/datasets/tiny-aya-translate/tr-hi-mimi-encoded
-- **Code**: https://github.com/tiny-aya-simulatenous-translation/model
+- **Code**: https://github.com/tiny-aya-simultaneous-translation/model
 - **Next version**: https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.2
 
 ## Version history

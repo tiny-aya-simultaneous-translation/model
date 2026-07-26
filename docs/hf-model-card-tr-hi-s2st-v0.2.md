@@ -19,7 +19,7 @@ datasets:
   - tiny-aya-translate/fleurs-tr-hi-mimi-encoded
 model-index:
   - name: tr-hi-s2st-v0.2
-    results: []   # TODO: ASR-BLEU / chrF / DNSMOS — to be filled after GPU eval
+    results: []   # v0.2 superseded by v0.3 (trained on the wrong FLEURS dataset); not separately evaluated
 ---
 
 # TinyAya — Turkish⇄Hindi Speech-to-Speech Translation (v0.2)
@@ -28,6 +28,26 @@ model-index:
 > and to document the full training trajectory. The recommended weights are
 > **`best_by_val` (step 1,000)**, *not* the final step-15,000 checkpoint. See
 > [Evaluation & the overfitting story](#evaluation--the-overfitting-story).
+
+> ## ⚠️ Dataset disclosure — honest correction
+>
+> This checkpoint was trained on **[`tiny-aya-translate/fleurs-tr-hi-mimi-encoded`](https://huggingface.co/datasets/tiny-aya-translate/fleurs-tr-hi-mimi-encoded)**
+> — Mimi-encoded **FLEURS** Turkish↔Hindi read speech (~27% real FLEURS audio +
+> ~73% multi-voice TTS over FLEURS text; ≈8.3k train / 929 val).
+>
+> **This was not the dataset we intended to train on.** The project's synthetic
+> data pipeline — FLORES + OPUS-100 + machine-translated conversational text,
+> rendered with multi-voice TTS into
+> **[`tiny-aya-translate/tr-hi-mimi-encoded`](https://huggingface.co/datasets/tiny-aya-translate/tr-hi-mimi-encoded)**
+> (~1.3M clips) — is the corpus our accompanying write-up describes. The training
+> launcher's `HF_DATASET` default pointed at the **`fleurs-`** *sibling* repo, so
+> v0.2 silently trained on FLEURS read speech instead of the synthetic
+> conversational corpus. We are disclosing this openly rather than quietly
+> re-labeling the run.
+>
+> **v0.3 corrects the data source** (→ `tr-hi-mimi-encoded`) together with the
+> codebase fixes (parallel-stream collator, regularization, deep-codebook
+> weighting). See [`tr-hi-s2st-v0.3`](https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3).
 
 Moshi-style **simultaneous speech-to-speech translation** for **Turkish ⇄ Hindi**:
 a LoRA-fine-tuned **Cohere2** backbone fused with a **frozen Moshi depth
@@ -47,7 +67,7 @@ This recipe was selected by a proxy-first **W&B hyperparameter sweep** (8 Bayesi
 
 - **📊 Sweep:** https://wandb.ai/cataluna84/tinyaya-stage2-tpu/sweeps/9ba8h0ho
 - **📈 Training run:** https://wandb.ai/cataluna84/tinyaya-stage2-tpu/runs/t1840nkd
-- **Code:** the [training repo](https://github.com/tiny-aya-simulatenous-translation/model) (PR #8)
+- **Code:** the [training repo](https://github.com/tiny-aya-simultaneous-translation/model) (PR #8)
 
 ## Training procedure
 
@@ -58,7 +78,7 @@ This recipe was selected by a proxy-first **W&B hyperparameter sweep** (8 Bayesi
 | Effective batch | 256 (batch 8 × grad-accum 4 × 8 chips), `max_frames` 300 |
 | Stability | **0 non-finite / NaN / loss-spike alerts** across the whole run |
 | **Recipe** | `lora.r=64`, `lora.alpha=128`, `lr_lora=4.6e-4`, `lr_depth=1.1e-4`, `text_weight=0.2`, `warmup=500`, `weight_decay=0.01` |
-| Data | [`tiny-aya-translate/fleurs-tr-hi-mimi-encoded`](https://huggingface.co/datasets/tiny-aya-translate/fleurs-tr-hi-mimi-encoded) (Mimi-encoded FLEURS TR↔HI parallel speech) |
+| Data | [`tiny-aya-translate/fleurs-tr-hi-mimi-encoded`](https://huggingface.co/datasets/tiny-aya-translate/fleurs-tr-hi-mimi-encoded) (Mimi-encoded **FLEURS** TR↔HI read speech) — ⚠️ *not* the intended synthetic corpus (see **Dataset disclosure** above) |
 
 ## Evaluation & the overfitting story
 
@@ -129,7 +149,7 @@ This is a composite model (custom architecture), not a drop-in
 `transformers` pipeline. Load via the training repo's
 `src/model/composite.py`: base Cohere2 backbone + the LoRA adapter
 (`peft_adapter/`) + the `.pt` components, then decode Mimi codes to audio.
-See the [repo README](https://github.com/tiny-aya-simulatenous-translation/model)
+See the [repo README](https://github.com/tiny-aya-simultaneous-translation/model)
 for the loading + inference path. Use the **`best_by_val`** folder.
 
 ## Recommended next run (fixing the overfit)

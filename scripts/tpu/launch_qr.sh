@@ -4,10 +4,12 @@
 #
 # Run from your local workstation (after setup_gcp.sh has succeeded).
 #
-# Default behaviour: on-demand v4-64 in us-central2-b. The TRC grant
-# (see docs/tpu-trc-allocation.md) also includes spot quotas in five
-# (zone, type) combinations; for those, prefer launch_spot.sh which
-# wraps this script with TRC_PROFILE-aware defaults and SPOT=1.
+# Default behaviour: legacy **on-demand v4-64 in us-central2-b** (the only
+# on-demand quota in the TRC grant). TRC v6e
+# is SPOT-only, so the current v6e-16 production path goes through
+# launch_spot.sh (`TRC_PROFILE=v6e-16-eu`), which wraps this script with
+# profile-aware defaults and SPOT=1. Keep these v4 hardware defaults as-is;
+# only the CONFIG_FILE default tracks the current recipe (v0.3).
 #
 # Configuration precedence (highest first):
 #   1. shell env vars (e.g. `PROJECT_ID=foo bash launch_qr.sh`)
@@ -30,7 +32,7 @@ QR_NAME="${QR_NAME:-tinyaya-stage2-qr}"
 NODE_ID="${NODE_ID:-tinyaya-stage2}"
 ACCEL_TYPE="${ACCEL_TYPE:-v4-64}"
 RUNTIME="${RUNTIME:-tpu-ubuntu2204-base}"
-CONFIG_FILE="${CONFIG_FILE:-configs/tpu/stage2_tpu_v6e_v2.yaml}"
+CONFIG_FILE="${CONFIG_FILE:-configs/tpu/stage2_tpu_v6e16_full_v03.yaml}"
 # SPOT=1  -> request preemptible (spot) capacity. Default empty = on-demand.
 SPOT="${SPOT:-}"
 # INTERNAL_IPS=1 -> create the TPU hosts WITHOUT external IPs. Required when
@@ -42,6 +44,10 @@ INTERNAL_IPS="${INTERNAL_IPS:-}"
 # Optional GCS path to a full-repo tarball, used by startup_script when the
 # repo is private and the VM has no GitHub credentials.
 REPO_TARBALL_GS_URI="${REPO_TARBALL_GS_URI:-}"
+# Phase E sweep fleet: when set, the slice runs `wandb agent SWEEP_ID` instead of
+# a single training run, and pulls the pre-staged subset from SWEEP_DATA_GS_URI.
+SWEEP_ID="${SWEEP_ID:-}"
+SWEEP_DATA_GS_URI="${SWEEP_DATA_GS_URI:-}"
 # Sharding strategy: replicated | fsdpv2 | fsdpv2_lora | auto. See
 # src/backend/tpu_backend.py for semantics.
 TPU_STRATEGY="${TPU_STRATEGY:-auto}"
@@ -75,6 +81,17 @@ fi
 metadata_pairs="config-file=$CONFIG_FILE,tpu-strategy=$TPU_STRATEGY,probe-first=$PROBE_FIRST,is-spot=$is_spot"
 if [ -n "$REPO_TARBALL_GS_URI" ]; then
     metadata_pairs+=",repo-tarball-gs-uri=$REPO_TARBALL_GS_URI"
+fi
+if [ -n "$SWEEP_ID" ]; then
+    metadata_pairs+=",sweep-id=$SWEEP_ID"
+fi
+if [ -n "$SWEEP_DATA_GS_URI" ]; then
+    metadata_pairs+=",sweep-data-gs-uri=$SWEEP_DATA_GS_URI"
+fi
+# Opt-in GCS-backed XLA compile cache (survives spot-preemption reboots so the
+# ~20-min recompile is paid once). startup_script.sh restores it at boot.
+if [ -n "${XLA_CACHE_GS_URI:-}" ]; then
+    metadata_pairs+=",xla-cache-gs-uri=$XLA_CACHE_GS_URI"
 fi
 
 echo "==> creating Queued Resource"

@@ -59,8 +59,13 @@ runs/
 .factory/archive/.tmp-*
 .factory/hooks/__pycache__/
 
-# --- claude memory system ---
+# --- claude memory system (reusable tooling ships; live session state + logs do not) ---
 .claude/settings.local.json
-.claude/archive/.tmp-*
 .claude/hooks/__pycache__/
+.claude/PROGRESS.md
+.claude/memories.md
+.claude/PLAN.md
+.claude/VERIFY.md
+.claude/archive/
 phase-3-data-generation-pipeline
+BUILD_SHA

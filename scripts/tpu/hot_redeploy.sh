@@ -24,8 +24,8 @@ load_env_file "$ENV_FILE"
 PROJECT_ID="${PROJECT_ID:-ml-pipelines-315702}"
 ZONE="${ZONE:-europe-west4-b}"
 NODE_ID="${NODE_ID:-tinyaya-stage2-canary}"
-BUCKET="${BUCKET:-tinyaya-stage2-tpu}"
-CONFIG_FILE="${CONFIG_FILE:-configs/tpu/stage2_tpu_v6e_v2.yaml}"
+BUCKET="${BUCKET:-tinyaya-stage2-eu}"
+CONFIG_FILE="${CONFIG_FILE:-configs/tpu/stage2_tpu_v6e16_full_v03.yaml}"
 TPU_STRATEGY="${TPU_STRATEGY:-auto}"
 RUN_PROBE_ONLY="${RUN_PROBE_ONLY:-0}"
 
@@ -36,12 +36,16 @@ LOCAL_TAR="/tmp/$TARBALL_NAME"
 
 echo "==> [1/5] tarballing repo"
 cd "$REPO_ROOT"
+# Provenance: TPU hosts have no .git, so stamp the deployed code identity
+# into the tarball -- the trainer reads it into wandb.config
+# (provenance/git_sha) so every public checkpoint is traceable.
+git rev-parse HEAD > BUILD_SHA 2>/dev/null || echo "unknown" > BUILD_SHA
 tar --exclude='.git' --exclude='.venv' --exclude='.env' \
     --exclude='__pycache__' --exclude='*.pyc' \
     --exclude='/mnt/*' --exclude='checkpoints' \
     --exclude='node_modules' --exclude='.pytest_cache' \
     -czf "$LOCAL_TAR" \
-    src scripts configs sweeps docs pyproject.toml uv.lock README.md
+    src scripts configs sweeps docs pyproject.toml uv.lock README.md BUILD_SHA
 ls -lh "$LOCAL_TAR"
 
 echo "==> [2/5] uploading tarball to $GCS_URI"
@@ -64,7 +68,9 @@ echo "==> [4/5] running remote helper (NODE_ID=$NODE_ID strategy=$TPU_STRATEGY p
 # to the fresh run. Result: 1-of-4 hosts on the new run; 3-of-4 silently
 # routed to a zombie. Per-launch suffix kills the race entirely.
 LAUNCH_EPOCH="$(date +%s)"
-WANDB_RENDEZVOUS_URI="gs://${BUCKET}/wandb-rendezvous/v4-32-spot-canary-${LAUNCH_EPOCH}.id"
+# Prefix derives from NODE_ID (was hardcoded "v4-32-spot-canary" from the v4
+# era, which made every v6e launch's rendezvous line misleading).
+WANDB_RENDEZVOUS_URI="gs://${BUCKET}/wandb-rendezvous/${NODE_ID}-${LAUNCH_EPOCH}.id"
 echo "==> wandb rendezvous (this launch): $WANDB_RENDEZVOUS_URI"
 # Pass config via env vars in the SSH command (small string, no quoting issue).
 ENV_PREFIX="export GCS_URI='$GCS_URI' REPO_DIR='$REPO_DIR' TPU_STRATEGY='$TPU_STRATEGY' CONFIG_FILE='$CONFIG_FILE' RUN_PROBE_ONLY='$RUN_PROBE_ONLY' WANDB_RENDEZVOUS_URI='$WANDB_RENDEZVOUS_URI';"

@@ -46,7 +46,7 @@ to a single SSH because there is exactly ONE worker.
 
 3. Run the hot-redeploy script:
    ```bash
-   cd /home/cataluna84/Workspace/tinyaya-stage2-scale
+   cd <repo-root>   # your local tinyaya-stage2-scale clone
    bash scripts/tpu/_remote_redeploy.sh 2>&1 | tee /tmp/redeploy_$(date +%s).log
    ```
 

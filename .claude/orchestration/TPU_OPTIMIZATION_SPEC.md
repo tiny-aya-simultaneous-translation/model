@@ -20,11 +20,11 @@ envelope that completed the first 5000-step production run:
 Iter 24h remains the canonical fallback checkpoint and baseline:
 W&B `7rrjupc7`, final loss `5.3558`, wall `615.9 min`, final
 checkpoint
-`gs://tinyaya-stage2-tpu/checkpoints/stage2-tpu-v6e-spot/step_005000_final/`.
+`gs://tinyaya-stage2-eu/checkpoints/stage2-tpu-v6e-spot/step_005000_final/`.
 The current optimized production checkpoint is `opt-prod5k`: W&B
 `kzsijxv5`, final loss `5.105`, p50 `6.14s`, p99 `6.76s`,
 examples/sec `43.04`, wall `562 min`, final checkpoint
-`gs://tinyaya-stage2-tpu/checkpoints/stage2-tpu-v6e-spot-opt-prod5k/step_005000_final/`.
+`gs://tinyaya-stage2-eu/checkpoints/stage2-tpu-v6e-spot-opt-prod5k/step_005000_final/`.
 It combines Phases 1+2+3 and is the checkpoint to evaluate unless a
 later Phase 4 candidate passes promotion.
 

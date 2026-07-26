@@ -28,6 +28,7 @@ weights back to the target device.
 
 import json
 import os
+import re
 from pathlib import Path
 
 import torch
@@ -75,19 +76,164 @@ def _normalize_gcs_dest(save_dir: str) -> str | None:
     return None
 
 
-def _gsutil_cp_into(src_dir: str, gcs_dest: str) -> None:
-    """Copy the *contents* of ``src_dir`` into ``gcs_dest`` via gsutil."""
-    import subprocess
+def _gsutil_with_retry(args: list[str], desc: str, attempts: int = 4) -> None:
+    """Run one gsutil command with exponential-backoff retries.
 
+    Retries with backoff: the checkpoint bundle includes the (large, frozen)
+    depth-decoder tensor, and a single transient network blip on that multi-GB
+    ``gsutil -m cp`` used to raise immediately and crash the whole training
+    process -- losing hundreds of steps and, worse, leaving ``best_by_val``
+    stuck on a STALE (pre-crash) metric that a sweep coordinator would then
+    rank on. gsutil's own "Resuming upload" retries a broken TCP stream but
+    still surfaces the operation as failed if the retry budget runs out; wrap
+    the whole copy again one level up.
+    """
+    import subprocess
+    import time
+
+    last_err = None
+    for attempt in range(1, attempts + 1):
+        result = subprocess.run(args, capture_output=True, text=True)
+        if result.returncode == 0:
+            return
+        last_err = result.stderr
+        print(f"[ckpt] {desc} attempt {attempt}/{attempts} failed (rc={result.returncode}); "
+              f"stderr tail: {(result.stderr or '')[-500:]}", flush=True)
+        if attempt < attempts:
+            time.sleep(min(10 * 2 ** (attempt - 1), 120))
+    raise RuntimeError(f"gsutil {desc} failed after {attempts} attempts: {last_err}")
+
+
+def _gsutil_cp_into(src_dir: str, gcs_dest: str, attempts: int = 4) -> None:
+    """Copy the *contents* of ``src_dir`` into ``gcs_dest`` via gsutil."""
     print(f"[ckpt] uploading {src_dir}/* -> {gcs_dest}", flush=True)
-    result = subprocess.run(
+    _gsutil_with_retry(
         ["gsutil", "-m", "cp", "-r", src_dir.rstrip("/") + "/.", gcs_dest],
+        desc="upload",
+        attempts=attempts,
+    )
+    print(f"[ckpt] upload complete: {gcs_dest}", flush=True)
+
+
+def _gsutil_cp_file(src_file: str, gcs_dest_dir: str, attempts: int = 4) -> None:
+    """Upload one local file into ``gcs_dest_dir`` (used for the metadata gate)."""
+    _gsutil_with_retry(
+        ["gsutil", "cp", src_file, gcs_dest_dir.rstrip("/") + "/"],
+        desc=f"upload {os.path.basename(src_file)}",
+        attempts=attempts,
+    )
+
+
+# Background checkpoint uploader (opt-in via logging.async_checkpoint_upload).
+# Single worker so uploads serialize (no bandwidth contention / pileup); each
+# task is the full metadata-last atomic-gate upload closure from save_checkpoint.
+_UPLOAD_EXECUTOR = None
+_UPLOAD_FUTURES: list = []
+
+# Storage-limit circuit breaker. Once HF rejects a weight push with the
+# private-storage-limit 403, every later push this run fails identically --
+# the v0.3-r2 run printed one WARNING per save for ~60k steps and staged
+# ~3.8 GB of doomed upload each time. Trip once, announce once, skip the
+# rest; GCS saving is unaffected and publish_checkpoint_suite.py backfills.
+_HUB_PUSH_DISABLED = False
+
+
+def _hub_push_failed(e: Exception) -> None:
+    """Log a failed hub push; trip the breaker on the storage-limit 403."""
+    global _HUB_PUSH_DISABLED
+    if "storage limit" in str(e).lower():
+        _HUB_PUSH_DISABLED = True
+        print(
+            "[ckpt] hub publishing DISABLED for this run: private storage limit "
+            "reached; weights keep saving to GCS -- backfill post-run with "
+            "publish_checkpoint_suite.py",
+            flush=True,
+        )
+    else:
+        print(f"[ckpt] WARNING: hub push failed: {e}", flush=True)
+
+
+def _submit_upload(fn) -> None:
+    """Run ``fn`` (a checkpoint upload closure) on the background uploader."""
+    global _UPLOAD_EXECUTOR
+    if _UPLOAD_EXECUTOR is None:
+        from concurrent.futures import ThreadPoolExecutor
+
+        _UPLOAD_EXECUTOR = ThreadPoolExecutor(max_workers=1, thread_name_prefix="ckpt-upload")
+
+    def _guarded():
+        try:
+            fn()
+        except Exception as e:  # noqa: BLE001 - a failed async upload must not kill training
+            print(f"[ckpt] WARNING: async upload failed: {e}", flush=True)
+
+    _UPLOAD_FUTURES.append(_UPLOAD_EXECUTOR.submit(_guarded))
+
+
+def wait_for_uploads(timeout: float | None = None) -> None:
+    """Block until all queued background checkpoint uploads finish.
+
+    Called before the final/canonical save (and at run end) so a released run
+    never exits with an in-flight upload. No-op when async upload was unused.
+    """
+    global _UPLOAD_FUTURES
+    if not _UPLOAD_FUTURES:
+        return
+    from concurrent.futures import wait
+
+    print(f"[ckpt] draining {len(_UPLOAD_FUTURES)} background upload(s)...", flush=True)
+    wait(_UPLOAD_FUTURES, timeout=timeout)
+    _UPLOAD_FUTURES = [f for f in _UPLOAD_FUTURES if not f.done()]
+
+
+def build_file_manifest(root_dir: str) -> dict[str, int]:
+    """Map every file under ``root_dir`` (recursive, relative path) to its size.
+
+    Used to stamp an integrity manifest into ``metadata.json`` at save time:
+    a checkpoint auditor can then compare the GCS object list against the
+    manifest instead of guessing which files a complete checkpoint contains.
+    ``metadata.json`` is excluded -- it is written after the manifest is built
+    and its presence is already the atomic completeness gate.
+    """
+    manifest: dict[str, int] = {}
+    for cur, _dirs, names in os.walk(root_dir):
+        for name in names:
+            if name == "metadata.json" and cur == root_dir:
+                continue
+            path = os.path.join(cur, name)
+            manifest[os.path.relpath(path, root_dir)] = os.path.getsize(path)
+    return manifest
+
+
+def fetch_checkpoint_file(ckpt_dir: str, fname: str) -> str | None:
+    """Return a LOCAL path for ``<ckpt_dir>/<fname>``, downloading from GCS if needed.
+
+    ``load_checkpoint`` downloads GCS checkpoints into a private temp dir and
+    returns only the step, so callers that later need a single component (the
+    trainer restores ``optimizer.pt`` separately, AFTER wrap + optimizer
+    creation) cannot ``os.path.exists()`` the original ``gs://`` dir -- that is
+    always False on a local filesystem check. This helper is the supported way
+    to reach one checkpoint file regardless of where the checkpoint lives.
+    Returns None when the file does not exist (locally or remotely).
+    """
+    gcs_src = _normalize_gcs_dest(ckpt_dir)
+    if gcs_src is None:
+        p = os.path.join(ckpt_dir, fname)
+        return p if os.path.exists(p) else None
+
+    import subprocess
+    import tempfile
+
+    local_dir = tempfile.mkdtemp(prefix="ckpt_fetch_")
+    local_path = os.path.join(local_dir, fname)
+    result = subprocess.run(
+        ["gsutil", "cp", gcs_src.rstrip("/") + "/" + fname, local_path],
         capture_output=True,
         text=True,
     )
     if result.returncode != 0:
-        raise RuntimeError(f"gsutil upload failed (rc={result.returncode}): {result.stderr}")
-    print(f"[ckpt] upload complete: {gcs_dest}", flush=True)
+        return None
+    return local_path
 
 
 def save_checkpoint(
@@ -100,6 +246,8 @@ def save_checkpoint(
     *,
     is_main: bool = True,
     keep_local_dir: str | None = None,
+    async_upload: bool = False,
+    hub: dict | None = None,
 ):
     """Save a multi-component checkpoint, multi-host SPMD-safe.
 
@@ -126,9 +274,10 @@ def save_checkpoint(
     is_xla = _is_xla_tensor(next(model.parameters(), None))
 
     if is_xla:
+        import torch_xla
         import torch_xla.core.xla_model as xm
 
-        xm.mark_step()
+        torch_xla.sync()
         xm.wait_device_ops()
 
     # model_audio_embed exists only when parallel two-stream is enabled
@@ -242,7 +391,11 @@ def save_checkpoint(
     peft_dir = os.path.join(write_dir, "peft_adapter")
     # peft_state is always pre-gathered now; use state_dict= to avoid
     # save_pretrained touching the (possibly re-sharded) model.
-    model.backbone.model.save_pretrained(peft_dir, state_dict=peft_state)
+    # save_embedding_layers stated explicitly: embed_tokens is a LoRA target,
+    # and letting peft infer it emits a UserWarning on EVERY save.
+    model.backbone.model.save_pretrained(
+        peft_dir, state_dict=peft_state, save_embedding_layers=True
+    )
 
     torch.save(proj_state, os.path.join(write_dir, "projection.pt"))
     torch.save(depth_state, os.path.join(write_dir, "depth_decoder.pt"))
@@ -254,20 +407,92 @@ def save_checkpoint(
     if sched_state is not None:
         torch.save(sched_state, os.path.join(write_dir, "scheduler.pt"))
 
+    # Host RNG snapshot (best-effort). Restoring it on resume keeps the dropout
+    # stream and any host-side shuffling from replaying the fresh-start
+    # sequence. Data ORDER is still at-least-once (no dataloader cursor).
+    rng_state: dict = {"torch": torch.get_rng_state()}
+    if is_xla:
+        try:
+            import torch_xla.core.xla_model as xm
+
+            rng_state["xla"] = xm.get_rng_state()
+        except Exception as e:  # noqa: BLE001 - telemetry, never blocks a save
+            print(f"[ckpt] WARNING: xla rng snapshot failed: {e}", flush=True)
+    torch.save(rng_state, os.path.join(write_dir, "rng.pt"))
+
     meta = {"step": step}
     if extra_state:
         meta.update(extra_state)
-    with open(os.path.join(write_dir, "metadata.json"), "w") as f:
+    # Integrity manifest: every payload file + its byte size, so a later audit
+    # can verify a checkpoint dir exactly instead of heuristically. Built after
+    # all payload writes and excludes metadata.json itself (the atomic gate).
+    meta["files"] = build_file_manifest(write_dir)
+    meta_path = os.path.join(write_dir, "metadata.json")
+    with open(meta_path, "w") as f:
         json.dump(meta, f, indent=2)
 
     if gcs_dest is not None:
-        import shutil
+        # The upload (metadata-last atomic gate) is factored into a closure so
+        # it can run either inline or on the background uploader (async_upload).
+        def _do_upload():
+            import shutil
 
-        _gsutil_cp_into(write_dir, gcs_dest)
-        if keep_local:
-            print(f"[ckpt] retained local mirror: {write_dir}", flush=True)
+            # metadata.json is the resume gate: find_latest_checkpoint /
+            # load_checkpoint only trust dirs that have it. ``gsutil -m`` uploads
+            # files in arbitrary parallel order, so a preemption mid-upload could
+            # otherwise land metadata.json BEFORE optimizer.pt -- and a resume
+            # from that dir would silently continue with a fresh optimizer. Move
+            # metadata aside, bulk-upload the payload, then upload metadata alone
+            # LAST so its presence in GCS implies a complete checkpoint. Staged
+            # as a SIBLING of write_dir so the bulk copy cannot pick it up.
+            staged_meta = write_dir.rstrip("/") + ".metadata.gate"
+            os.replace(meta_path, staged_meta)
+            _gsutil_cp_into(write_dir, gcs_dest)
+            os.replace(staged_meta, meta_path)
+            _gsutil_cp_file(meta_path, gcs_dest)
+            # HF-hub artifact push rides the SAME closure so it reads the
+            # staged LOCAL dir before deletion (pushing "gs://..." after the
+            # fact walks nothing). Weights-only; failures never block saves
+            # (publish_checkpoint_suite.py backfills post-hoc).
+            if hub and not _HUB_PUSH_DISABLED:
+                try:
+                    push_checkpoint_to_hub(
+                        write_dir,
+                        hub["repo_id"],
+                        commit_message=f"step {step}",
+                        token=hub.get("token"),
+                        revision=hub.get("revision"),
+                        private=hub.get("private", True),
+                    )
+                except Exception as e:  # noqa: BLE001 - hub push never blocks a save
+                    _hub_push_failed(e)
+            if keep_local:
+                print(f"[ckpt] retained local mirror: {write_dir}", flush=True)
+            else:
+                shutil.rmtree(write_dir, ignore_errors=True)
+
+        if async_upload:
+            # Background the multi-GB upload so keep-all periodic saves don't
+            # stall the training loop. Serialized (max_workers=1) to avoid
+            # bandwidth contention / pileup; a mid-flight upload interrupted by
+            # preemption just leaves an un-gated (metadata-less) dir that resume
+            # skips. Drain with wait_for_uploads() before the final save.
+            _submit_upload(_do_upload)
         else:
-            shutil.rmtree(write_dir, ignore_errors=True)
+            _do_upload()
+    elif hub and not _HUB_PUSH_DISABLED:
+        # Local save_dir (GPU/CPU runs): write_dir persists; push directly.
+        try:
+            push_checkpoint_to_hub(
+                write_dir,
+                hub["repo_id"],
+                commit_message=f"step {step}",
+                token=hub.get("token"),
+                revision=hub.get("revision"),
+                private=hub.get("private", True),
+            )
+        except Exception as e:  # noqa: BLE001 - hub push never blocks a save
+            _hub_push_failed(e)
 
 
 def save_checkpoint_canonical_final(
@@ -326,9 +551,10 @@ def save_checkpoint_canonical_final(
         )
         return
 
+    import torch_xla
     import torch_xla.core.xla_model as xm
 
-    xm.mark_step()
+    torch_xla.sync()
     xm.wait_device_ops()
 
     subs_to_cpu = [
@@ -390,36 +616,59 @@ def save_checkpoint_canonical_final(
         json.dump({"step": "final", "save_kind": "canonical_final"}, f, indent=2)
 
     if is_gcs:
-        import subprocess
-
-        print(
-            f"[patch 19] uploading {write_dir}/* to {gcs_dest}",
-            flush=True,
-        )
-        result = subprocess.run(
-            ["gsutil", "-m", "cp", "-r", write_dir + "/.", gcs_dest],
-            capture_output=True,
-            text=True,
-        )
-        if result.returncode != 0:
-            print(f"[patch 19] gsutil stderr: {result.stderr}", flush=True)
-            raise RuntimeError(f"gsutil upload failed (rc={result.returncode}): {result.stderr}")
-        print(
-            f"[patch 19] gsutil upload complete: {gcs_dest}",
-            flush=True,
-        )
         import shutil
 
+        _gsutil_cp_into(write_dir, gcs_dest)
         shutil.rmtree(write_dir, ignore_errors=True)
+
+
+# Backbone decoder blocks are wrapped by the TPU grad-checkpoint / scan proxy
+# (``_ScannedLayerStack`` in src/model/scan_utils.py) whenever ``xla_grad_checkpoint``
+# or ``use_scan_layers`` is on, which renames every block param from
+# ``...model.layers.<i>.<rest>`` to ``...model.layers.layers_list.<i>.layer.<rest>``.
+# A checkpoint SAVED under that proxy therefore carries the ``layers_list.<i>.layer``
+# namespace, but a model BUILT without the proxy (CPU/GPU eval, the HF/PEFT export a
+# release consumer loads, or a resume with grad-ckpt off) uses the plain ``layers.<i>``
+# namespace. ``set_peft_model_state_dict`` matches on exact key names, so the mismatch
+# silently loads 0 of the adapter tensors -- the model runs base-only and reads near
+# random. This canonicalises the saved keys to whichever namespace the LIVE model uses,
+# so the adapter loads on any structure (proven bug: 1/239 lora_B tensors loaded on a
+# vanilla eval model before this; after the fix, 239/239).
+_SCAN_WRAP_RE = re.compile(r"\.layers\.layers_list\.(\d+)\.layer\.")
+_SCAN_PLAIN_RE = re.compile(r"\.layers\.(\d+)\.")
+
+
+def _match_scan_namespace(sd: dict, model_keys) -> dict:
+    """Remap a saved state_dict's decoder-block keys to the live model's namespace.
+
+    Bidirectional: strips the ``layers_list.<i>.layer`` wrapper when the live model
+    is plain (eval/export), or inserts it when the live model is scan-wrapped (TPU
+    resume) but the checkpoint is plain. A no-op when the two already agree.
+    """
+    model_wrapped = any(".layers.layers_list." in k for k in model_keys)
+    saved_wrapped = any(".layers.layers_list." in k for k in sd)
+    if saved_wrapped and not model_wrapped:
+        return {_SCAN_WRAP_RE.sub(r".layers.\1.", k): v for k, v in sd.items()}
+    if model_wrapped and not saved_wrapped:
+        return {_SCAN_PLAIN_RE.sub(r".layers.layers_list.\1.layer.", k): v for k, v in sd.items()}
+    return sd
 
 
 def load_checkpoint(model, optimizer, scheduler, load_dir: str) -> int:
     """Load checkpoint into an UNWRAPPED model (before FSDP/DDP wrapping).
 
-    For FSDP resume: call this BEFORE backend.wrap_model(). The model
-    gets correct weights, then FSDP shards them during wrapping.
-    Optimizer/scheduler state is NOT restored (incompatible after
-    re-sharding) — Adam momentum restarts from zero.
+    For FSDP resume: call this BEFORE backend.wrap_model() with optimizer=None
+    and scheduler=None -- the model gets correct weights, then FSDP shards them
+    during wrapping. The optimizer/scheduler do not exist yet at that point, so
+    the caller restores THEM separately AFTER wrap + optimizer creation (see the
+    resume block in train_hierarchical.py: full optimizer state is gathered at
+    save time, then re-loaded -- FSDP.optim_state_dict_to_load on GPU, or a direct
+    load on the SPMD/TPU path where the optimizer sees global logical tensors).
+
+    If optimizer/scheduler ARE passed here (non-FSDP single-device resume), their
+    state is restored inline below. Adam moments therefore survive a resume on all
+    paths; only the dataloader cursor is at-least-once (re-seen from the epoch
+    boundary), which is acceptable for a fixed-budget LoRA run.
     """
     from peft.utils.save_and_load import load_peft_weights, set_peft_model_state_dict
 
@@ -432,8 +681,17 @@ def load_checkpoint(model, optimizer, scheduler, load_dir: str) -> int:
 
         load_dir = tempfile.mkdtemp(prefix="ckpt_load_")
         print(f"[ckpt] downloading {gcs_src}/* -> {load_dir}", flush=True)
+        # NB: use "/*" (glob) NOT "/." here. The "/." contents-of idiom works for
+        # a LOCAL `cp` (and for the upload in _gsutil_cp_into whose source is
+        # local), but gsutil treats a GCS "gs://.../dir/." as a literal object
+        # named "." -> "No URLs matched" -> 0 files. Combined with the
+        # empty-checkpoint handling below, that made EVERY real GCS checkpoint
+        # download silently "start fresh from step 0" -- i.e. spot-preemption
+        # resume never actually resumed (it restarted). "/*" copies all objects
+        # incl. the peft_adapter/ subdir; a truly empty dir still yields
+        # "No URLs matched" so the start-fresh path is preserved.
         result = subprocess.run(
-            ["gsutil", "-m", "cp", "-r", gcs_src.rstrip("/") + "/.", load_dir],
+            ["gsutil", "-m", "cp", "-r", gcs_src.rstrip("/") + "/*", load_dir],
             capture_output=True,
             text=True,
         )
@@ -466,12 +724,33 @@ def load_checkpoint(model, optimizer, scheduler, load_dir: str) -> int:
 
     with open(os.path.join(load_dir, "metadata.json")) as f:
         meta = json.load(f)
-    step = meta["step"]
+    # Real checkpoints always carry a scalar `step`. A LAWA average
+    # (save_kind == "lawa_average") intentionally omits it -- fall back to the
+    # window end so loading an average for eval/export does not KeyError.
+    if "step" in meta:
+        step = int(meta["step"])
+    else:
+        step = int(max(meta.get("averaged_steps") or [0]))
 
     peft_dir = os.path.join(load_dir, "peft_adapter")
     if os.path.isdir(peft_dir):
         sd = load_peft_weights(peft_dir)
-        set_peft_model_state_dict(model.backbone.model, sd)
+        # Canonicalise the scan/grad-ckpt block namespace to the LIVE model's before
+        # matching (see _match_scan_namespace) -- otherwise a TPU-saved adapter loads
+        # 0 tensors onto a plain eval/export model and the backbone runs un-adapted.
+        sd = _match_scan_namespace(sd, model.backbone.model.state_dict().keys())
+        res = set_peft_model_state_dict(model.backbone.model, sd)
+        # Fidelity guard: a still-mismatched namespace (or a rank/target mismatch)
+        # would silently no-op. Fail loud rather than ship a base-only model.
+        missing = getattr(res, "missing_keys", []) or []
+        adapter_missing = [k for k in missing if "lora_" in k]
+        if adapter_missing:
+            raise RuntimeError(
+                f"[ckpt] adapter load MISMATCH: {len(adapter_missing)} lora_* keys "
+                f"unfilled (e.g. {adapter_missing[:2]}). The checkpoint's LoRA "
+                f"structure/namespace does not match the live model -- the backbone "
+                f"would run un-adapted. Check r/target_modules and scan-wrapper state."
+            )
 
     modules_to_load = [
         ("projection.pt", model.projection),
@@ -485,7 +764,11 @@ def load_checkpoint(model, optimizer, scheduler, load_dir: str) -> int:
     for fname, mod in modules_to_load:
         p = os.path.join(load_dir, fname)
         if os.path.exists(p):
-            mod.load_state_dict(torch.load(p, map_location="cpu", weights_only=True), strict=False)
+            msd = torch.load(p, map_location="cpu", weights_only=True)
+            # depth_decoder blocks are scan-wrapped on TPU too; realign the namespace
+            # to the live module so trained keys are not silently dropped by strict=False.
+            msd = _match_scan_namespace(msd, mod.state_dict().keys())
+            mod.load_state_dict(msd, strict=False)
 
     opt_p = os.path.join(load_dir, "optimizer.pt")
     if optimizer is not None and os.path.exists(opt_p):
@@ -498,15 +781,32 @@ def load_checkpoint(model, optimizer, scheduler, load_dir: str) -> int:
 
 
 def push_checkpoint_to_hub(
-    local_dir: str, repo_id: str, commit_message: str = "checkpoint", token: str | None = None
+    local_dir: str,
+    repo_id: str,
+    commit_message: str = "checkpoint",
+    token: str | None = None,
+    revision: str | None = None,
+    private: bool = True,
 ):
-    """Upload model weights (no optimizer/scheduler) to a HuggingFace Hub repo."""
+    """Upload model weights (no optimizer/scheduler) to a HuggingFace Hub repo.
+
+    ``revision`` puts this checkpoint on its own branch (e.g. ``step-12000``) so
+    the whole training trajectory lives in ONE repo, Pythia-style, for the
+    public mechanistic-interp suite. The branch is created off ``main`` if new.
+    Optimizer/scheduler/rng blobs are skipped -- released weights only.
+
+    ``private`` (default TRUE) applies only if this call creates the repo:
+    during-run pushes must never publish half-trained weights -- the repo is
+    flipped public manually at release time.
+    """
     from huggingface_hub import HfApi
 
     api = HfApi(token=token)
-    api.create_repo(repo_id, repo_type="model", exist_ok=True, private=False)
+    api.create_repo(repo_id, repo_type="model", exist_ok=True, private=private)
+    if revision:
+        api.create_branch(repo_id, branch=revision, repo_type="model", exist_ok=True)
 
-    skip = {"optimizer.pt", "scheduler.pt"}
+    skip = {"optimizer.pt", "scheduler.pt", "rng.pt"}
     for root, _dirs, files in os.walk(local_dir):
         for fname in files:
             if fname in skip:
@@ -519,8 +819,66 @@ def push_checkpoint_to_hub(
                 repo_id=repo_id,
                 repo_type="model",
                 commit_message=commit_message,
+                revision=revision,
             )
-    print(f"  pushed to https://huggingface.co/{repo_id}")
+    _where = f"{repo_id}@{revision}" if revision else repo_id
+    print(f"  pushed to https://huggingface.co/{_where}")
+
+
+def dedupe_repeats(lines: list[str]) -> list[str]:
+    """Collapse CONSECUTIVE identical lines into one + a repeat marker.
+
+    Guards the published rolling log against a noisy dependency flooding it:
+    the v0.3-r2 artifact was 88% one torch_xla UserWarning repeated 6,925
+    times. Order-preserving; unique lines pass through untouched; a run of
+    N>1 identical lines becomes the line followed by ``[repeated N x]``.
+    Pure (no I/O) so it is unit-testable and reusable for post-hoc cleanup.
+    """
+    out: list[str] = []
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        n = 1
+        while i + n < len(lines) and lines[i + n] == line:
+            n += 1
+        out.append(line)
+        if n > 1:
+            out.append(f"[repeated {n} x]")
+        i += n
+    return out
+
+
+def push_files_to_hub(
+    paths: list[str],
+    repo_id: str,
+    dest_prefix: str = "",
+    token: str | None = None,
+    private: bool = True,
+    commit_message: str = "artifacts",
+):
+    """Upload loose artifact files (audio samples, log snapshots) to the hub.
+
+    Companion to ``push_checkpoint_to_hub`` for non-checkpoint run artifacts:
+    files land on ``main`` under ``dest_prefix/<basename>``. Same private-on-
+    create semantics. Never raises past the caller's guard -- artifact pushes
+    must not kill training (callers wrap in try/except or the async executor).
+    """
+    from huggingface_hub import HfApi
+
+    api = HfApi(token=token)
+    api.create_repo(repo_id, repo_type="model", exist_ok=True, private=private)
+    for p in paths:
+        if not os.path.isfile(p):
+            continue
+        dest = f"{dest_prefix.rstrip('/')}/{os.path.basename(p)}" if dest_prefix else os.path.basename(p)
+        api.upload_file(
+            path_or_fileobj=p,
+            path_in_repo=dest,
+            repo_id=repo_id,
+            repo_type="model",
+            commit_message=commit_message,
+        )
+    print(f"  pushed {len(paths)} file(s) -> https://huggingface.co/{repo_id}/tree/main/{dest_prefix}")
 
 
 def prune_checkpoints(save_dir: str, keep_last: int = 5, keep_best: str | None = "best_by_val"):
@@ -569,40 +927,113 @@ def is_gcs_path(path: str) -> bool:
     return path.startswith("gs://")
 
 
+def _step_of(path: str) -> int:
+    """Parse the step number out of a ``.../step_NNNNNN`` dir; -1 if unparseable."""
+    name = path.rstrip("/").rsplit("/", 1)[-1]
+    try:
+        return int(name.split("step_", 1)[1])
+    except (IndexError, ValueError):
+        return -1
+
+
 def get_checkpoint_dirs(base_dir: str) -> list[str]:
-    """List checkpoint directories, supporting both local and GCS."""
+    """List the COMPLETE periodic ``step_*`` checkpoint dirs, ascending by step.
+
+    save_checkpoint writes ``<save_dir>/step_NNNNNN`` (zero-padded). This finds
+    exactly those, EXCLUDING non-step dirs like ``best_by_val`` so resume always
+    picks the latest periodic checkpoint. Supports local and GCS (gsutil, matching
+    the rest of this module -- no gcsfs dependency).
+
+    Two completeness filters guard resume:
+    * dirs whose name does not parse as ``step_<int>`` are dropped -- the
+      canonical-final ``step_NNNNNN_final`` dir (weights-only, no optimizer)
+      must never be a resume target;
+    * dirs without ``metadata.json`` are dropped -- metadata is uploaded LAST
+      (see save_checkpoint), so its absence means a preemption interrupted the
+      upload and resume should fall back to the previous complete checkpoint
+      instead of starting fresh.
+    """
     if is_gcs_path(base_dir):
-        try:
-            import gcsfs
+        import subprocess
 
-            fs = gcsfs.GCSFileSystem()
-            try:
-                entries = fs.ls(base_dir)
-            except FileNotFoundError:
-                return []
-            dirs = [f"gs://{d}" for d in entries if fs.isdir(d)]
-            return sorted(dirs)
-        except ImportError:
-            print("Warning: gcsfs not installed, cannot list GCS checkpoints")
-            return []
-    else:
-        import os
-
-        if not os.path.exists(base_dir):
-            return []
-        return sorted(
-            [
-                os.path.join(base_dir, d)
-                for d in os.listdir(base_dir)
-                if os.path.isdir(os.path.join(base_dir, d)) and d.startswith("checkpoint_")
-            ]
+        listing = subprocess.run(
+            ["gsutil", "ls", base_dir.rstrip("/") + "/"],
+            capture_output=True,
+            text=True,
         )
+        if listing.returncode != 0:
+            return []
+        dirs = [
+            ln.rstrip("/")
+            for ln in listing.stdout.splitlines()
+            if ln.rstrip("/").rsplit("/", 1)[-1].startswith("step_")
+        ]
+        dirs = [d for d in dirs if _step_of(d) >= 0]
+        if not dirs:
+            return []
+        # One batched existence check for all metadata gates (avoids N
+        # round-trips): gsutil ls on an explicit list prints only the
+        # objects that exist and warns about the rest.
+        gates = subprocess.run(
+            ["gsutil", "ls"] + [d + "/metadata.json" for d in dirs],
+            capture_output=True,
+            text=True,
+        )
+        present = set(ln.strip() for ln in gates.stdout.splitlines())
+        dirs = [d for d in dirs if d + "/metadata.json" in present]
+        return sorted(dirs, key=_step_of)
+
+    if not os.path.exists(base_dir):
+        return []
+    dirs = [
+        os.path.join(base_dir, d)
+        for d in os.listdir(base_dir)
+        if d.startswith("step_") and os.path.isdir(os.path.join(base_dir, d))
+    ]
+    dirs = [
+        d
+        for d in dirs
+        if _step_of(d) >= 0 and os.path.exists(os.path.join(d, "metadata.json"))
+    ]
+    return sorted(dirs, key=_step_of)
 
 
 def find_latest_checkpoint(base_dir: str) -> str | None:
-    """Find the latest checkpoint directory for resume."""
+    """Return the highest-step ``step_*`` checkpoint dir for resume, or None."""
     dirs = get_checkpoint_dirs(base_dir)
     return dirs[-1] if dirs else None
+
+
+def read_checkpoint_metadata(load_dir: str) -> dict:
+    """Return a checkpoint's parsed ``metadata.json`` (local or GCS), or ``{}``.
+
+    A cheap single-file read (``gsutil cat`` for GCS) used to recover resume
+    context -- e.g. the W&B run id, so a preempted run can continue the SAME run
+    instead of fragmenting the dashboard -- without re-downloading the checkpoint.
+    """
+    gcs_src = _normalize_gcs_dest(load_dir)
+    if gcs_src is not None:
+        import subprocess
+
+        out = subprocess.run(
+            ["gsutil", "cat", gcs_src.rstrip("/") + "/metadata.json"],
+            capture_output=True,
+            text=True,
+        )
+        if out.returncode != 0 or not out.stdout.strip():
+            return {}
+        try:
+            return json.loads(out.stdout)
+        except ValueError:
+            return {}
+    p = os.path.join(load_dir, "metadata.json")
+    if not os.path.exists(p):
+        return {}
+    try:
+        with open(p) as f:
+            return json.load(f)
+    except ValueError:
+        return {}
 
 
 def save_checkpoint_with_backend(

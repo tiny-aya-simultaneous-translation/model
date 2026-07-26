@@ -1,0 +1,139 @@
+# TPU v6e-16 MULTI-HOST LONG-HORIZON run v0.3 (text+audio, arm-D recipe).
+#
+# THE MULTI-HOST DP PIPELINE (2026-07-13): unlike the legacy v6e-16 config
+# (which ran the SPMD replicated-input UB -- only host 0's rows survived), this
+# uses the minibatch data-parallel pipeline (per_chip_batch + DistributedSampler
+# + backend.shard_to_device). Verified live on a 4-host mesh
+# (scripts/tpu/spmd_minibatch_truth.py): per-host (8,300) -> GLOBAL (32,300)
+# with all 4 hosts' distinct rows assembled. Real batch 32 = the VALIDATED
+# optimum (b16xaccum2 on v6e-8 tied R0; R3 showed batch-64 loses -- do NOT
+# scale batch). v6e-16 does it in ONE micro-step across 16 chips (accum 1) vs
+# two across 8 on v6e-8 => ~1.7-2x faster/step.
+#
+# RECIPE: arm D (r=32 / lr_lora=1.716e-4 / +MLP / rsLoRA / exclude_top 0),
+# validated across the v03-5k-reval sweep + round-2/3 probes (report Appendix
+# 3). Schedule: WSD plateau + stop-anytime anneal (round-3 R5 beat cosine on
+# all metrics post-anneal). Checkpoints: log-spaced early {1,2,4,...,512} +
+# every 1000, keep ALL, async upload -> public mech-interp suite. Early stop
+# patience 10. New save_dir (new experiment).
+#
+# LAUNCH (europe-west4-a, co-located with the EU bucket -> zero egress):
+#   TRC_PROFILE=v6e-16-eu CONFIG_FILE=configs/tpu/stage2_tpu_v6e16_full_v03_mh.yaml \
+#   REPO_TARBALL_GS_URI=... \
+#   SWEEP_DATA_GS_URI=gs://tinyaya-stage2-eu/data/full-corpus-ta-20260708.tar.gz \
+#   bash scripts/tpu/launch_spot.sh
+# Metadata gates (hardening pass 2026-07-14): set expected-train-rows=1100000
+# and min-text-coverage=99 so a wrong/stale corpus or missing alignments can
+# NEVER silently train (stage_dataset.sh preflight refuses to launch).
+# Probe verdicts (report addendum A.5): flash-attention OFF (no win at these
+# seq lengths); xla-cache-gs-uri UNSET (persistent-cache keys nondeterministic
+# on torch_xla 2.9 v6e SPMD -- never hits; ~14 min recompile per preemption is
+# the accepted cost); grad-ckpt ON + depth_chunk 100 confirmed optimal.
+# Run the QR babysitter for the whole run: scripts/tpu/qr_watch.sh (local tmux).
+# Launch ONLY on explicit user word.
+
+backend: tpu
+
+data:
+  encoded_dir: /mnt/data/encoded
+  train_split: /mnt/data/splits/train.jsonl
+  val_split: /mnt/data/splits/val.jsonl
+  max_frames: 300
+  audio_frame_rate: 12.5
+  num_workers: 32
+  pin_memory: false
+
+train:
+  weight_decay: 0.01
+  num_codebooks: 8
+  per_chip_batch: 2               # 2 rows/chip x 16 chips = GLOBAL 32 (8/host x 4 hosts)
+  batch_size: 4                   # fallback; per_chip_batch drives the multi-host loader
+  grad_accum: 1                   # global 32 in one micro-step (no accum needed on 16 chips)
+  max_steps: 110463               # 3 real epochs (1,178,302 / 32 = 36,821 steps/epoch x 3)
+  warmup_steps: 1100              # ~1% of horizon
+  min_lr_ratio: 0.0
+  schedule: wsd                   # warmup -> plateau -> anneal; round-3 R5 beat cosine
+  wsd_anneal_steps: 11000         # ~10% linear anneal to 0 (MiniCPM recipe)
+  early_stop_patience: 10         # 10 val cycles (2500 steps) no-improvement -> stop
+  compile_warmup_steps: 1
+  enable_clip_grad_norm: true
+  clip_grad_norm: 1.0             # confirmed (round-2: clip level irrelevant, clipping protects cb0)
+  log_grad_norm: true
+  fsdp_barrier_hook: false
+  micro_mark_step: true
+  depth_chunk_size: 100
+  precision: bfloat16
+  use_scan_layers: true
+  xla_grad_checkpoint: true
+  final_canonical_save: true
+
+loss:
+  text_weight: 0.2
+  audio_weight: 1.0
+  text_weight_curriculum_frac: 0.0
+  composite_text_w: 0.4
+  composite_audio_w: 0.6
+  text_padding_weight: 0.01
+  zero_padding_weight: 0.0
+  label_smoothing: 0.1
+  per_codebook_multipliers: [1.0, 1.0, 1.5, 1.5, 2.0, 2.0, 2.0, 2.0]
+  progressive_unmask_fraction: 0.10
+  unmask_k0: 1
+
+lora:
+  r: 32
+  alpha: 64
+  dropout: 0.05
+  use_rslora: true
+  target_modules: [q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, down_proj, embed_tokens]
+  lora_exclude_top: 0
+  num_full_ft_layers: 0
+  depth_unfreeze_blocks: 0
+
+optim:
+  lr_lora: 1.716e-4
+  lr_full_ft: 5.0e-5
+  lr_projection: 5.0e-4
+  lr_depth: 1.0e-4
+  lr_depth_blocks: 1.0e-5
+  lr_audio_embed: 5.0e-4
+  lr_text_embed: 5.0e-4
+
+logging:
+  log_every: 25
+  save_every: 1000                # keep-all periodic; log-spaced early adds {1,2,4,...,512}
+  log_spaced_saves: true
+  async_checkpoint_upload: true   # background the multi-GB keep-all upload
+  audio_every: 5000               # inline TPU demos: ~29 s warm, 48 s cold (validated 2026-07-15)
+  audio_ar_frames: 50
+  val_every: 250
+  # Val gate = 3200 samples, unchanged -- but batched 4x wider so the cycle
+  # costs ~120 s instead of ~210 s (probe M3, 2026-07-14: ~1.9 s/batch at
+  # b8/host vs ~4 s at b32/host). Val is inference-only: training math is
+  # untouched. 25 x global 128 == the old 100 x global 32.
+  val_max_batches: 25
+  val_per_chip_batch: 8
+  val_on_tpu: true
+  tpu_telemetry_every: 250    # per-host chip HBM into the shared run (all 16 chips)
+  diag_metrics: true
+  # -r2: attempt 2 (from-scratch restart with native audio_loss_full +
+  # tokens_seen fix in the deployed code). Attempt 1 (run 1021mlne, aborted
+  # ~step 7.5k, healthy) kept at .../stage2-v6e16-mh-v03 for forensics.
+  save_dir: gs://tinyaya-stage2-eu/checkpoints/stage2-v6e16-mh-v03-r2
+  keep_last_n: 0                  # keep ALL checkpoints (public suite)
+  keep_local_checkpoints: false
+  use_wandb: true
+  # Async artifact publishing to the v0.3 hub (PRIVATE until release; flip
+  # public manually at release time). Checkpoints -> branch step-N (weights
+  # only), audio demos -> main:samples/step_N/, rolling log -> main:logs/.
+  push_to_hub: true
+  hub_repo_id: tiny-aya-translate/tr-hi-s2st-v0.3
+  hub_private: true
+  wandb_tags: [v0.3, multi-host, wsd]
+  wandb_project: tinyaya-stage2-tpu
+  wandb_run_name: v0.3-long-horizon-mh-r2
+
+perf:
+  enabled: true
+  warmup_skip_steps: 25
+  xprof_trace_labels: false

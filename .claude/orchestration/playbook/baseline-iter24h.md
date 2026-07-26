@@ -19,7 +19,7 @@ but iter 24h remains the protected fallback and comparison baseline.
 | Config | `batch_size=8`, `grad_accum=4`, `max_frames=400`, `depth_chunk_size=16` |
 | Effective batch | `256` |
 | Frame-tokens per optimizer step | `102400` |
-| Final checkpoint | `gs://tinyaya-stage2-tpu/checkpoints/stage2-tpu-v6e-spot/step_005000_final/` |
+| Final checkpoint | `gs://tinyaya-stage2-eu/checkpoints/stage2-tpu-v6e-spot/step_005000_final/` |
 
 ## Runtime and compile
 
@@ -99,7 +99,7 @@ memory, stability, or quality gates.
 | p50 / p99 step time | `6.14 s` / `6.76 s` |
 | Examples/sec | `43.04` |
 | Final loss | `5.105` (`text=9.990`, `audio=4.106`) |
-| Final checkpoint | `gs://tinyaya-stage2-tpu/checkpoints/stage2-tpu-v6e-spot-opt-prod5k/step_005000_final/` |
+| Final checkpoint | `gs://tinyaya-stage2-eu/checkpoints/stage2-tpu-v6e-spot-opt-prod5k/step_005000_final/` |
 
 Use `opt-prod5k` as the Phase 4 comparison point unless a candidate
 needs to prove it also beats the original iter 24h fallback.

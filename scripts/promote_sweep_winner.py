@@ -5,7 +5,7 @@ WHY THIS EXISTS
 ---------------
 After the proxy sweep (``sweeps/sweep_stage2.yaml``) picks a recipe, the
 winning hyperparameters have to land in the production config
-(``configs/tpu/stage2_tpu_v6e_v2.yaml``) before the 15k release run. Doing
+(``configs/tpu/stage2_tpu_v6e16_full_v03.yaml``) before the 15k release run. Doing
 that by hand is error-prone: the swept *flat* names (``lr_lora``, ``lora_r``,
 ``lora_alpha_mult`` ...) map onto *nested* config sections, and a hand-edit
 easily clobbers the file's block comments or sets the wrong section.
@@ -43,6 +43,7 @@ PARAM_MAP: dict[str, tuple[str, str]] = {
     "val_every": ("logging", "val_every"),
     "val_on_tpu": ("logging", "val_on_tpu"),
     "lora_r": ("lora", "r"),
+    "lora_dropout": ("lora", "dropout"),  # Phase E regularization knob
     # lora_alpha_mult -> lora.alpha (= mult * r); resolved in resolve_updates().
 }
 
@@ -174,8 +175,9 @@ def main() -> None:
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--config", required=True, help="config YAML to patch in place")
     p.add_argument("--sweep", help="W&B sweep path <entity>/<project>/<sweep_id>")
-    p.add_argument("--metric", default="val/audio_loss",
-                   help="metric to minimise when picking the winner (default val/audio_loss)")
+    p.add_argument("--metric", default="val/composite",
+                   help="metric to minimise when picking the winner (default val/composite; "
+                        "v0.3 Phase D. Use val/audio_loss for the legacy v2 sweep)")
     p.add_argument("--set", nargs="*", default=[], dest="set_pairs",
                    help="explicit key=value HPs (flat swept names)")
     p.add_argument("--dry-run", action="store_true", help="print changes, don't write")

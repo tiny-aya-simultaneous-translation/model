@@ -25,10 +25,10 @@ source "$SCRIPT_DIR/_lib.sh"
 load_env_file "$ENV_FILE"
 
 PROJECT_ID="${PROJECT_ID:-ml-pipelines-315702}"
-ZONE="${ZONE:-us-central2-b}"
+ZONE="${ZONE:-europe-west4-a}"
 QR_NAME="${QR_NAME:-tinyaya-stage2-qr}"
 NODE_ID="${NODE_ID:-tinyaya-stage2}"
-BUCKET="${BUCKET:-tinyaya-stage2-tpu}"
+BUCKET="${BUCKET:-tinyaya-stage2-eu}"
 CKPT_PREFIX="${CKPT_PREFIX:-checkpoints/stage2-tpu}"
 
 usage() {

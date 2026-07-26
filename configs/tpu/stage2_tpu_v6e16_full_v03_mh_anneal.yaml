@@ -1,0 +1,125 @@
+# ANNEAL-LEG TEMPLATE for the v0.3 long-horizon run (stop-anytime WSD).
+#
+# WHEN TO USE: the long run (stage2_tpu_v6e16_full_v03_mh.yaml) early-stops on
+# the WSD plateau (patience 10 = 2500 steps without val improvement) WITHOUT
+# running its scheduled final anneal. This config launches the 11k-step
+# LR->0 anneal leg from the stopped run's latest checkpoint -- the exact
+# mechanics validated live by Phase-E spoke 4 (resume plateau ckpt, extend
+# max_steps, WSD total = start + anneal => resume lands directly in the anneal).
+#
+# FILL EXACTLY ONE FIELD before launching:
+#   max_steps: <START_STEP + 11000>   where START_STEP = the stopped run's
+#              latest checkpoint step (gsutil ls the save_dir).
+# FILLED 2026-07-20: START_STEP = 65,250 (run xzcb60bl early-stop; best
+# plateau val composite 2.9048 @ 62,750) -> max_steps 76250; identity
+# fields updated to the -r2 restart (save_dir/-r2, run name/-r2).
+# Everything else stays IDENTICAL to the long-run config on purpose:
+#   - same save_dir: this is a CONTINUATION of the same experiment (same W&B
+#     run via resume auto, contiguous public checkpoint suite) -- the
+#     new-experiment/new-save_dir rule applies to new experiments, not the
+#     anneal leg of this one.
+#   - early_stop_patience: 0 -- never early-stop DURING the anneal.
+#   - wsd_anneal_steps: 11000 -- with max_steps = START+11000 the WSD schedule
+#     puts the whole remaining horizon in the anneal.
+# Launch: same launch_spot.sh env as the long run, CONFIG_FILE pointed here
+# (or hot-swap config + relaunch tmux on the live slice; --resume auto).
+# The unedited template fails LOUDLY (max_steps is not an int) -- by design.
+
+backend: tpu
+
+data:
+  encoded_dir: /mnt/data/encoded
+  train_split: /mnt/data/splits/train.jsonl
+  val_split: /mnt/data/splits/val.jsonl
+  max_frames: 300
+  audio_frame_rate: 12.5
+  num_workers: 32
+  pin_memory: false
+
+train:
+  weight_decay: 0.01
+  num_codebooks: 8
+  per_chip_batch: 2               # LOCKED: global 32 (8/host x 4 hosts)
+  batch_size: 4
+  grad_accum: 1
+  max_steps: 76250                # 65,250 (early-stop step) + 11,000 anneal
+  warmup_steps: 1100              # part of the schedule shape; resume skips it
+  min_lr_ratio: 0.0
+  schedule: wsd
+  wsd_anneal_steps: 11000         # anneal = [START_STEP, START_STEP+11000]
+  early_stop_patience: 0          # NEVER early-stop during the anneal
+  compile_warmup_steps: 1
+  enable_clip_grad_norm: true
+  clip_grad_norm: 1.0
+  log_grad_norm: true
+  fsdp_barrier_hook: false
+  micro_mark_step: true
+  depth_chunk_size: 100
+  precision: bfloat16
+  use_scan_layers: true
+  xla_grad_checkpoint: true
+  final_canonical_save: true
+
+loss:
+  text_weight: 0.2
+  audio_weight: 1.0
+  text_weight_curriculum_frac: 0.0
+  composite_text_w: 0.4
+  composite_audio_w: 0.6
+  text_padding_weight: 0.01
+  zero_padding_weight: 0.0
+  label_smoothing: 0.1
+  per_codebook_multipliers: [1.0, 1.0, 1.5, 1.5, 2.0, 2.0, 2.0, 2.0]
+  progressive_unmask_fraction: 0.10
+  unmask_k0: 1
+
+lora:
+  r: 32
+  alpha: 64
+  dropout: 0.05
+  use_rslora: true
+  target_modules: [q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, down_proj, embed_tokens]
+  lora_exclude_top: 0
+  num_full_ft_layers: 0
+  depth_unfreeze_blocks: 0
+
+optim:
+  lr_lora: 1.716e-4
+  lr_full_ft: 5.0e-5
+  lr_projection: 5.0e-4
+  lr_depth: 1.0e-4
+  lr_depth_blocks: 1.0e-5
+  lr_audio_embed: 5.0e-4
+  lr_text_embed: 5.0e-4
+
+logging:
+  log_every: 25
+  save_every: 1000                # keep-all continues through the anneal
+  log_spaced_saves: true          # no-op here (steps 1..512 long past)
+  async_checkpoint_upload: true
+  audio_every: 5000               # inline TPU demos: ~29 s warm, 48 s cold (validated 2026-07-15)
+  audio_ar_frames: 50
+  val_every: 250
+  val_max_batches: 25             # same 3200-sample gate as the long run
+  val_per_chip_batch: 8           # (25 x global 128 == 100 x global 32)
+  val_on_tpu: true
+  tpu_telemetry_every: 250    # per-host chip HBM into the shared run (all 16 chips)
+  diag_metrics: true
+  save_dir: gs://tinyaya-stage2-eu/checkpoints/stage2-v6e16-mh-v03-r2   # SAME dir as the r2 run: continuation
+  keep_last_n: 0
+  keep_local_checkpoints: false
+  use_wandb: true
+  # Async artifact publishing to the v0.3 hub (PRIVATE until release; flip
+  # public manually at release time). Checkpoints -> branch step-N (weights
+  # only), audio demos -> main:samples/step_N/, rolling log -> main:logs/.
+  push_to_hub: true
+  hub_repo_id: tiny-aya-translate/tr-hi-s2st-v0.3
+  hub_private: true
+  wandb_tags: [v0.3, multi-host, wsd]
+  wandb_project: tinyaya-stage2-tpu
+  wandb_run_name: v0.3-long-horizon-mh-r2   # same run; resume auto re-attaches xzcb60bl
+
+perf:
+  enabled: true
+  warmup_skip_steps: 25
+  xprof_trace_labels: false

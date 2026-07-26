@@ -1,5 +1,5 @@
 ---
-license: apache-2.0
+license: cc-by-nc-4.0
 base_model: CohereLabs/tiny-aya-base
 base_model_relation: adapter
 library_name: peft
@@ -17,94 +17,105 @@ tags:
   - tinyaya
 pipeline_tag: audio-to-audio
 metrics:
-  - bleu
-# Eval results go here once the GPU eval (ASR-BLEU + DNSMOS) has run; the
-# Hub renders model-index as a metrics widget. Template:
-# model-index:
-#   - name: tinyaya-stage2-tr-hi
-#     results:
-#       - task: { type: audio-to-audio, name: Speech-to-Speech Translation }
-#         dataset: { type: google/fleurs, name: FLEURS (tr/hi) }
-#         metrics:
-#           - { type: bleu, name: ASR-BLEU (tr->hi), value: TBD }
-#           - { type: bleu, name: ASR-BLEU (hi->tr), value: TBD }
-# When a better checkpoint supersedes this repo, point users to it with:
-# new_version: tiny-aya-translate/<next-repo>
+  - chrf
+model-index:
+  - name: tinyaya-stage2-tr-hi-s2st-v0.3
+    results:
+      - task: { type: audio-to-audio, name: Speech-to-Speech Translation }
+        dataset: { type: tiny-aya-translate/tr-hi-mimi-encoded, name: v03-val-500 (in-domain) }
+        metrics:
+          # Free-run text inner-monologue — the translation the model produces (chrF++).
+          - { type: chrf, name: "Free-run text chrF++ (hi->tr)", value: 25.7 }
+          - { type: chrf, name: "Free-run text chrF++ (tr->hi)", value: 25.1 }
+          # Generated-audio ASR-chrF++ (Whisper-transcribed); report WITH the GT-audio
+          # topline (92.1 / 86.6) — the pipeline ceiling — so the gap reads honestly.
+          - { type: chrf, name: "ASR-chrF++ (hi->tr)", value: 3.7 }
+          - { type: chrf, name: "ASR-chrF++ (tr->hi)", value: 9.6 }
 ---
 
-> **Version:** `v0.1.0` — step-15000 checkpoint (first public release; eval pending).
-> Versions are git tags in this repo; load a specific one with
-> `revision="v0.1.0"`. See **Version history** at the bottom.
+> **Version:** `v0.3` — text+audio, capacity-swept recipe. **Complete**: the full-corpus
+> long-horizon run finished (WSD early-stop @ 65,250 + anneal → 76,250; **best val composite
+> 2.8199 @ step 76,000**, 2.07 epochs), and the release evaluation has run. Versions are git
+> tags; load a specific one with `revision=`. See **Version history** at the bottom.
 
 # TinyAya Stage 2 — Turkish ↔ Hindi Speech-to-Speech Translation (LoRA)
 
-Stage-2 simultaneous-translation adapter for Turkish↔Hindi **speech-to-speech**
-translation, trained on TPU v6e-8. This repo ships the authors' **trained
-deltas only** — a LoRA adapter over `CohereLabs/tiny-aya-base` plus the
-custom projection / Moshi depth-decoder / audio-head / embedding tensors.
+Stage-2 **text+audio** speech-to-speech translation adapter for Turkish↔Hindi, trained
+on Cloud TPU v6e. This repo ships the authors' **trained deltas only** — a LoRA adapter
+over `CohereLabs/tiny-aya-base` plus the custom projection / Moshi depth-decoder /
+audio-head / embedding tensors.
 
 > ## ⚠️ License scope — read first
-> The **`apache-2.0`** license declared above covers **only the trained
-> weights in this repo** (the LoRA adapter + custom heads) and the authors'
-> code. It does **NOT** relicense the components this model builds on, which
-> keep their own licenses (mirrored from `THIRD_PARTY_NOTICES.md`):
-> - **`CohereLabs/tiny-aya-base`** base weights → **Cohere model license**
->   (NOT Apache). Not included here; you must obtain it from Cohere and
->   comply with its terms.
-> - **Moshi / Mimi** (depth decoder + audio codec) → **MIT**.
-> - **FLEURS** source data → **CC BY 4.0**.
+> The **released weights** in this repo (the LoRA adapter + custom heads) are
+> **CC-BY-NC-4.0** — they are derivatives of `CohereLabs/tiny-aya-base` (CC-BY-NC-4.0)
+> and inherit its **non-commercial** terms. The authors' separate **training/eval code**
+> (the GitHub repo) is Apache-2.0. This does **NOT** relicense the components this model
+> builds on (see `THIRD_PARTY_NOTICES.md`):
+> - **`CohereLabs/tiny-aya-base`** → **CC-BY-NC-4.0** (not included — obtain it from Cohere; the released weights inherit its non-commercial terms).
+> - **Moshi / Mimi** (depth decoder + audio codec) → **CC-BY-4.0** (attribution given).
+> - **Source data**: FLORES (CC BY-SA 4.0), OPUS-100, conversational MT, and TTS-model outputs (per-source terms).
 
 ## What this is
 
 | | |
 |---|---|
-| Task | TR↔HI speech-to-speech translation (Moshi inner-monologue, hierarchical codebook decode) |
-| Base | `CohereLabs/tiny-aya-base` + Moshi depth decoder + Mimi codec |
-| Method | LoRA (+ trained projection/heads/embeds), bf16, FSDPv2 SPMD |
-| Hardware | Cloud TPU v6e-8 (single host), via Google TRC |
-| Steps | 15,000 (effective batch 256) |
-| Data | `tiny-aya-translate/tr-hi-mimi-encoded` (Mimi-encoded FLEURS TR/HI) |
+| Task | TR↔HI speech-to-speech translation with a **text inner-monologue** (Moshi hierarchical codebook decode) |
+| Base | `CohereLabs/tiny-aya-base` + frozen Moshi depth decoder + Mimi codec |
+| Method | LoRA (r=32, +MLP, rsLoRA, adapters on all 36 layers) + trained projection/heads/embeds; bf16, FSDPv2 SPMD |
+| Hardware | Cloud TPU v6e-16 (4 hosts × 4 chips), europe-west4-a, via Google TRC |
+| Horizon | 76,250 steps (2.07 epochs); WSD schedule with a linear anneal leg; **best val 2.8199 @ 76,000** |
+| Data | `tiny-aya-translate/tr-hi-mimi-encoded` (synthetic, Mimi-encoded, with word-level text alignments) |
 
 ## Training procedure
 
-- **Init**: LoRA (r=16) on the `tiny-aya-base` backbone; Moshi depth decoder
-  initialized from `kyutai/moshiko`; projection / per-codebook audio heads /
-  audio & text embeddings trained from scratch.
-- **Recipe**: effective batch 256 (b=8 × grad-accum 4 × 8 chips), bf16,
-  FSDPv2 SPMD, cosine LR (lr_lora 1.5e-4), 500 warmup steps, `max_frames=300`,
-  8 codebooks, hierarchical codebook loss (text_weight 0.1, audio_weight 1.0).
-- **Compute**: single-host Cloud TPU v6e-8 (spot), ~22 h, 15,000 steps
-  (≈ 3.3 epochs over 1,178,302 train pairs).
+- **Init**: LoRA on the `tiny-aya-base` backbone; Moshi depth decoder from
+  `kyutai/moshiko` (transformer **blocks frozen**, only I/O layers trained); projection /
+  per-codebook audio heads / audio & text embeddings trained from scratch.
+- **Recipe (re-validation winner, arm D)**: `lora {r:32, alpha:64, use_rslora:true}`,
+  target modules **+MLP** (`q,k,v,o + gate,up,down + embed_tokens`, **`exclude_top:0`** —
+  adapters on all 36 layers), `lr_lora 1.716e-4`, 150 warmup, `max_frames 300`, 8 codebooks,
+  **text+audio loss** (`text_weight 0.2`, `composite_text_w 0.4`; the corpus ships
+  word-level alignments, so the text inner-monologue is supervised).
+- **Data**: synthetic `tr-hi-mimi-encoded`, ~1.24M pairs → **1,178,302 train / 62,036
+  val** after filtering ~5% rows with missing `.pt` files.
 
-**Convergence note (honest):** the **audio** loss plateaued by ~step 8,000
-(≈1.7 epochs) and did not improve over the final 7k steps. The **text /
-inner-monologue** stream did not learn in this run (loss ≈ random), pending
-a data-pipeline fix. So this checkpoint reflects the audio-translation
-capability of the recipe at convergence, not an under-trained model.
+**Pipeline validation (honest):** an overfit gate (32-example train==val) memorizes **all
+8 codebooks to 89–98%**, confirming the full data→backbone(CB0)→frozen-depth(CB1–7)→
+loss→metric path is correct. A per-codebook accuracy metric bug (predictions were scored
+against the *undelayed* target while the model predicts *delayed* codes) understated
+CB1–7 in earlier dashboards and is fixed; loss-based metrics were never affected.
 
 ## Evaluation
 
-Speech-translation quality is measured with **ASR-BLEU** (Whisper transcribes
-the generated target audio, BLEU vs. reference target text) and **DNSMOS**
-(naturalness). Reproduce with `scripts/eval_release.py`. **Pending for this
-release** (`v0.1.0`); will be filled in the YAML `model-index` + below.
+Full end-task evaluation (500-row in-domain `v03-val-500`, greedy) framed as a
+**data-efficiency / emergence** study — *how much full-corpus training before translation
+quality emerges, not just language identity?* Reproduce with `scripts/eval_release.py`;
+the detailed report is `docs/v0.3-eval-report.md`.
 
-| Metric | tr→hi | hi→tr | overall |
-|--------|-------|-------|---------|
-| ASR-BLEU | _TBD_ | _TBD_ | _TBD_ |
-| DNSMOS (ovrl) | _TBD_ | _TBD_ | _TBD_ |
+| Metric | hi→tr | tr→hi | notes |
+|--------|-------|-------|-------|
+| Free-run **text** chrF++ (inner-monologue) | **25.7** | **25.1** | the model *translates* — text emerges |
+| Generated-audio **ASR-chrF++** | 3.7 | 9.6 | audio not yet ASR-intelligible |
+| **GT-audio topline** chrF++ (ceiling) | 92.1 | 86.6 | pipeline is sound — the gap is synthesis, not the harness |
+| **BLASER-2.0 QE** (ASR-free, 1–5) | ~2.5 | ~2.5 | speech carries real, weak translation signal ASR can't recover |
+| **DNSMOS** Δ(gen − GT) | −1.34 | −1.34 | naturalness gap |
+
+**Honest reading:** the full-corpus run learns the translation *mapping* — a 96.6%
+teacher-forced text inner-monologue that free-runs to ~25 chrF++ — and genuine
+speech-semantic signal (BLASER-QE 2.5), within ~2 epochs. **Intelligible audio
+*synthesis* is the remaining, quantified frontier**, bounded by the frozen Moshi depth
+decoder rather than the translation understanding. On real human speech (FLEURS) the
+model is distribution-bound (acoustic-shift only; texts overlap training).
 
 ## Intended use & limitations
 
-- **Intended**: research on low-resource speech-to-speech translation and
-  simultaneous translation; a Stage-2 checkpoint, not a production system.
-- **Limitations**: trained on read-speech (FLEURS) — expect degradation on
-  spontaneous/noisy audio; two language directions only; generation is
-  autoregressive and not optimized for latency here.
-- **History (transparency)**: the run was a spot v6e-8 (preemptible); an
-  earlier run had a checkpoint GCS-path bug (fixed) and three W&B metrics
-  (per-codebook loss, grad-norm, HBM) that logged as zero (fixed in the
-  current run).
+- **Intended**: research on low-resource speech-to-speech and simultaneous translation.
+- **Limitations**: **audio synthesis is the frontier** — the text inner-monologue
+  translates, but generated speech is not yet ASR-intelligible free-run (frozen depth
+  decoder); trained on synthetic TTS speech (expect degradation on spontaneous/noisy
+  audio, and heavy distribution-dependence); two directions only; AR generation not
+  latency-optimized here. References are MT-synthetic; report any ASR score next to its
+  GT-audio topline.
 
 ## Inference quickstart
 
@@ -113,48 +124,40 @@ import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from peft import PeftModel
 
-BASE = "CohereLabs/tiny-aya-base"  # obtain per Cohere license
-ADAPTER = "tiny-aya-translate/tinyaya-stage2-tr-hi"  # this repo
+BASE = "CohereLabs/tiny-aya-base"                      # obtain per Cohere license
+ADAPTER = "tiny-aya-translate/tr-hi-s2st-v0.3"          # this repo
 
 tok = AutoTokenizer.from_pretrained(BASE, trust_remote_code=True)
 base = AutoModelForCausalLM.from_pretrained(BASE, torch_dtype=torch.bfloat16, trust_remote_code=True)
-model = PeftModel.from_pretrained(base, ADAPTER)  # loads adapter_model.safetensors
-
-# Then attach the custom heads (projection / depth_decoder / audio_heads /
-# text_embed / model_audio_embed *.safetensors) and the Mimi codec; see
-# scripts/eval_stage2.py for the full composite + generation loop.
+model = PeftModel.from_pretrained(base, ADAPTER)        # loads adapter_model.safetensors
 ```
 
-The full speech→speech pipeline (Mimi encode → backbone+depth-decoder →
-Mimi decode) is in `scripts/eval_stage2.py` (`ar_generate`).
+Then attach the custom heads (`projection` / `depth_decoder` / `audio_heads` /
+`text_embed` / `model_audio_embed`) and the Mimi codec; the full speech→speech pipeline
+(Mimi encode → backbone+depth-decoder → `undo_codebook_delay` → Mimi decode) is in
+`scripts/eval_checkpoint.py`.
 
 ## Links
 
-- **Training run (W&B)**: https://wandb.ai/cataluna84/tinyaya-stage2-tpu/runs/b7fr72u5
-  — full config, loss curves, system/throughput metrics, and the model
-  artifact (`tinyaya-stage2-tr-hi-v6e-v2:v0`).
-- **Checkpoints (GCS)**: `gs://tinyaya-stage2-tpu/checkpoints/stage2-tpu-v6e-v2/`
+- **Training (W&B)**: https://wandb.ai/cataluna84/tinyaya-stage2-tpu/runs/xzcb60bl
+- **Emergence report (W&B)**: https://wandb.ai/cataluna84/tinyaya-stage2-tpu/reports/TinyAya-v0.3-Emergence-and-Data-Efficiency--VmlldzoxNzU1OTU1NQ==
+- **Blog**: [Adapting Moshi for Low-Resource Speech Translation](https://labscommunity.cohere.com/blog/2026/adapting-moshi-low-resource-speech-translation/)
+- **Checkpoints (GCS)**: `gs://tinyaya-stage2-eu/checkpoints/`
 - **Dataset**: https://huggingface.co/datasets/tiny-aya-translate/tr-hi-mimi-encoded
-- **Code**: https://github.com/tiny-aya-simulatenous-translation/tinyaya-stage2-scale
+- **Code**: https://github.com/tiny-aya-simultaneous-translation/model
 
 ## Version history
 
-Versions are **git tags** in this repo (HF convention: one checkpoint per
-repo, versioned with tags). Load a specific one with `revision=`:
+Versions are **git tags** in this repo (HF convention: one checkpoint per repo). Load one
+with `revision=`.
 
-```python
-PeftModel.from_pretrained(base, "tiny-aya-translate/tinyaya-stage2-tr-hi", revision="v0.1.0")
-```
-
-| Version | Step | Notes |
-|---------|------|-------|
-| `v0.1.0` | 15,000 | First release. Audio converged ~step 8k; text stream not yet learning; eval pending. |
-
-When a materially different model is trained (new data / architecture), it
-goes in a **new repo**, and this card is updated with a `new_version:` field
-so the Hub shows a banner linking forward.
+| Version | Data | Outcome | Note |
+|---------|------|---------|------|
+| `v0.1` | synthetic `tr-hi-mimi-encoded` (~1.18M) | audio learned; text stream weak | Early runs under-supervised the text stream; the corpus *does* ship alignments (later corrected). |
+| `v0.2` | `fleurs-tr-hi-mimi-encoded` (~8.3k) | overfit (val bottomed ~step 1000) | Trained on the wrong (FLEURS) dataset via a launcher default (disclosed). |
+| `v0.3` | synthetic `tr-hi-mimi-encoded` (~1.24M) | **text+audio, capacity-swept; complete + evaluated** | r=32/+MLP/rsLoRA/`exclude_top:0` winner; 2.07-epoch run, best val 2.8199 @ 76,000; text translation emerges, audio synthesis is the frontier. |
 
 ## Acknowledgments
 
-Cloud TPU compute provided by Google's **TPU Research Cloud (TRC)**. See
-`NOTICE` and `THIRD_PARTY_NOTICES.md`.
+Cloud TPU compute provided by Google's **TPU Research Cloud (TRC)**. See `NOTICE` and
+`THIRD_PARTY_NOTICES.md`.

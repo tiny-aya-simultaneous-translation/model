@@ -48,28 +48,27 @@ uv run python -m py_compile $(git ls-files '*.py')  # quick lint
 
 ## TPU launch (canonical commands)
 
-```bash
-# Current production path: v6e-8 spot in europe-west4-a
-# (single-host, 8 chips, ONE Python process, 32 GiB HBM/chip).
-TRC_PROFILE=v6e-8-eu \
-QR_NAME=tinyaya-stage2-spot-v6e8-eu-qr \
-NODE_ID=tinyaya-stage2-spot-v6e8-eu \
-CONFIG_FILE=configs/tpu/stage2_tpu_v6e_v2.yaml \
-TPU_STRATEGY=fsdpv2_lora \
-  bash scripts/tpu/launch_spot.sh
+Current long-horizon path: **v6e-16 spot in `europe-west4-a`** (4 hosts × 4 chips = one
+16-chip SPMD mesh, 32 GiB HBM/chip). A v6e-8 (single host) is used for smoke/overfit/eval.
+Checkpoints → **`gs://tinyaya-stage2-eu/`** (europe-west4, co-located with the TPUs).
 
-# production 15k release run (on the VM, after deploy)
-bash scripts/tpu/launch_release.sh configs/tpu/stage2_tpu_v6e_v2.yaml
+```bash
+# v0.3 long-horizon run (r=32 / +MLP / rsLoRA winner, 110,463 steps @ real global batch 32)
+TRC_PROFILE=v6e-16-eu CONFIG_FILE=configs/tpu/stage2_tpu_v6e16_full_v03_mh.yaml \
+SWEEP_DATA_GS_URI=gs://tinyaya-stage2-eu/data/full-corpus-ta-20260708.tar.gz \
+bash scripts/tpu/launch_spot.sh
+# babysit the QR for the whole run (local tmux):
+#   QR_NAME=... ZONE=europe-west4-a LAUNCH_ENV_FILE=launch.env bash scripts/tpu/qr_watch.sh
+# DURABLE MONITORING RULE: run/error watchers for multi-hour work go in tmux
+# ON the TPU VM (scripts/tpu/vm_watcher.sh -> GCS status file), never as
+# workstation-local loops — see docs/tpu-runbook.md "Durable monitoring".
 
 # hot-redeploy code without recreating the QR
 bash scripts/tpu/hot_redeploy.sh
-
-# probe sharding strategy on the live mesh
-gcloud compute tpus tpu-vm ssh tinyaya-stage2-spot-v6e8-eu \
-    --project=ml-pipelines-315702 --zone=europe-west4-a \
-    --worker=0 --command='cd /opt/tinyaya && \
-    sudo TPU_STRATEGY=fsdpv2_lora python3 scripts/tpu/probe_strategies.py --strategy=fsdpv2_lora'
 ```
+
+See [`docs/tpu-runbook.md`](docs/tpu-runbook.md) for provisioning, resume, and the
+sweep-fleet launchers under `scripts/tpu/`.
 
 ## TPU sharding strategies (env: `TPU_STRATEGY`)
 
@@ -105,42 +104,26 @@ torch_xla >= 2.6 and silently no-op. Use the explicit
   Phase 0 `text_padding_weight` fix (ported from TPU).
 
 **TPU** (`configs/tpu/`):
-- `stage2_tpu_v6e_v2.yaml` — production 15k v6e-8 release run.
-- `stage2_tpu_v6e_valfix_smoke.yaml` — short smoke (inline-val NaN fix,
-  parallel stream, dashboard) before committing the slot.
-- `stage2_tpu_v6e_proxy.yaml` — short/cheap proxy used by the W&B sweep
-  (`sweeps/sweep_stage2.yaml`).
+- `stage2_tpu_v6e16_full_v03_mh.yaml` — **v0.3 long-horizon** run (v6e-16 multi-host, r=32/+MLP/rsLoRA, 110,463 steps @ real global batch 32).
+- `stage2_tpu_v6e16_smoke_r{8,32,64}.yaml` — full-corpus smoke arms (capacity-sweep candidates).
+- `stage2_tpu_v6e16_scale_proxy.yaml` — the capacity-sweep proxy (de-regularized, batch 256).
+- `stage2_tpu_v6e8_overfit.yaml` — overfit / pipeline-validation (32-example memorize).
 
-Each TPU config carries the Phase 0–3 knobs: `loss.text_padding_weight`,
-the `lora:` block (`r`/`alpha`/`target_modules`/`lora_exclude_top`/
-`num_full_ft_layers`), and `logging.{val_on_tpu,diag_metrics}`.
+Each TPU config carries: the `loss:` text/audio weights (text+audio since 2026-07-08:
+`text_weight 0.2`, `composite_text_w 0.4` — the corpus ships alignments), the
+`lora:` block (`r`/`alpha`/`use_rslora`/`target_modules`/`lora_exclude_top`/
+`num_full_ft_layers`), and `logging.{val_on_tpu,diag_metrics,save_dir}` (save_dir under
+`gs://tinyaya-stage2-eu/`).
 
 ## Per-chip memory budget
 
-### v5litepod-16 (16 GiB / chip)
-
-```
-Backbone (10.34 GB) + activations (5-10 GB) + grads + AdamW = OOM under replicated
-                                                            = ~7-12 GB under fsdpv2_lora
-                                                            = ~6-11 GB under fsdpv2
-```
-
-If `diagnose()` reports per-chip HBM > 12 GB, you're heading for OOM
-once activations + grads accumulate. Switch strategy or enable
-gradient checkpointing.
-
-### v6e-8 / v4-32 (32 GiB / chip)
-
-Both topologies share a 32 GiB HBM/chip budget, so the same per-chip
-totals apply to v4-32 (4 hosts x 4 chips = 16 chips) and v6e-8
-(1 host x 8 chips). The headroom relative to v5e is roughly 2x: for
-the `fsdpv2_lora` strategy, peak per-chip HBM in iter 7 (v4-32) and
-iter 13b (v6e-8 EU) sat under 12 GB out of the 32 GB budget. Iter 24h
-then completed 5000/5000 production steps on v6e-8 with effective
-batch 256 (`batch_size=8`, `grad_accum=4`, 8 chips) and ~6.7-7.0
-sec/step after startup compilation. The budget that matters in
-practice is activation memory (5-10 GB) + sharded params + grads +
-optim state, not HBM ceiling.
+**v6e (32 GiB / chip)** — the current path. Under `fsdpv2_lora`, peak per-chip HBM sits
+well under ~12 GB of the 32 GB budget (backbone sharded across the mesh + activations
+5-10 GB + grads + optim state). The binding constraint in practice is **activation
+memory**, not the HBM ceiling. If `diagnose()` reports per-chip HBM climbing toward the
+budget, switch strategy or enable `xla_grad_checkpoint`. Throughput is rank-independent
+(~5.5 s/step on v6e-16 at effective batch 256). *(Historical v5e-16 (16 GiB) OOM'd the
+model under `replicated`; see git history / `.claude/memories.md`.)*
 
 ## Conventions
 
@@ -281,8 +264,9 @@ session's context as a checklist.
 - **`which uv` is empty under sudo on fresh TPU VMs.** Enumerate
   `/root/.local/bin/uv`, `/usr/local/bin/uv`, `/usr/bin/uv` until
   one resolves.
-- **TRC quotas pre-empt.** Spot/preemptible v5e in `europe-west4-b`
-  reclaims regularly. Use queued resources + checkpoint every N steps.
+- **TRC quotas pre-empt.** Spot/preemptible v6e in `europe-west4-a`
+  reclaims regularly. Use queued resources + checkpoint every N steps +
+  `--resume auto`. No persistent XLA compile cache → each restart re-pays ~35-40 min compile.
 - **Mimi audio loading uses `transformers` API**, not the older
   `kyutai/mimi` path; keep the `transformers` pin in `pyproject.toml`.
 

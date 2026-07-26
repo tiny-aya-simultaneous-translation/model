@@ -1,0 +1,45 @@
+# TinyAya Stage 2 v0.3-SCALE — STAGE 2: Bayesian lr x rank (NATIVE W&B sweep).
+#
+# Run AFTER Stage 1 picks the best STRUCTURE. This IS a real W&B sweep (method:
+# bayes) so the native W&B sweep dashboard populates (parallel-coordinates,
+# parameter-importance, the sweep run table) — a public-release requirement.
+#
+# MULTI-HOST EXECUTION: a plain per-host `wandb agent` desyncs the 4-host SPMD
+# mesh (each host pulls a different trial). Instead ONE `wandb agent` runs on
+# HOST-0 only, invoking scripts/tpu/sweep_agent_primary.sh, which broadcasts the
+# trial's args to the 3 worker hosts (shared GCS control file -> they form the
+# 16-chip mesh) AND runs host-0's training as the PRIMARY. Host-0's run is created
+# by the agent, so it lands in the sweep and the dashboard fills in. Launch it:
+#   NAME=scale-bayes MAX_TRIALS=8 bash scripts/tpu/launch_sweep_bayes.sh
+#
+# The FIXED structure (Stage-1 +MLP winner) + rsLoRA knobs are injected by the
+# wrapper (a JSON list can't ride wandb's ${args}); only lr x rank is swept here.
+# STAGE-1 WINNER: q,k,v,o + gate,up,down + embed_tokens (val/composite 5.1326).
+#
+# NOTE: keep this YAML block-style (as below). `${env}` / `${args}` contain a
+# brace, so a flow-style `command: [${env}, ...]` makes YAML mis-parse the file
+# and wandb then errors; the launcher creates the sweep via wandb.sweep() but the
+# `wandb sweep` CLI works fine on this block-style form too.
+
+entity: cataluna84
+project: tinyaya-stage2-tpu
+method: bayes
+metric:
+  name: val/composite
+  goal: minimize
+
+parameters:
+  # ---- SWEPT: lr (log-uniform) x rank (categorical) ----
+  lr_lora:
+    distribution: log_uniform_values
+    min: 1.0e-5
+    max: 5.0e-4
+  lora_r:
+    values: [8, 16, 32, 64]
+
+# The agent runs the host-0 wrapper with the suggested --lr_lora / --lora_r.
+command:
+  - ${env}
+  - bash
+  - scripts/tpu/sweep_agent_primary.sh
+  - ${args}
