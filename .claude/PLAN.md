@@ -62,16 +62,55 @@ with a full honest eval and a lean, secret-free public repo.
       **zero queued resources and zero TPU VMs** across `europe-west4-a`,
       `us-east1-d`, `us-central2-b`. No compute cost accruing.
 
-`main` @ `4e906da`, 216 tracked files; both CI gates green, ruff clean, 193 tests.
+`main` @ `0d9460f`, 216 tracked files; both CI gates green, ruff clean, 193 tests.
 
-## Next (optional, nothing blocking)
-- [ ] Dataset cards (alignments note).
+## Done — HuggingFace org brought to release standard (2026-07-27)
+
+Admin access landed, so the whole org was audited and fixed: **26 repos → 20
+public (7 models + 13 datasets) + 6 private, 0 missing metadata, 85/85 card URLs
+resolving.**
+
+- [x] **LEGAL — `tr-hi-s2st-v0.1`, `v0.2` and the private `…-tr-hi-pt` were
+      published as `apache-2.0`.** All three are LoRA derivatives of
+      `CohereLabs/tiny-aya-base` (`cc-by-nc-4.0`), so the non-commercial term is
+      inherited and Apache was never ours to grant. Corrected on the Hub **and**
+      in the repo sources (`docs/hf-model-card-tr-hi-s2st-v0.{1,2}.md` still said
+      Apache too, so it would have regressed on the next upload).
+- [x] **Dataset licences.** Every dataset previously declared *none*.
+      FLORES-derived corpora → `cc-by-sa-4.0` (share-alike propagates); eval sets
+      → `other` + upstream note, rather than inventing a licence.
+- [x] **The `tr-hi-mimi-encoded` P0.** Its card documented `.pt` keys as
+      `source_text`/`target_text` (real: `src_text`/`tgt_text`) and alignment
+      paths as `encoded/<stem>_src.json` (real: `{stem}.src.alignments.json` at
+      the data root) — the very mismatch that made v0.1/v0.2 train audio-only.
+      Corrected, with the resolution order spelled out.
+- [x] **13 new cards**, incl. `fleurs-tr-hi-parallel-speech` (11,383 files,
+      previously undocumented) and the 2 stray trainer `push_to_hub` artifacts,
+      now labelled superseded → v0.3.
+- [x] **GitHub ↔ HF cross-links on every card.** Verified mapping, not guessed:
+      `codec-finetuning` is what the whole phase-3 cluster exists for, and
+      `hindi-tts-probe` benchmarks directly on `lahaja-eval` — the study that
+      chose the Hindi ASR judge used in the v0.3 eval. The three **private**
+      GitHub repos are deliberately never linked as browsable.
+- [x] **Shared lineage footer** everywhere: `parallel-text → parallel-speech →
+      mimi-encoded → v0.3`, plus eval report, W&B run + emergence report, blog,
+      TRC acknowledgement, and the honest framing (text translates ~25 chrF++;
+      intelligible audio synthesis is the frontier).
+- [x] **Housekeeping.** 4 empty models + 1 empty dataset → private (reversible,
+      nothing deleted); `turkish-{cv,openslr}-24k-phase3` stay public with
+      placeholder cards.
+
+Tooling: `~/Workspace/v0.3-work/hf_release_cards.py` — idempotent and
+re-runnable, preserving every auto-generated `dataset_info` block.
+
+## Next (other, optional)
 - [ ] Make `data-pipeline` public if its README link should resolve for outside
       readers (currently private → 404 anonymously; the link itself is correct).
 - [ ] Cut a fresh tag at `main` if the release should point at the final state
       rather than the `e89fb26` code freeze.
-- [ ] GCS still holds the ~411 GB checkpoint suite — intentional (it backs the
-      published Pythia-style suite), but it is the one ongoing cost.
+- [x] ~~GCS checkpoint suite cost~~ — bucket deleted 2026-07-27; zero cloud cost.
+      Note the trade: it held the only optimizer state, so the published
+      checkpoints support inference/eval/averaging but **not** resume.
 
 ## Definition of Done
 ✅ **Met.** Public HF repo + full checkpoint suite + card with eval numbers; eval
