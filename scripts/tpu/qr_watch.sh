@@ -23,9 +23,9 @@
 #   1. Save the exact launch env to a file (one KEY=VALUE per line), e.g.
 #        TRC_PROFILE=v6e-16-eu
 #        CONFIG_FILE=configs/tpu/stage2_tpu_v6e16_full_v03_mh.yaml
-#        REPO_TARBALL_GS_URI=gs://tinyaya-stage2-eu/code/<sha>.tar.gz
-#        SWEEP_DATA_GS_URI=gs://tinyaya-stage2-eu/data/full-corpus-ta-20260708.tar.gz
-#        XLA_CACHE_GS_URI=gs://tinyaya-stage2-eu/xla-cache/v03-mh
+#        REPO_TARBALL_GS_URI=gs://<your-bucket>/code/<sha>.tar.gz
+#        SWEEP_DATA_GS_URI=gs://<your-bucket>/data/full-corpus-ta-20260708.tar.gz
+#        XLA_CACHE_GS_URI=gs://<your-bucket>/xla-cache/v03-mh
 #   2. tmux new -d -s qrwatch \
 #        "QR_NAME=tinyaya-stage2-spot-v6e16-eu-qr ZONE=europe-west4-a \
 #         LAUNCH_ENV_FILE=launch.env bash scripts/tpu/qr_watch.sh \

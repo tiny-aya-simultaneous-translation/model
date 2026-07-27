@@ -79,6 +79,138 @@ moved to `.claude/archive/PROGRESS-YYYY-Qn.md` by the
 
 ---
 
+## 2026-07-27T06:42:08Z | docs/plan-release-closeout@1b2f545 | done | exec
+cd ~/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-27T06:41:31Z | docs/plan-release-closeout@1b2f545 | done | edit
+edited `scripts/tpu/sweep_coordinator.py`
+
+
+## 2026-07-27T06:41:23Z | docs/plan-release-closeout@1b2f545 | done | exec
+cd ~/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-27T06:41:12Z | docs/plan-release-closeout@1b2f545 | done | exec
+cd ~/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-27T06:40:46Z | docs/plan-release-closeout@1b2f545 | done | edit
+edited `scripts/train_hierarchical.py`
+
+
+## 2026-07-27T06:40:33Z | docs/plan-release-closeout@1b2f545 | done | edit
+edited `scripts/tpu/startup_script.sh`
+
+
+## 2026-07-27T06:40:28Z | docs/plan-release-closeout@1b2f545 | done | edit
+edited `scripts/tpu/vm_watcher.sh`
+
+
+## 2026-07-27T06:39:57Z | docs/plan-release-closeout@1b2f545 | done | exec
+cd ~/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-27T06:35:08Z | chore/dependabot-ignore-pins@e6c4925 | fail | verify
+verify: 11 passed, 1 failed out of 12 on Stop
+
+FAIL [1] # the TPU↔GPU seam holds: torch_xla must NOT leak into shared model/data code
+    src/model/scan_utils.py:479:    from torch_xla.experimental.scan_layers import (
+
+
+## 2026-07-27T06:33:40Z | chore/dependabot-ignore-pins@e6c4925 | fail | verify
+verify: 11 passed, 1 failed out of 12 on Stop
+
+FAIL [1] # the TPU↔GPU seam holds: torch_xla must NOT leak into shared model/data code
+    src/model/scan_utils.py:479:    from torch_xla.experimental.scan_layers import (
+
+
+## 2026-07-27T06:33:21Z | chore/dependabot-ignore-pins@e6c4925 | done | edit
+edited `~/.claude/projects/-home-cataluna84-Workspace-tinyaya-stage2-scale/memory/MEMORY.md`
+
+
+## 2026-07-27T06:33:19Z | chore/dependabot-ignore-pins@e6c4925 | done | edit
+created `~/.claude/projects/-home-cataluna84-Workspace-tinyaya-stage2-scale/memory/dependabot-pin-policy.md`
+
+
+## 2026-07-27T06:33:03Z | chore/dependabot-ignore-pins@e6c4925 | done | exec
+cd ~/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-27T06:32:38Z | chore/dependabot-ignore-pins@e6c4925 | done | exec
+cd ~/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-27T06:32:09Z | chore/dependabot-ignore-pins@e6c4925 | done | exec
+cd ~/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-27T06:31:43Z | docs/plan-release-closeout@1b2f545 | done | exec
+cd ~/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-27T06:31:32Z | docs/plan-release-closeout@1b2f545 | done | edit
+created `.github/dependabot.yml`
+
+
+## 2026-07-27T06:31:11Z | docs/plan-release-closeout@1b2f545 | done | exec
+cd ~/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-27T06:30:45Z | docs/plan-release-closeout@1b2f545 | done | exec
+cd ~/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-27T06:30:31Z | docs/plan-release-closeout@1b2f545 | done | exec
+cd ~/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-27T06:30:14Z | docs/plan-release-closeout@1b2f545 | done | exec
+cd ~/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-27T06:27:51Z | docs/plan-release-closeout@1b2f545 | fail | verify
+verify: 11 passed, 1 failed out of 12 on Stop
+
+FAIL [1] # the TPU↔GPU seam holds: torch_xla must NOT leak into shared model/data code
+    src/model/scan_utils.py:479:    from torch_xla.experimental.scan_layers import (
+
+
+## 2026-07-27T06:27:32Z | docs/plan-release-closeout@1b2f545 | done | exec
+cd ~/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-27T06:27:06Z | docs/plan-release-closeout@1b2f545 | done | exec
+cd ~/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-27T06:26:44Z | docs/plan-release-closeout@1b2f545 | done | exec
+cd ~/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-27T06:20:57Z | docs/plan-release-closeout@1b2f545 | fail | verify
+verify: 11 passed, 1 failed out of 12 on Stop
+
+FAIL [1] # the TPU↔GPU seam holds: torch_xla must NOT leak into shared model/data code
+    src/model/scan_utils.py:479:    from torch_xla.experimental.scan_layers import (
+
+
+## 2026-07-27T06:20:39Z | docs/plan-release-closeout@1b2f545 | done | edit
+edited `~/.claude/projects/-home-cataluna84-Workspace-tinyaya-stage2-scale/memory/v03-release-debloat.md`
+
+
+## 2026-07-27T06:20:24Z | docs/plan-release-closeout@1b2f545 | done | exec
+cd ~/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-27T06:20:09Z | docs/plan-release-closeout@1b2f545 | done | exec
+cd ~/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-27T06:19:29Z | docs/plan-release-closeout@1b2f545 | done | exec
+cd ~/Workspace/tinyaya-stage2-scale
+
+
 ## 2026-07-27T06:18:56Z | docs/plan-release-closeout@3577b8b | done | exec
 cd ~/Workspace/tinyaya-stage2-scale
 

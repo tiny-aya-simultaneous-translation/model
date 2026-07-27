@@ -10,7 +10,7 @@
 #
 # Usage:
 #   SWEEP_ID=ENTITY/PROJECT/SWEEP_ID \
-#   SWEEP_DATA_GS_URI=gs://tinyaya-stage2-eu/data/sweep-subset-200000.tar.gz \
+#   SWEEP_DATA_GS_URI=gs://<your-bucket>/data/sweep-subset-200000.tar.gz \
 #   N_SLICES=7 \
 #       bash scripts/tpu/launch_sweep_fleet.sh
 #

@@ -2141,10 +2141,16 @@ def main():
         except Exception:
             host_idx = 0
 
-        rendezvous_uri = os.environ.get(
-            "WANDB_RENDEZVOUS_URI",
-            f"gs://tinyaya-stage2-eu/wandb-rendezvous/{cfg['logging']['wandb_run_name']}.id",
-        )
+        # Fall back to a bucket derived from the run's own save_dir rather than a
+        # hardcoded one -- a run configured against a different bucket would
+        # otherwise try to rendezvous through someone else's.
+        _save_dir = str(cfg["logging"].get("save_dir", ""))
+        _bucket = _save_dir.split("/")[2] if _save_dir.startswith("gs://") else ""
+        rendezvous_uri = os.environ.get("WANDB_RENDEZVOUS_URI", "")
+        if not rendezvous_uri and _bucket:
+            rendezvous_uri = (
+                f"gs://{_bucket}/wandb-rendezvous/{cfg['logging']['wandb_run_name']}.id"
+            )
 
         if is_tpu and not is_main:
             # Worker host: wait for primary to publish run-id, then attach.

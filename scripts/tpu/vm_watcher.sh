@@ -2,16 +2,22 @@
 # Durable run watcher -- runs ON TPU host 0 in tmux, survives any workstation.
 # Watches /tmp/train.log for completion AND errors; publishes status to GCS so
 # any session (or a browser via the console) can check without SSH:
-#   gs://tinyaya-stage2-eu/watch/anneal-r2-status.txt   (heartbeat, overwritten)
-#   gs://tinyaya-stage2-eu/watch/anneal-r2-errors.txt   (appended on error)
+#   gs://$BUCKET/watch/$RUN_TAG-status.txt   (heartbeat, overwritten)
+#   gs://$BUCKET/watch/$RUN_TAG-errors.txt   (appended on error)
 # Stale-log guard: terminal/exit markers only count with a timestamp >= START_DAY
-# (the append-mode log still contains the 07-19 plateau-leg ending).
+# (an append-mode log can still contain a previous leg's ending).
+#
+# BUCKET/RUN_TAG/START_DAY/TARGET_STEP are per-run and MUST be set for your own
+# run; the defaults below are the v0.3 anneal leg's values, kept as a worked
+# example. (That run's bucket was decommissioned after release.)
 set -u
 LOG=/tmp/train.log
-STATUS=gs://tinyaya-stage2-eu/watch/anneal-r2-status.txt
-ERRFILE=gs://tinyaya-stage2-eu/watch/anneal-r2-errors.txt
-START_DAY="2026-07-20"
-TARGET_STEP=76250
+BUCKET="${BUCKET:-tinyaya-stage2-eu}"
+RUN_TAG="${RUN_TAG:-anneal-r2}"
+STATUS="gs://${BUCKET}/watch/${RUN_TAG}-status.txt"
+ERRFILE="gs://${BUCKET}/watch/${RUN_TAG}-errors.txt"
+START_DAY="${START_DAY:-2026-07-20}"
+TARGET_STEP="${TARGET_STEP:-76250}"
 last_err_sig=""
 
 publish () {  # $1 = state line
