@@ -17,6 +17,7 @@ from pathlib import Path
 
 PROJECT_DIR = Path(os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd()).resolve()
 CLAUDE_DIR = PROJECT_DIR / ".claude"
+HOME_DIR = Path.home()
 
 PROGRESS_FILE = CLAUDE_DIR / "PROGRESS.md"
 PLAN_FILE = CLAUDE_DIR / "PLAN.md"
@@ -74,6 +75,26 @@ def scrub(text: str) -> str:
     return text
 
 
+def relativize_paths(text: str) -> str:
+    """Rewrite absolute paths so PROGRESS entries stay machine-independent.
+
+    PROGRESS.md is version-controlled, so a logged ``/home/<user>/...`` leaks the
+    username into a public repo and re-churns the diff on every clone. Paths
+    inside the project become repo-relative; anything else under ``$HOME``
+    collapses to ``~``.
+
+    PROJECT_DIR is substituted before HOME because the project normally lives
+    under HOME -- the reverse order would rewrite the prefix to ``~`` first and
+    leave ``~/.../repo/file`` instead of ``file``.
+    """
+    project = str(PROJECT_DIR)
+    text = text.replace(f"{project}{os.sep}", "")
+    text = text.replace(project, ".")
+    home = str(HOME_DIR)
+    text = text.replace(f"{home}{os.sep}", f"~{os.sep}")
+    return text.replace(home, "~")
+
+
 def read_input() -> dict:
     try:
         return json.load(sys.stdin)
@@ -89,8 +110,10 @@ def emit(payload: dict | None = None) -> None:
 def append_progress(status: str, kind: str, summary: str, detail: str = "") -> None:
     if not PROGRESS_FILE.exists():
         return
-    summary = scrub(summary).replace("\n", " ").strip()[:300]
-    detail = scrub(detail).strip()
+    # Relativize before truncating so the 300-char budget holds content, not
+    # a machine-specific path prefix.
+    summary = relativize_paths(scrub(summary)).replace("\n", " ").strip()[:300]
+    detail = relativize_paths(scrub(detail)).strip()
     if not summary:
         return
     header_marker = "\n---\n"

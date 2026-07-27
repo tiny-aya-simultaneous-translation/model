@@ -79,6 +79,65 @@ moved to `.claude/archive/PROGRESS-YYYY-Qn.md` by the
 
 ---
 
+## 2026-07-27T04:41:51Z | chore/track-claude-tooling@5e4fcc4 | done | exec
+cd ~/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-27T04:41:10Z | chore/track-claude-tooling@5e4fcc4 | done | exec
+cd /tmp && rm -rf /tmp/hooktest && mkdir -p /tmp/hooktest/home/Workspace/repo/.claude
+
+
+## 2026-07-27T04:40:48Z | chore/track-claude-tooling@5e4fcc4 | done | exec
+cd ~/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-27T04:40:19Z | chore/track-claude-tooling@5e4fcc4 | done | edit
+created `tests/test_hook_path_relativization.py`
+
+
+## 2026-07-27T04:39:53Z | chore/track-claude-tooling@5e4fcc4 | done | edit
+edited `.claude/hooks/_lib.py`
+
+
+## 2026-07-27T04:39:49Z | chore/track-claude-tooling@5e4fcc4 | done | edit
+edited `~/Workspace/tinyaya-stage2-scale/.claude/hooks/_lib.py`
+
+
+## 2026-07-27T04:39:45Z | chore/track-claude-tooling@5e4fcc4 | done | edit
+edited `~/Workspace/tinyaya-stage2-scale/.claude/hooks/_lib.py`
+
+
+## 2026-07-27T04:39:12Z | chore/track-claude-tooling@5e4fcc4 | done | exec
+cd ~/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-27T04:38:13Z | chore/track-claude-tooling@5e4fcc4 | fail | verify
+verify: 11 passed, 1 failed out of 12 on Stop
+
+FAIL [1] # the TPU↔GPU seam holds: torch_xla must NOT leak into shared model/data code
+    src/model/scan_utils.py:479:    from torch_xla.experimental.scan_layers import (
+
+
+## 2026-07-27T04:37:55Z | chore/track-claude-tooling@5e4fcc4 | done | edit
+edited `~/.claude/projects/-home-cataluna84-Workspace-tinyaya-stage2-scale/memory/v03-release-debloat.md`
+
+
+## 2026-07-27T04:37:36Z | chore/track-claude-tooling@5e4fcc4 | done | exec
+cd ~/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-27T04:34:23Z | chore/track-claude-tooling@5e4fcc4 | done | exec
+cd ~/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-27T04:33:08Z | chore/track-claude-tooling@5e4fcc4 | done | exec
+cd ~/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-27T04:32:34Z | chore/track-claude-tooling@5d0bc02 | done | exec
+cd ~/Workspace/tinyaya-stage2-scale
+
+
 ## 2026-07-27T04:32:19Z | chore/track-claude-tooling@5d0bc02 | done | exec
 cd ~/Workspace/tinyaya-stage2-scale
 
