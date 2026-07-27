@@ -202,7 +202,7 @@ custom `projection.pt` / `depth_decoder.pt` / `audio_heads.pt` / `text_embed.pt`
 - [Model + checkpoints on Hugging Face](https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3)
 
 ## Related Repos
-- [`data-pipeline`](https://github.com/tiny-aya-simultaneous-translation/data-pipeline) — TTS generation, deployment, Mimi encoding
+- `data-pipeline` — TTS generation, deployment, Mimi encoding *(private repo — not publicly browsable)*
 - [`sound-quality-check`](https://github.com/tiny-aya-simultaneous-translation/sound-quality-check) — 4-stage audio QC pipeline
 
 ## License
