@@ -42,7 +42,7 @@ automatically; `Skill("keep-context-fresh")` primes them on demand.
 ```bash
 # from the repo root
 uv sync                                       # install / update deps
-uv run python -m pytest tests/ -v             # if tests dir exists
+uv run python -m pytest tests/ -q             # CI gate
 uv run python -m py_compile $(git ls-files '*.py')  # quick lint
 ```
 
@@ -74,10 +74,10 @@ sweep-fleet launchers under `scripts/tpu/`.
 
 | Value | Behaviour |
 |-------|-----------|
-| `replicated` | Every chip holds a full model copy; only data is sharded. **OOMs the 5.17B model on v5e.** Useful for small models. |
-| `fsdpv2_lora` | Shards layers that contain trainable params (LoRA-bearing CohereDecoderLayer); replicates frozen MoshiDecoderLayer. **Default for canary + production.** |
+| `replicated` | Every chip holds a full model copy; only data is sharded. **What the v0.3 long-horizon run actually used** (v6e-16, 32 GiB/chip). Historically OOM'd on v5e's 16 GiB. |
+| `fsdpv2_lora` | Shards layers that contain trainable params (LoRA-bearing CohereDecoderLayer); replicates frozen MoshiDecoderLayer. |
 | `fsdpv2` | Shards every transformer layer including frozen ones. Tightest memory but highest comm cost. |
-| `auto` | Lets the backend pick (currently == `fsdpv2_lora`). |
+| `auto` | Lets the backend pick — `_resolve_strategy` returns **`replicated`** below ~500M trainable params (v0.3 is ≈192M) and `fsdpv2` above. This is the default the launchers pass. |
 
 The strategy is selected inside
 `src/backend/tpu_backend.py::wrap_model`. See
@@ -89,7 +89,7 @@ measurements per strategy.
 ```bash
 export PJRT_DEVICE=TPU                        # auto-set when libtpu present
 export XLA_DISABLE_FUNCTIONALIZATION=0        # MUST be 0 (pytorch/xla #8607)
-export TPU_STRATEGY=fsdpv2_lora               # see table above
+export TPU_STRATEGY=auto                      # resolves to `replicated` here; see table above
 export LD_LIBRARY_PATH=/opt/conda/lib:$LD_LIBRARY_PATH   # libpython
 ```
 
@@ -117,13 +117,14 @@ Each TPU config carries: the `loss:` text/audio weights (text+audio since 2026-0
 
 ## Per-chip memory budget
 
-**v6e (32 GiB / chip)** — the current path. Under `fsdpv2_lora`, peak per-chip HBM sits
-well under ~12 GB of the 32 GB budget (backbone sharded across the mesh + activations
-5-10 GB + grads + optim state). The binding constraint in practice is **activation
-memory**, not the HBM ceiling. If `diagnose()` reports per-chip HBM climbing toward the
-budget, switch strategy or enable `xla_grad_checkpoint`. Throughput is rank-independent
-(~5.5 s/step on v6e-16 at effective batch 256). *(Historical v5e-16 (16 GiB) OOM'd the
-model under `replicated`; see git history / `.claude/memories.md`.)*
+**v6e (32 GiB / chip)** — the current path. The v0.3 run used `replicated` (a full
+composite copy per chip) and still sat inside the 32 GB budget. The binding constraint
+in practice is **activation memory**, not the HBM ceiling. If `diagnose()` reports
+per-chip HBM climbing toward the budget, switch strategy or enable
+`xla_grad_checkpoint`. Measured throughput on v6e-16 was **~1.45–1.8 s/step at the real
+optimizer batch of 32** (`batch_size × grad_accum`; older notes quoting ~5.5 s/step "at
+effective batch 256" multiplied by the chip count — see the batch-semantics audit).
+*(Historical v5e-16 (16 GiB) OOM'd the model under `replicated`.)*
 
 ## Conventions
 
@@ -260,7 +261,9 @@ session's context as a checklist.
 
 - **XLA compile time blows up with unrolled transformer stacks.**
   36 `CohereDecoderLayer` + 6 `MoshiDecoderLayer` => 25+ minute
-  compile. Mitigation: `scan_layers` (open task in `.claude/PLAN.md`).
+  compile. Mitigation: `scan_layers` — **shipped** and on by default for the
+  long-horizon path (`use_scan_layers: true`, `src/model/scan_utils.py`; see
+  `docs/tpu-runbook.md`).
 - **`which uv` is empty under sudo on fresh TPU VMs.** Enumerate
   `/root/.local/bin/uv`, `/usr/local/bin/uv`, `/usr/bin/uv` until
   one resolves.

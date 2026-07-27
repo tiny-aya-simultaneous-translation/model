@@ -64,8 +64,8 @@ References
 ----------
 - pytorch/xla docs on ``scan_layers``:
   https://github.com/pytorch/xla/blob/master/docs/source/learn/scan_layers.rst
-- ``.factory/memories.md`` -> "scan_layers wrapper as a ModuleList proxy"
-- ``.factory/PLAN.md`` -> Phase 1 + Phase 2
+- ``.claude/memories.md`` -> "scan_layers wrapper as a ModuleList proxy"
+- ``.claude/PLAN.md`` -> Phase 1 + Phase 2
 """
 
 from __future__ import annotations

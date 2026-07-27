@@ -66,7 +66,7 @@ Key design choices:
 │   ├── training/               # checkpointing, scheduler, translation_loss
 │   └── backend/                # base + gpu_backend + tpu_backend (ONLY torch_xla importer)
 ├── docs/                       # release plan, model cards, TPU runbook, onboarding
-├── .claude/                    # External Memory System (PLAN/PROGRESS/VERIFY/memories, hooks, skills)
+├── .claude/                    # External Memory System (hooks, skills, agents, orchestration)
 ├── AGENTS.md                   # agent briefing + TPU↔GPU seam rules
 └── pyproject.toml
 ```

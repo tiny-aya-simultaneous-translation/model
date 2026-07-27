@@ -3,7 +3,7 @@
 # Tests: train → save → verify (incl optimizer) → resume → verify → resume → verify
 set -e
 
-cd ~/tinyaya-stage2-scale/simultaneous-translation
+cd ~/tinyaya-stage2-scale
 export PYTHONUNBUFFERED=1
 
 CKPT_DIR="checkpoints/validate_pipeline"

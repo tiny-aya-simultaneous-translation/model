@@ -28,7 +28,7 @@ process)::
 Output: a comparison table on stdout plus a JSON dump under
 ``/tmp/probe-results.json``. Use the ``compile_s``, ``median_step_s``,
 and ``peak_hbm_gb`` columns to pick a strategy. Record the choice in
-``.factory/memories.md`` under "TPU strategy decisions".
+``.claude/memories.md`` under "TPU strategy decisions".
 """
 
 from __future__ import annotations

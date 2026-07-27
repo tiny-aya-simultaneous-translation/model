@@ -60,7 +60,7 @@ def stratified_subset(rows: list[dict], n: int, rng: random.Random) -> list[dict
     picked: list[dict] = []
     chosen_ids: set[int] = set()
 
-    for source, srows in by_source.items():
+    for _source, srows in by_source.items():
         quota = round(n * len(srows) / total)
         by_dir: dict[str, list[dict]] = defaultdict(list)
         for r in srows:

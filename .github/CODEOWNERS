@@ -1,0 +1,18 @@
+# Default owners for everything in this repo (contributors listed in NOTICE).
+*       @cataluna84 @alperiox @ahmeterdempmk
+
+# The dual-backend seam and the TPU launch path are the two places where a
+# careless change is most expensive: the seam keeps GPU/CPU runs importable,
+# and the launch scripts drive spot TPU provisioning that costs real compute.
+/src/backend/          @cataluna84
+/scripts/tpu/          @cataluna84
+/scripts/ci/           @cataluna84
+
+# Published-artifact surface: model cards, licence/legal files, and citation
+# metadata are what downstream users rely on.
+/MODEL_CARD.md         @cataluna84
+/docs/hf-model-card-*  @cataluna84
+/NOTICE                @cataluna84
+/LICENSE               @cataluna84
+/THIRD_PARTY_NOTICES.md @cataluna84
+/CITATION.cff          @cataluna84

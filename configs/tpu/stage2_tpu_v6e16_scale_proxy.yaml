@@ -4,7 +4,8 @@
 # ---------------
 # v0.3 tuned REGULARIZATION to fix the 200K-subset overfit (winner: r=8 /
 # dropout 0.15 / wd 0.10 / targets q,v,embed). In the SCALE regime (full corpus,
-# multi-host, global batch 256) overfitting is no longer the binding constraint,
+# multi-host, nominal global batch 256 -- batch-semantics audit: the real
+# optimizer batch is batch_size x grad_accum) overfitting is no longer binding,
 # so that winner likely UNDER-fits. This proxy is the base for a 2-stage W&B
 # sweep that pushes the *capacity* axes instead:
 #   Stage 1 (grid):  target_modules x use_rslora x lora_exclude_top   (structure)
@@ -13,7 +14,9 @@
 # HORIZON + checkpointing live here so promote_sweep_winner never carries them.
 #
 # DE-REGULARIZED defaults (vs the b256 winner): dropout 0.15->0.05, wd 0.10->0.01.
-# Global batch = batch_size x grad_accum x 16 chips = 4 x 4 x 16 = 256 (same
+# NOMINAL global batch = batch_size x grad_accum x 16 chips = 4 x 4 x 16 = 256.
+# batch-semantics audit: the chip factor is NOT real -- the true optimizer batch
+# is batch_size x grad_accum. Kept verbatim for provenance. (same
 # optimization regime as the b256 baseline = arm 0). Per-chip batch 4 is
 # validated-safe (v6e NaN'd at 16/chip).
 #
@@ -53,6 +56,9 @@ train:
   final_canonical_save: false
 
 loss:
+  # NOTE (2026-07-08): the "no text alignments" premise below was FALSE -- the
+  # corpus ships 840,426 x2 alignment JSONs (100% coverage); the old check used
+  # legacy filenames. Kept as-is for provenance; the shipped recipe is text+audio.
   # AUDIO-ONLY (corpus has no text alignments).
   text_weight: 0.0
   audio_weight: 1.0

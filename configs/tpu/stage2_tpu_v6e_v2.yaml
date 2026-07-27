@@ -2,12 +2,13 @@
 #
 # WHY THIS EXISTS
 # ---------------
-# First production training on the large tr-hi-mimi-encoded corpus
+# First long-horizon training on the large tr-hi-mimi-encoded corpus
 # (1,240,589 train / 65,295 val rows) -- the Mimi-encoded + aligned
 # form of tiny-aya-translate/tr-hi-parallel-speech-v2. It reuses the
 # validated opt-prod5k recipe (Phases 1+2+3) and only changes:
 #   - data paths -> the staged v2 encoded set on the VM local disk
-#   - max_steps  -> ~3 epochs (effective batch 256; ~4,850 steps/epoch)
+#   - max_steps  -> ~3 epochs (nominal effective batch 256 -- batch-semantics
+#     audit: real optimizer batch = batch_size x grad_accum)
 #   - save_every -> 1000 (CRITICAL: v6e-8 is spot/preemptible; the run
 #     MUST checkpoint to GCS so --resume auto survives a reclaim)
 #   - max_frames -> 300 (covers p95 of src+tgt length; truncates ~1.7%;
@@ -18,8 +19,8 @@
 # reduce-scatter, pytorch/xla #8591/#8778).
 #
 # Usage (single-host v6e-8 spot, europe-west4-a):
-#   TPU_STRATEGY=fsdpv2_lora uv run python scripts/train_hierarchical.py \
-#       --config configs/stage2_tpu_v6e_v2.yaml --resume auto
+#   TPU_STRATEGY=auto uv run python scripts/train_hierarchical.py \
+#       --config configs/tpu/stage2_tpu_v6e_v2.yaml --resume auto
 
 backend: tpu
 
@@ -42,7 +43,8 @@ data:
 
 # ---------------------------------------------------------------------
 # Train: single-host v6e-8 spot.
-# Effective batch = batch_size * grad_accum * 8 chips = 8 * 4 * 8 = 256.
+# NOMINAL effective batch = batch_size * grad_accum * 8 chips = 8 * 4 * 8 = 256.
+# batch-semantics audit: the chip factor is fiction; real batch = 8 * 4 = 32.
 # 1,240,589 train rows / 256 ~= 4,846 steps/epoch.
 # max_steps=15000 ~= 3.1 epochs (cosine decay horizon). Early-stop on
 # val plateau is fine; do NOT shorten the horizon after the fact (that

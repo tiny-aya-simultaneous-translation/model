@@ -104,7 +104,7 @@ fi
 #    intentionally absent: GCP spot TPU preemption is a VM-level event,
 #    not a process-level one, so process supervision hides compile errors
 #    as transient failures. Failures bubble up and the orchestrator
-#    classifies + redeploys per .factory/orchestration/playbook/.
+#    classifies + redeploys per .claude/orchestration/playbook/.
 INNER_SCRIPT="/tmp/train_loop.sh"
 sudo tee "$INNER_SCRIPT" >/dev/null <<INNER
 #!/bin/bash

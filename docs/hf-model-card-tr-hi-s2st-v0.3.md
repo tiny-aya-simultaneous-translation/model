@@ -50,7 +50,7 @@ model-index:
 > improving validation on essentially every cycle of the descent to a final
 > **val composite 2.8199** (text ppl 1.489, text acc 96.6%). Best = step 76,000
 > ≈ final. **The repo is public and carries the FULL checkpoint suite**
-> (~87 training points as branches and under `checkpoints/`). **End-task release
+> (~89 training points as branches and under `checkpoints/`). **End-task release
 > evals are complete** — a data-efficiency / emergence study (the model learns
 > text translation ~25 chrF++ but audio synthesis is the next frontier); see
 > *Evaluation*.
@@ -148,7 +148,7 @@ The same clips are browsable with a step slider in the
 
 ## 📦 Checkpoints — the full training trajectory
 
-**Every checkpoint of the run is published** (~87 training points): log-spaced
+**Every checkpoint of the run is published** (~89 training points): log-spaced
 early steps `{1, 2, 4, …, 512}`, **every 1,000 steps from 1,000 → 76,000**
 (covering both the plateau and anneal legs), the annealed final `step-76250`,
 and 🏆 `best` (step **76,000**, val composite **2.8199**). Each is a complete
@@ -351,7 +351,7 @@ stride-0 broadcast views):
 | `MoshiFlexibleLinear.forward` rewritten as equal-batch `bmm` (`src/model/depth_decoder.py::_patch_flexible_linear_bmm`) | stock broadcast-batched `matmul` materialises the per-codebook weight **per token** on XLA (5.5 GiB/FFN call → OOM) | none on GPU (identical math); apply the patch if running inference on XLA |
 | Identity-gather skip in the same patch (`index_select(weight, arange(C))` → read weight directly) | the training path always selects ALL codebook rows; XLA copies the full weight per call otherwise | none (identical math) |
 | Full-attention forcing under `use_scan_layers` (`composite.py::_force_full_attention_for_scan`) | Cohere2 interleaves sliding/full attention (`sliding_window_pattern=4`); `scan_layers` needs 36 homogeneous layers. Sliding window 4096 ≫ max seq 300 ⇒ identical | none — attention pattern is a config read at load; released config unchanged |
-| **LoRA adapters on ALL 36 layers, top-2 frozen** (`lora_setup.py::apply_lora(scan_homogeneous=True)`) instead of `exclude_top=2` omitting them | scan stacks per-layer param pytrees and requires identical keys | **checkpoint-structural**: `peft_adapter/` contains 36 layers of adapters; the top-2 are zero (`lora_B` never trained) ⇒ mathematically identical to exclusion. Load with the shipped `adapter_config.json`, not a hand-written one |
+| **LoRA adapters materialised on ALL 36 layers** (`lora_setup.py::apply_lora(scan_homogeneous=True)`) | scan stacks per-layer param pytrees and requires identical keys across layers | **checkpoint-structural**: `peft_adapter/` contains 36 layers of adapters. Under the shipped arm-D recipe (`lora_exclude_top: 0`) all 36 are *trained*, so this is the intended recipe rather than a scan artefact. (On an `exclude_top=N` recipe the top N would be present but zero — `lora_B` never trained — and mathematically equivalent to omitting them.) Load with the shipped `adapter_config.json`, not a hand-written one |
 | Scan-safe dropout (`scan_utils.py::_ScanSafeDropout`) | `native_dropout`'s bool-mask meta vs bf16 XLA lowering breaks `scan`'s stacked activation buffers | none — train-time only, eval-mode is a no-op |
 | Per-micro-batch graph break (`train.micro_mark_step`) + `depth_chunk_size` | XLA buffer-assignment fragmentation (81 GiB "used" over 14 GiB real) when 8 grad-accum micros trace into one program | none — pure scheduling |
 
@@ -393,7 +393,7 @@ the Pythia/OLMo one-branch-per-checkpoint convention, weights-only
   ladder and loading examples. *Ops disclosure:* during the private training
   phase, private-repo storage limits (~50 GB) meant only a 12-point interim
   ladder could be hosted; the flip to public (no such cap) enabled the full
-  ~87-point publication, backfilled from the keep-all GCS archive.
+  ~89-point publication, backfilled from the keep-all GCS archive.
 - **`samples/step_NNNNNN/`** on `main`: source / ground-truth-target / generated
   WAVs from the inline audio demo that runs on the TPU every 5000 steps — you
   can *listen* to the model improve across training.
@@ -421,7 +421,7 @@ checkpoint gains teacher-forced text **chrF/BLEU** backfilled at its own step
 | Pipeline validated (all 8 codebooks memorize) | ✅ |
 | Long-horizon training run (plateau leg) | ✅ completed 2026-07-19 (early stop @65,250; plateau best 2.9048 @62,750) |
 | WSD anneal leg (65,250 → 76,250, linear LR→0) | ✅ completed 2026-07-20 — **best val composite 2.8199 @76,000** |
-| Repo public + full checkpoint suite (~87 points) | ✅ (branches + `checkpoints/` tree) |
+| Repo public + full checkpoint suite (~89 points) | ✅ (branches + `checkpoints/` tree) |
 | Audio samples + training log on `main` | ✅ (13 milestones, playable above) |
 | Release evals (ASR-chrF++ / MOS / BLASER / GEMBA / RTF) | ✅ complete 2026-07-22 — data-efficiency study; `@best` (76,000) released; report [`docs/v0.3-eval-report.md`](https://github.com/tiny-aya-simultaneous-translation/model/blob/main/docs/v0.3-eval-report.md) |
 

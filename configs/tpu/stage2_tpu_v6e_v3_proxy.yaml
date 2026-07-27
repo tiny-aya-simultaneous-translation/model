@@ -4,10 +4,10 @@
 # SHORT proxy horizon and NO checkpoints, so `wandb agent` can run many trials
 # sequentially on one v6e-8. The sweep grid overrides only the *recipe* knobs
 # (lr_lora, lora_r, lora_dropout, weight_decay, lora_alpha_mult); the horizon
-# lives here so it never gets promoted into the production config.
+# lives here so it never gets promoted into the long-horizon config.
 #
 # PREREQUISITE: repoint the data loader to the synthetic `tr-hi-mimi-encoded`
-# corpus before running the sweep (see docs/v0.3-implementation-plan.md).
+# corpus before running the sweep.
 
 backend: tpu
 
@@ -44,6 +44,9 @@ train:
   final_canonical_save: false
 
 loss:
+  # NOTE (2026-07-08): the "no text alignments" premise below was FALSE -- the
+  # corpus ships 840,426 x2 alignment JSONs (100% coverage); the old check used
+  # legacy filenames. Kept as-is for provenance; the shipped recipe is text+audio.
   # AUDIO-ONLY (synthetic corpus has no text alignments -> text loss is 0).
   text_weight: 0.0
   audio_weight: 1.0

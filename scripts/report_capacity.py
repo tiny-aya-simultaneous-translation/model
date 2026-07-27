@@ -3,13 +3,13 @@
 WHY THIS EXISTS
 ---------------
 The v0.3 recipe was frozen from a 1,500-step / 200K-subset sweep; before the
-14,532-step full-corpus production run we re-validate six recipe arms at a
+full-corpus long-horizon run, six recipe arms were re-validated at a
 5,000-step horizon. Picking LoRA rank without
 knowing the tokens-per-trainable-parameter budget is guesswork, so this script
 prints, per arm: the analytic trainable-parameter breakdown (backbone LoRA,
 embedding adapters, always-trainable heads, depth-decoder I/O) and the
 supervised-token budget over the planned horizon -- the "is r=64 oversized /
-is r=16 starved" number for release-plan section 5.
+is r=16 starved" number.
 
 Everything is closed-form arithmetic from the model configs; no weights are
 downloaded and no TPU is touched. The one empirical input is the mean frame

@@ -1,8 +1,11 @@
 """Validate a saved checkpoint: load it and verify all tensor shapes + forward pass."""
-import sys, os, json
+import os
+import sys
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import torch
+
 from src.model.composite import TinyAyaMoshiComposite
 from src.model.lora_setup import apply_lora
 from src.training.checkpointing import load_checkpoint

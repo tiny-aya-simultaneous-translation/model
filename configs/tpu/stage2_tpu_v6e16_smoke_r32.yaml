@@ -1,19 +1,18 @@
-# TPU v6e-16 SMOKE test, ARM A (Stage-2 sweep winner): r=32, lr=1.716e-4.
+# TPU v6e-16 SMOKE test, ARM A (capacity-sweep winner): r=32, lr=1.716e-4.
+#
+# HISTORICAL -- this arm's audio-only recipe (text_weight 0, exclude_top 2) was
+# SUPERSEDED on 2026-07-09 by the text+audio re-validation, where arm D
+# (exclude_top 0, text_weight 0.2) won and exclude_top=2 finished LAST. The
+# shipped recipe is in stage2_tpu_v6e16_full_v03_mh.yaml.
 #
 # WHY THIS EXISTS
 # ---------------
 # The Stage-1/2 capacity sweep only ever trained on the 200K GCS SUBSET for
-# 1,500 steps -- 0.31 epochs of the real 1.24M corpus. Before committing to
-# a full 3-epoch (14,532-step) production run on the winning recipe
-# (lr_lora=1.716e-4, lora_r=32, +MLP structure), this smoke test re-validates
-# it on the FULL corpus for ~5,000 steps (~1.04 epochs), in parallel with two
-# other Stage-2 candidates (r=8 and r=64) on separate TPU v6e-16 slices
-# across two TRC zones (europe-west4-a + us-east1-d).
-#
-# If this arm still wins on real full-corpus data diversity, it gets
-# EXTENDED IN PLACE: bump train.max_steps from 5000 to 14532 and re-run
-# --resume auto on the SAME slice/save_dir/W&B run -- no new config, no
-# restart. This file IS the production config once that happens.
+# 1,500 steps -- 0.31 epochs of the real 1.24M corpus. This smoke test
+# re-validated the then-winning recipe (lr_lora=1.716e-4, lora_r=32, +MLP
+# structure) on the FULL corpus for ~5,000 steps (~1.04 epochs), in parallel
+# with two other Stage-2 candidates (r=8 and r=64) on separate TPU v6e-16
+# slices across two TRC zones (europe-west4-a + us-east1-d).
 #
 # data.* paths are populated by scripts/tpu/startup_script.sh's plain
 # (non-sweep) branch -- MUST clear /mnt/data/encoded + /mnt/data/splits and
@@ -52,6 +51,9 @@ train:
   final_canonical_save: false     # set true when this arm is extended to the full run (Part 2)
 
 loss:
+  # NOTE (2026-07-08): the "no text alignments" premise below was FALSE -- the
+  # corpus ships 840,426 x2 alignment JSONs (100% coverage); the old check used
+  # legacy filenames. Kept as-is for provenance; the shipped recipe is text+audio.
   # AUDIO-ONLY (corpus has no text alignments).
   text_weight: 0.0
   audio_weight: 1.0
