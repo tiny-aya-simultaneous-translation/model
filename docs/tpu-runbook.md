@@ -12,9 +12,11 @@ history). Companion: [`AGENTS.md`](../AGENTS.md) (seam rules + doc style),
 | **v6e-16** | 4 hosts × 4 chips = one 16-chip SPMD mesh | v0.3 production | `europe-west4-a` |
 | **v6e-8** | 1 host × 8 chips | smoke / overfit / eval | `europe-west4-a` |
 
-Both are **spot** under Google TRC. Free zones: `europe-west4-a` and `us-east1-d`. 32 GiB HBM/chip. **GCS bucket
-`gs://tinyaya-stage2-eu` (europe-west4)** — keep it co-located with the TPUs (a
-cross-region bucket makes every checkpoint write pay egress).
+Both are **spot** under Google TRC. Free zones: `europe-west4-a` and `us-east1-d`. 32 GiB HBM/chip. **Create your own GCS bucket
+(`BUCKET`, see `setup_gcp.sh`) in the TPUs' region** — a cross-region bucket
+makes every checkpoint write pay egress, which on an earlier run was ~98% of the
+daily bill. (The v0.3 run's bucket was decommissioned after release; the
+checkpoint suite lives on the Hub.)
 
 ## Provisioning + launch
 
@@ -28,7 +30,7 @@ bash scripts/tpu/launch_spot.sh
 # launch the LONG-HORIZON run (fresh QR bakes self-healing metadata: config,
 # preflight gates, backbone prefetch; see the config header for the full recipe)
 TRC_PROFILE=v6e-16-eu CONFIG_FILE=configs/tpu/stage2_tpu_v6e16_full_v03_mh.yaml \
-SWEEP_DATA_GS_URI=gs://tinyaya-stage2-eu/data/full-corpus-ta-20260708.tar.gz \
+SWEEP_DATA_GS_URI=gs://<your-bucket>/data/<corpus>.tar.gz \
 bash scripts/tpu/launch_spot.sh
 # then babysit the QR (QR-death != preemption; preemption self-heals):
 #   QR_NAME=tinyaya-stage2-spot-v6e16-eu-qr ZONE=europe-west4-a \
@@ -94,7 +96,7 @@ monitors — the *training* survived both because it follows this rule).
 - **Trainer**: tmux `train` (started by `startup_script.sh` /
   `_remote_redeploy.sh`) — already the convention.
 - **Watcher**: tmux `watcher` running a loop that (a) heartbeats
-  `state/last-step/last-val` to `gs://tinyaya-stage2-eu/watch/<run>-status.txt`
+  `state/last-step/last-val` to `gs://<your-bucket>/watch/<run>-status.txt`
   every ~2 min, (b) appends error context (Traceback / FATAL / non-finite /
   RESOURCE_EXHAUSTED / hard-kill) to `…/<run>-errors.txt`, (c) marks DONE vs
   EXITED-EARLY using **fresh-timestamp exit markers only** (the append-mode
@@ -102,7 +104,7 @@ monitors — the *training* survived both because it follows this rule).
   false-positive). Reference implementation: the anneal-leg watcher
   (`vm_watcher.sh` pattern, 2026-07-20).
 - Anyone can check status without SSH:
-  `gcloud storage cat gs://tinyaya-stage2-eu/watch/<run>-status.txt`.
+  `gcloud storage cat gs://<your-bucket>/watch/<run>-status.txt`.
 - Workstation-local loops are permitted only as redundant conveniences.
 
 ## Sweeps (multi-host)

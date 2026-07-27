@@ -79,6 +79,152 @@ moved to `.claude/archive/PROGRESS-YYYY-Qn.md` by the
 
 ---
 
+## 2026-07-27T06:18:56Z | docs/plan-release-closeout@3577b8b | done | exec
+cd ~/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-27T06:18:17Z | docs/plan-release-closeout@3577b8b | done | edit
+edited `docs/evals-runbook.md`
+
+
+## 2026-07-27T06:18:14Z | docs/plan-release-closeout@3577b8b | done | edit
+edited `docs/hf-model-card-tr-hi-s2st-v0.1.md`
+
+
+## 2026-07-27T06:18:12Z | docs/plan-release-closeout@3577b8b | done | edit
+edited `docs/hf-model-card-tr-hi-s2st-v0.3.md`
+
+
+## 2026-07-27T06:18:10Z | docs/plan-release-closeout@3577b8b | done | edit
+edited `docs/tpu-runbook.md`
+
+
+## 2026-07-27T06:18:03Z | docs/plan-release-closeout@3577b8b | done | exec
+cd ~/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-27T06:17:38Z | docs/plan-release-closeout@3577b8b | done | exec
+cd ~/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-27T06:16:49Z | docs/plan-release-closeout@3577b8b | done | exec
+cd ~/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-27T06:16:02Z | docs/plan-release-closeout@3577b8b | done | edit
+edited `docs/evals-runbook.md`
+
+
+## 2026-07-27T06:15:57Z | docs/plan-release-closeout@3577b8b | done | edit
+edited `MODEL_CARD.md`
+
+
+## 2026-07-27T06:15:50Z | docs/plan-release-closeout@3577b8b | done | exec
+cd ~/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-27T06:15:29Z | docs/plan-release-closeout@3577b8b | done | exec
+cd ~/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-27T06:15:19Z | docs/plan-release-closeout@3577b8b | done | exec
+cd ~/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-27T06:10:57Z | docs/plan-release-closeout@3577b8b | done | exec
+cd ~/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-27T06:10:19Z | docs/plan-release-closeout@3577b8b | done | exec
+cd ~/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-27T06:09:53Z | docs/plan-release-closeout@3577b8b | done | exec
+cd ~/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-27T06:07:19Z | docs/plan-release-closeout@3577b8b | fail | verify
+verify: 11 passed, 1 failed out of 12 on Stop
+
+FAIL [1] # the TPU↔GPU seam holds: torch_xla must NOT leak into shared model/data code
+    src/model/scan_utils.py:479:    from torch_xla.experimental.scan_layers import (
+
+
+## 2026-07-27T06:06:58Z | docs/plan-release-closeout@3577b8b | done | edit
+edited `~/.claude/projects/-home-cataluna84-Workspace-tinyaya-stage2-scale/memory/v03-release-debloat.md`
+
+
+## 2026-07-27T06:06:48Z | docs/plan-release-closeout@3577b8b | done | exec
+cd ~/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-27T06:06:34Z | docs/plan-release-closeout@3577b8b | done | exec
+cd ~/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-27T06:06:12Z | main@4e906da | done | edit
+edited `.claude/PLAN.md`
+
+
+## 2026-07-27T06:05:35Z | main@4e906da | done | exec
+cd ~/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-27T05:59:36Z | main@4e906da | fail | verify
+verify: 11 passed, 1 failed out of 12 on Stop
+
+FAIL [1] # the TPU↔GPU seam holds: torch_xla must NOT leak into shared model/data code
+    src/model/scan_utils.py:479:    from torch_xla.experimental.scan_layers import (
+
+
+## 2026-07-27T05:59:18Z | main@4e906da | done | edit
+edited `~/.claude/projects/-home-cataluna84-Workspace-tinyaya-stage2-scale/memory/v03-post-release-sweep.md`
+
+
+## 2026-07-27T05:59:10Z | main@4e906da | done | edit
+edited `~/.claude/projects/-home-cataluna84-Workspace-tinyaya-stage2-scale/memory/v03-post-release-sweep.md`
+
+
+## 2026-07-27T05:59:03Z | main@4e906da | done | exec
+cd ~/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-27T05:58:46Z | main@4e906da | done | exec
+cd ~/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-27T05:58:31Z | main@4e906da | done | exec
+cd ~/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-27T05:57:51Z | chore/track-claude-tooling@3889424 | done | exec
+cd ~/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-27T05:57:19Z | chore/track-claude-tooling@3889424 | done | exec
+cd ~/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-27T05:56:38Z | chore/track-claude-tooling@3889424 | done | exec
+cd ~/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-27T05:56:21Z | chore/track-claude-tooling@aff1c9c | done | exec
+cd ~/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-27T05:55:35Z | chore/track-claude-tooling@aff1c9c | done | exec
+cd ~/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-27T05:55:06Z | chore/track-claude-tooling@aff1c9c | done | edit
+edited `.gitignore`
+
+
+## 2026-07-27T05:54:35Z | chore/track-claude-tooling@aff1c9c | done | exec
+cd ~/Workspace/tinyaya-stage2-scale
+
+
 ## 2026-07-27T04:54:37Z | chore/track-claude-tooling@2ff4b3b | done | exec
 cd ~/Workspace/tinyaya-stage2-scale
 

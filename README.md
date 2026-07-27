@@ -124,13 +124,13 @@ keep-all checkpoint suite streaming to GCS + the HF hub. Full runbook:
 # long-horizon run: r=32 / +MLP / rsLoRA winner, 110,463 steps (3 epochs)
 # (metadata gates: expected-train-rows=1100000, min-text-coverage=99)
 TRC_PROFILE=v6e-16-eu CONFIG_FILE=configs/tpu/stage2_tpu_v6e16_full_v03_mh.yaml \
-SWEEP_DATA_GS_URI=gs://tinyaya-stage2-eu/data/full-corpus-ta-20260708.tar.gz \
+SWEEP_DATA_GS_URI=gs://<your-bucket>/data/<corpus>.tar.gz \
 bash scripts/tpu/launch_spot.sh
 ```
 
 `XLA_NO_SPECIAL_SCALARS=1` (set by the launchers) is required — it disables XLA's
 "assume no NaN/Inf" rewrites that otherwise corrupt the inline-validation loss scalar.
-Checkpoints go to **`gs://tinyaya-stage2-eu/`** (europe-west4, co-located with the TPUs).
+Checkpoints go to **`gs://<your-bucket>/`** (keep it in the TPUs' region -- a cross-region bucket makes every checkpoint write pay egress).
 
 ### Training (single / multi-GPU)
 ```bash
@@ -142,7 +142,7 @@ torchrun --nproc_per_node=2 scripts/train_hierarchical.py --config configs/gpu/s
 ### Evaluation
 ```bash
 uv run python scripts/eval_checkpoint.py \
-    --checkpoint gs://tinyaya-stage2-eu/checkpoints/<run>/best_by_val \
+    --checkpoint hub:tiny-aya-translate/tr-hi-s2st-v0.3@best \
     --val_jsonl /path/to/val.jsonl --encoded_dir /path/to/encoded \
     --lora_r 32 --num_samples 20 --output_dir eval_results
 ```
