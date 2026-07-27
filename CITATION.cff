@@ -1,16 +1,44 @@
 cff-version: 1.2.0
-message: "If you use this model or codebase, please cite it as below."
-title: "TinyAya: Turkish-Hindi Speech-to-Speech Translation (v0.3)"
-authors:
-  - name: "tiny-aya-translate"
+message: "If you use this software or the released model, please cite it as below."
+title: "TinyAya Stage 2: Turkish-Hindi Speech-to-Speech Translation"
+version: 0.3.0
+date-released: 2026-07-19
 type: software
-year: 2026
-url: "https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3"
+authors:
+  - given-names: Mayank
+    family-names: Bhaskar
+    alias: cataluna84
+  - given-names: Alper
+    alias: alperiox
+  - given-names: Ahmet
+    alias: ahmeterdempmk
 repository-code: "https://github.com/tiny-aya-simultaneous-translation/model"
+repository-artifact: "https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3"
+url: "https://github.com/tiny-aya-simultaneous-translation/model"
+commit: e89fb26
 license: Apache-2.0
-notes: >-
-  Cohere2 backbone + frozen Moshi depth decoder, LoRA (r=32, +MLP, rsLoRA);
-  text+audio S2ST over Mimi codes on a synthetic FLORES/OPUS/conversational
-  corpus. Trained on Cloud TPU v6e via Google's TPU Research Cloud (TRC).
-  Code Apache-2.0; released weights CC-BY-NC-4.0 (derivative of
-  CohereLabs/tiny-aya-base).
+keywords:
+  - speech-to-speech-translation
+  - speech-translation
+  - low-resource
+  - turkish
+  - hindi
+  - moshi
+  - mimi
+  - lora
+  - tpu
+abstract: >-
+  Stage-2 Turkish<->Hindi speech-to-speech translation: a Cohere2 backbone
+  (LoRA r=32, +MLP, rsLoRA) fused with a frozen Moshi depth decoder over Mimi
+  codes, trained text+audio on a synthetic FLORES/OPUS-100/conversational
+  corpus. The v0.3 long-horizon run covered 76,250 steps (2.07 epochs) on Cloud
+  TPU v6e-16 provided by Google's TPU Research Cloud (TRC), reaching a best
+  validation composite of 2.8199. The release evaluation frames the result as a
+  data-efficiency study: the text inner-monologue learns to translate
+  (free-run chrF++ ~25), while intelligible audio synthesis remains the
+  frontier, bounded by the frozen depth decoder.
+  LICENSE SCOPE - the Apache-2.0 license above applies to THIS SOURCE CODE
+  only. The released model weights at the repository-artifact URL are
+  CC-BY-NC-4.0 (non-commercial), inherited from the CC-BY-NC-4.0 base model
+  CohereLabs/tiny-aya-base; the Moshi/Mimi components are CC-BY-4.0. See
+  THIRD_PARTY_NOTICES.md.
