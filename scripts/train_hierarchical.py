@@ -33,9 +33,9 @@ YAML (``--config``) provides the defaults; CLI flags override; the
 Two new keys plumb the scan_layers / grad-checkpoint feature flags:
 
 * ``train.use_scan_layers`` (bool) -- swap layer stacks for the
-  ``scan_utils`` proxy. See PLAN.md Phase 1.
+  ``scan_utils`` proxy. See .claude/PLAN.md Phase 1.
 * ``train.xla_grad_checkpoint`` (bool) -- per-layer
-  ``torch.utils.checkpoint``. See PLAN.md Phase 2.
+  ``torch.utils.checkpoint``. See .claude/PLAN.md Phase 2.
 * ``train.compile_warmup_steps`` (int) -- run zero-LR TPU macro-steps
   before visible step 1 so the counted loss curve starts after compile.
 """
@@ -1148,7 +1148,9 @@ def run_validation(
             if n == 0 and val_debug:
                 if is_tpu:
                     torch_xla.sync()
-                fin = lambda t: bool(torch.isfinite(t).all().item())
+                def fin(t):
+                    return bool(torch.isfinite(t).all().item())
+
                 print(
                     "  [val-debug] finite: "
                     f"hidden={fin(hidden)} "
@@ -1964,7 +1966,7 @@ def main():
     # os.path.exists(os.path.join("gs://...", "optimizer.pt")) check was ALWAYS
     # False for GCS resume, so every spot-preemption resume silently restarted
     # Adam moments from zero. Missing state is now a hard error: a long
-    # production run must never quietly continue on a fresh optimizer
+    # long-horizon run must never quietly continue on a fresh optimizer
     # (train.allow_fresh_optimizer=true is the deliberate escape hatch).
     if start_step > 0 and resume_dir:
         opt_p = fetch_checkpoint_file(resume_dir, "optimizer.pt")
@@ -3054,7 +3056,7 @@ def main():
         # absolute tolerance so genuine drift (a mis-zeroed LR/WD group) still
         # trips it while bf16 read-noise does not.
         _drift = max(
-            (abs(a - b) for a, b in zip(sentinel_after, sentinel_before)),
+            (abs(a - b) for a, b in zip(sentinel_after, sentinel_before, strict=False)),
             default=0.0,
         )
         if _drift > 1e-2:
@@ -3155,7 +3157,7 @@ def main():
             _dnames = macro.get("diag_names") or []
             if _dvals is not None and len(_dnames) > 0:
                 _flat = _dvals.cpu().tolist()  # single host transfer for all groups
-                gd = dict(zip(_dnames, _flat))
+                gd = dict(zip(_dnames, _flat, strict=False))
                 _lr_by = {g["name"]: g["lr"] for g in optimizer.param_groups if "name" in g}
                 for gname in sorted({k.split("/", 1)[1] for k in gd}):
                     gn = gd.get(f"grad_norm/{gname}", 0.0)

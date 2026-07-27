@@ -52,7 +52,6 @@ import subprocess
 import sys
 import time
 
-
 # --------------------------------------------------------------------------
 # Pure core (unit-tested; no wandb / gsutil / torch)
 # --------------------------------------------------------------------------
@@ -92,7 +91,7 @@ def enumerate_grid(parameters: dict) -> list[dict]:
                 f"parameter {key!r} has neither 'values' nor 'value' "
                 f"(a 'distribution' axis is not griddable -- use --stage bayes)"
             )
-    return [dict(zip(keys, combo)) for combo in itertools.product(*choices)]
+    return [dict(zip(keys, combo, strict=False)) for combo in itertools.product(*choices)]
 
 
 def build_trial_args(params: dict) -> list[str]:
@@ -249,7 +248,7 @@ def _print_leaderboard(leaderboard: list, metric: str) -> None:
         tm = params.get("target_modules")
         print(f"[coord]   #{rank}  {metric}={m:.4f}  trial={index}  run={run_id}  "
               f"target_modules={tm}", flush=True)
-    for (m, index, run_id, params) in (e for e in leaderboard if e[0] is None):
+    for (_m, index, run_id, _params) in (e for e in leaderboard if e[0] is None):
         print(f"[coord]   (no metric) trial={index}  run={run_id}", flush=True)
 
 

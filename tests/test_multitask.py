@@ -51,7 +51,7 @@ def test_text_weight_starts_high_ends_low():
 
 def test_text_weight_monotone_nonincreasing_over_ramp():
     vals = [mt.text_weight_at(s, 1000, 0.5, 0.3, 0.25) for s in range(0, 260, 10)]
-    assert all(b <= a + 1e-9 for a, b in zip(vals, vals[1:]))
+    assert all(b <= a + 1e-9 for a, b in zip(vals, vals[1:], strict=False))
     assert vals[0] == 0.5 and vals[-1] == 0.3
 
 

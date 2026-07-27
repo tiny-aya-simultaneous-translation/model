@@ -2,7 +2,7 @@
 #
 # WHY THIS EXISTS
 # ---------------
-# v0.3 recipe (docs/v0.3-implementation-plan.md). v0.2 OVERFIT: val/loss bottomed
+# v0.3 regularization-regime recipe. v0.2 OVERFIT: val/loss bottomed
 # at step 1000 then rose while train fell -- a sharp-minimum overshoot from too
 # much capacity (LoRA r=64) + too high an LR (lr_lora 4.6e-4). This config
 # implements **Phase A (regularization)**:
@@ -20,7 +20,7 @@
 #   - Phase E: SpecAugment + regularization sweep
 #
 # Usage (single-host v6e-8 spot, europe-west4-a):
-#   TPU_STRATEGY=fsdpv2_lora uv run python scripts/train_hierarchical.py \
+#   TPU_STRATEGY=auto uv run python scripts/train_hierarchical.py \
 #       --config configs/tpu/stage2_tpu_v6e_v3.yaml --resume auto
 
 backend: tpu
@@ -63,6 +63,9 @@ train:
   final_canonical_save: true
 
 loss:
+  # NOTE (2026-07-08): the "no text alignments" premise below was FALSE -- the
+  # corpus ships 840,426 x2 alignment JSONs (100% coverage); the old check used
+  # legacy filenames. Kept as-is for provenance; the shipped recipe is text+audio.
   # AUDIO-ONLY: the synthetic tr-hi-mimi-encoded corpus ships NO text alignments
   # (verified: 0 _src/_tgt.json in the batch tarballs), so the text/inner-monologue
   # stream can't be supervised (text loss is structurally 0 -- same as v0.1). We

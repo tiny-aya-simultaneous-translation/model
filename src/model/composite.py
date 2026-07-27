@@ -163,18 +163,18 @@ class TinyAyaMoshiComposite(nn.Module):
     ----------
     num_codebooks : int, default 8
         Number of audio codebooks the depth decoder will produce per
-        frame. Trained at 8 for the canary; the production run also
+        frame. Trained at 8 for the canary; the long-horizon run also
         uses 8.
     use_scan_layers : bool, default False
         If True, swap the backbone and depth-decoder layer stacks for
         ``_ScannedLayerStack`` proxies. Recommended True on TPU.
         On GPU/CPU this is a no-op (the proxy falls back to a manual
-        loop). See ``.factory/PLAN.md`` Phase 1.
+        loop). See ``.claude/PLAN.md`` Phase 1.
     xla_grad_checkpoint : bool, default False
         If True, each layer's forward is wrapped in
         ``torch.utils.checkpoint`` with ``use_reentrant=False``.
         Recommended True on TPU to keep per-chip HBM under 12 GB.
-        See ``.factory/PLAN.md`` Phase 2.
+        See ``.claude/PLAN.md`` Phase 2.
 
     Notes
     -----

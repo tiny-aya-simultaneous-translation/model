@@ -6,10 +6,14 @@ Contributors (GitHub):
   - Alper            (@alperiox)
   - Ahmet            (@ahmeterdempmk)
 
-This product is licensed under the Apache License, Version 2.0 (see the
-LICENSE file). This NOTICE file is provided for informational purposes
-and must be propagated with redistributions per Section 4(d) of the
-License; its contents do not modify the License.
+The SOURCE CODE in this repository is licensed under the Apache License,
+Version 2.0 (see the LICENSE file). The RELEASED MODEL WEIGHTS are NOT
+Apache-2.0: they are CC-BY-NC-4.0 (non-commercial), inherited from the
+base model — see "Important: scope of this license" below.
+
+This NOTICE file is provided for informational purposes and must be
+propagated with redistributions per Section 4(d) of the License; its
+contents do not modify the License.
 
 ================================================================================
 Acknowledgments
@@ -26,15 +30,28 @@ Important: scope of this license
 
 The Apache-2.0 license in this repository covers the SOURCE CODE authored
 by the TinyAya Stage 2 contributors. It does NOT relicense the third-party
-models, datasets, or libraries this project builds on. In particular:
+models, datasets, or libraries this project builds on, and it does NOT
+cover the released model weights. In particular:
 
-  * The Cohere "tiny-aya" base model weights are governed by Cohere's own
-    model license, NOT by this repository's Apache-2.0 license. This
-    repository distributes only LoRA adapter deltas and training/eval code;
-    obtaining and using the base weights is subject to Cohere's terms.
+  * The Cohere "tiny-aya" base model weights are CC-BY-NC-4.0
+    (non-commercial), NOT this repository's Apache-2.0 license. The base
+    weights are not redistributed here; obtaining and using them is subject
+    to Cohere's terms.
 
-  * Audio codec / depth-decoder weights (Kyutai Moshi / Mimi) and the FLEURS
-    source data carry their own licenses.
+  * The RELEASED WEIGHTS (LoRA adapter deltas + trained projection /
+    depth-decoder I/O / audio heads / embeddings, published at
+    huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3) are derivatives of
+    that base model and therefore inherit CC-BY-NC-4.0 — non-commercial use
+    only. This repository itself distributes code, not weights.
+
+  * Audio codec / depth-decoder weights (Kyutai Moshi / Mimi) are CC-BY-4.0
+    (attribution required); Kyutai's Moshi source code is separately
+    Apache-2.0.
+
+  * Source data for the v0.3 corpus: FLORES (CC BY-SA 4.0 — share-alike),
+    OPUS-100 (per-subcorpus terms), conversational MT (per-source), and
+    TTS-model outputs (kokoro / XTTS-v2 / chatterbox, per-model terms).
+    FLEURS (CC BY 4.0) applies to v0.2 only.
 
 See THIRD_PARTY_NOTICES.md for the full list of third-party components and
 their licenses and obligations.

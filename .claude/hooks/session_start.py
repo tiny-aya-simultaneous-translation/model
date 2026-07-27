@@ -10,20 +10,20 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from _lib import (  # noqa: E402
-    PROJECT_DIR,
-    PROGRESS_FILE,
-    PLAN_FILE,
-    VERIFY_FILE,
     MEMORIES_FILE,
-    ORCHESTRATION_README,
     ORCHESTRATION_CONTROL_PLANE,
+    ORCHESTRATION_README,
     ORCHESTRATION_TPU_OPT_SPEC,
+    PLAN_FILE,
+    PROGRESS_FILE,
+    PROJECT_DIR,
+    VERIFY_FILE,
     emit,
     find_relevant_subproject_agents,
-    read_file_safe,
-    read_input,
     git_branch,
     git_rev,
+    read_file_safe,
+    read_input,
 )
 
 

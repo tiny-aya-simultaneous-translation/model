@@ -208,7 +208,7 @@ def test_trainer_logs_per_host_tpu_telemetry():
     assert 'tpu_telemetry_every' in _TRAIN_SRC
     assert 'f"tpu/host{_hidx}/chip{_cid}_hbm_gib"' in _TRAIN_SRC
     assert 'hasattr(backend, "hbm_per_chip")' in _TRAIN_SRC
-    # default off; production configs opt in
+    # default off; long-horizon configs opt in
     assert '"tpu_telemetry_every": 0,' in _TRAIN_SRC
     for cfgname in ("stage2_tpu_v6e16_full_v03_mh.yaml", "stage2_tpu_v6e16_full_v03_mh_anneal.yaml"):
         assert "tpu_telemetry_every: 250" in (REPO / "configs" / "tpu" / cfgname).read_text()

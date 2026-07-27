@@ -8,9 +8,19 @@ on:
     branches: [main]
   pull_request:
 
+# Read-only token: nothing in this workflow writes to the repo.
+permissions:
+  contents: read
+
+# A newer push to the same PR/branch supersedes the running job.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   seam-and-syntax:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -22,14 +32,20 @@ jobs:
       - name: Docs consistency (batch semantics, run config, naming)
         run: bash scripts/ci/check_docs_sync.sh
 
+      # CONTRIBUTING makes `ruff check .` a contributor requirement and
+      # pyproject configures it, but nothing enforced it until now.
+      - name: Lint (ruff)
+        run: |
+          python3 -m pip install --quiet ruff
+          ruff check .
+
+      # Compile EVERY tracked Python file. The previous hardcoded five-file
+      # list guarded each entry with `test -f`, so a renamed or deleted script
+      # was skipped silently and coverage could rot to zero without CI failing.
       - name: Byte-compile all Python sources
         run: |
-          find src -name '*.py' -print0 | xargs -0 -n1 python3 -m py_compile
-          for s in scripts/train_hierarchical.py scripts/make_splits.py \
-                   scripts/eval_checkpoint.py scripts/gen_parallel.py \
-                   scripts/tpu/probe_strategies.py; do
-            test -f "$s" && python3 -m py_compile "$s"
-          done
+          find src scripts tests .claude -name '*.py' -print0 \
+            | xargs -0 -n1 python3 -m py_compile
 
       - name: Parse all YAML configs + sweeps
         run: |
@@ -39,9 +55,9 @@ jobs:
           done
 
       - name: Shell scripts parse
-        run: bash -n scripts/tpu/*.sh scripts/ci/*.sh
+        run: bash -n scripts/*.sh scripts/tpu/*.sh scripts/ci/*.sh
 
-      - name: Torch-free unit tests (sweep promote, config consistency, ckpt retention)
+      - name: Torch-free unit tests
         run: |
           python3 -m pip install --quiet pytest pyyaml
           python3 -m pytest tests/ -q

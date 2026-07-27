@@ -11,8 +11,8 @@
 # two across 8 on v6e-8 => ~1.7-2x faster/step.
 #
 # RECIPE: arm D (r=32 / lr_lora=1.716e-4 / +MLP / rsLoRA / exclude_top 0),
-# validated across the v03-5k-reval sweep + round-2/3 probes (report Appendix
-# 3). Schedule: WSD plateau + stop-anytime anneal (round-3 R5 beat cosine on
+# validated across the v03-5k-reval sweep + round-2/3 probes.
+# Schedule: WSD plateau + stop-anytime anneal (round-3 R5 beat cosine on
 # all metrics post-anneal). Checkpoints: log-spaced early {1,2,4,...,512} +
 # every 1000, keep ALL, async upload -> public mech-interp suite. Early stop
 # patience 10. New save_dir (new experiment).
@@ -25,7 +25,7 @@
 # Metadata gates (hardening pass 2026-07-14): set expected-train-rows=1100000
 # and min-text-coverage=99 so a wrong/stale corpus or missing alignments can
 # NEVER silently train (stage_dataset.sh preflight refuses to launch).
-# Probe verdicts (report addendum A.5): flash-attention OFF (no win at these
+# Probe verdicts: flash-attention OFF (no win at these
 # seq lengths); xla-cache-gs-uri UNSET (persistent-cache keys nondeterministic
 # on torch_xla 2.9 v6e SPMD -- never hits; ~14 min recompile per preemption is
 # the accepted cost); grad-ckpt ON + depth_chunk 100 confirmed optimal.

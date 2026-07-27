@@ -19,6 +19,45 @@ uv sync --extra eval       # + evaluation deps (see docs/evals-runbook.md)
   training pins; they live in a standalone venv (procedure in
   `docs/evals-runbook.md`), not in `pyproject.toml`.
 
+## Credentials (`.env`)
+
+Secrets live in a gitignored repo-root `.env`. Start from the template:
+
+```bash
+cp example.env .env      # then fill in your own values
+```
+
+`example.env` documents every variable; the short version:
+
+| variable | when you need it |
+|---|---|
+| `HF_TOKEN` | **required** — pulls the gated `CohereLabs/tiny-aya-base`; `setup_gcp.sh` aborts without it |
+| `WANDB_API_KEY` + `WANDB_PROJECT` / `WANDB_ENTITY` | recommended — training runs without it but logs nothing |
+| `GEMINI_API_KEY` | release evals only (the GEMBA judge + ASR referee stage) |
+| `PROJECT_ID` / `REGION` / `BUCKET` | optional GCP overrides; defaults reproduce the published run |
+
+Shell scripts load `.env` through `load_env_file` (`scripts/tpu/_lib.sh`) with
+precedence **shell env > `.env` > script defaults**. Python entrypoints read the
+process environment, so export first (`set -a; . ./.env; set +a`).
+
+Two rules, both non-negotiable:
+
+- **Never commit real values.** Every `*.env` is gitignored (plus `.envrc` and
+  `*-key.json` / `service-account*.json` / `credentials.json`); `example.env` is
+  the one tracked exception. On TPU, `setup_gcp.sh` pushes `HF_TOKEN` /
+  `WANDB_API_KEY` into GCP Secret Manager and the workers fetch them at boot —
+  keys never land in a VM image, a config, or a log.
+- **Keep secrets out of logs.** If you add a code path that echoes environment
+  or command lines, check it against the scrubber in
+  `.claude/hooks/_lib.py::scrub` and `scripts/tpu/launch_release.sh`'s log
+  sanitizer.
+
+Per-run launch settings (slice, recipe, corpus URIs) are *not* credentials and
+are *not* read from `.env` — pass them to `scripts/tpu/launch_spot.sh` on the
+command line. Saving them to a gitignored `launch.env` is optional and serves one
+purpose: `scripts/tpu/qr_watch.sh` (the only consumer) re-sources that file to
+replay an identical relaunch after a spot preemption. See `docs/tpu-runbook.md`.
+
 ## The rules CI enforces
 
 Run these locally before pushing — the `seam-and-syntax` workflow runs them

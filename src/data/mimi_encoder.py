@@ -4,9 +4,10 @@ WHY THIS EXISTS
 ---------------
 The data pipeline encodes raw waveform into Mimi audio codes once,
 offline, and persists the result in ``.pt`` shards consumed by the
-training datasets. This module is the helper used by the offline
-encoder (``scripts/prepare_data.py``) and by the inference scripts
-that need to round-trip audio for ad-hoc demos.
+training datasets. The bulk offline encode lives in the separate
+data-pipeline repo; this module is the helper used in-repo by
+``scripts/gen_parallel.py`` and the eval harness, which round-trip
+audio for demos and release evaluation.
 
 The Mimi model itself is a separate HF checkpoint (``kyutai/mimi``)
 and is NOT part of the trained composite. We only ever call its

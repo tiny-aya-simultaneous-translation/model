@@ -62,7 +62,7 @@ Compile-time gotcha
 SPMD runs as a single process. If any chip OOMs or errors, the whole
 job dies. Mitigated by frequent checkpoints and the spot-preemption
 restart loop in ``scripts/tpu/startup_script.sh``. See
-``.factory/memories.md`` for empirical compile / step / HBM
+``.claude/memories.md`` for empirical compile / step / HBM
 measurements per strategy.
 """
 

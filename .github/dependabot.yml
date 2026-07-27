@@ -1,0 +1,24 @@
+version: 2
+updates:
+  # Python deps. Monthly, not weekly: this is a research repo with a pinned,
+  # validated stack -- transformers in particular is held at 4.49.x because
+  # 4.57+/5.x break the Cohere2 + Moshi internals this project patches
+  # (proven live). Treat any bump to it as a full re-validation, not a merge.
+  - package-ecosystem: pip
+    directory: "/"
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 5
+    labels: ["dependencies"]
+    ignore:
+      - dependency-name: "transformers"
+      # torch/torchaudio are routed per dependency-group (CPU vs cu128 index);
+      # dependabot cannot see that split, so its bumps would be wrong.
+      - dependency-name: "torch"
+      - dependency-name: "torchaudio"
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: monthly
+    labels: ["dependencies", "ci"]

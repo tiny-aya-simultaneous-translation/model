@@ -1,12 +1,16 @@
 [project]
 name = "tinyaya-stage2"
-version = "0.1.0"
-description = "TR-HI speech-to-speech translation Stage 2 training (TPU)"
+version = "0.3.0"
+description = "TR-HI speech-to-speech translation, Stage 2: TPU training + GPU release evaluation"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 authors = [
     { name = "Mayank Bhaskar", email = "mayankbhaskar007@gmail.com" },
+    { name = "Alper" },
+    { name = "Ahmet" },
 ]
+# Apache-2.0 covers THIS SOURCE CODE. The released model weights are
+# CC-BY-NC-4.0 (inherited from the CC-BY-NC-4.0 base model) -- see NOTICE.
 license = { text = "Apache-2.0" }
 
 dependencies = [
@@ -24,7 +28,7 @@ dependencies = [
     #   * 4.57  -> Cohere2 reads decoder_layer.attention_type (fixable) AND
     #              MoshiDepthDecoder/MoshiFlexibleLinear changed shape
     #              (IndexError inside transformers' moshi code).
-    # 4.49.0 is the version the full 15k-step run was trained on.
+    # 4.49.0 is the version the v0.3 long-horizon run (76,250 steps) trained on.
     "transformers>=4.49,<4.50",
     "peft>=0.19,<1.0",
     "accelerate>=1.14,<2.0",
@@ -41,6 +45,15 @@ dependencies = [
     "tqdm>=4.66",
     "numpy>=2.0,<3.0",
 ]
+
+# NOTE: a table header ends the [project] key-value block, so this must stay
+# BELOW `dependencies` -- placing it above silently reparents the array.
+[project.urls]
+Repository = "https://github.com/tiny-aya-simultaneous-translation/model"
+Model = "https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3"
+Dataset = "https://huggingface.co/datasets/tiny-aya-translate/tr-hi-mimi-encoded"
+Blog = "https://labscommunity.cohere.com/blog/2026/adapting-moshi-low-resource-speech-translation/"
+"Training run (W&B)" = "https://wandb.ai/cataluna84/tinyaya-stage2-tpu/runs/xzcb60bl"
 
 [project.optional-dependencies]
 # Evals-program deps (docs/v0.3-evals-plan.md) -- GPU-box only; ALL imports in

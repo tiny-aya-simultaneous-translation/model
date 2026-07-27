@@ -1,5 +1,6 @@
 #!/bin/bash
-# Release launcher for the v0.3 production run (v6e-16, 14,532 steps / 3 epochs).
+# Release launcher for the v0.3 long-horizon run (v6e-16; the shipped run
+# covered 76,250 steps / 2.07 epochs).
 #
 # Differs from the canary/spot launchers by adding the release
 # instrumentation the public run needs (audit items #5, #6, #12):
