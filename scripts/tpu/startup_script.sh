@@ -233,10 +233,14 @@ else
 fi
 _slice_id="$(hostname | sed 's/-w-[0-9]*$//')"
 _bucket=$(( $(date +%s) / 600 ))
-export WANDB_RENDEZVOUS_URI="gs://tinyaya-stage2-eu/wandb-rendezvous/${_slice_id}-${_bucket}.id"
+# GCS_BUCKET is the run's bucket (metadata `bucket`, else the repo default).
+# These two paths used to hardcode it, so a slice launched with a different
+# bucket still wrote its rendezvous state to the old one.
+GCS_BUCKET="$(read_meta bucket "${BUCKET:-tinyaya-stage2-eu}")"
+export WANDB_RENDEZVOUS_URI="gs://${GCS_BUCKET}/wandb-rendezvous/${_slice_id}-${_bucket}.id"
 if [ "${NUM_HOSTS:-1}" -gt 1 ]; then
     _wid="$(hostname | grep -oP 'w-\K[0-9]+' || echo 0)"
-    _barrier="gs://tinyaya-stage2-eu/rendezvous/${_slice_id}/${_bucket}"
+    _barrier="gs://${GCS_BUCKET}/rendezvous/${_slice_id}/${_bucket}"
     echo "[startup] rendezvous: host ${_wid}/${NUM_HOSTS} barrier=${_barrier}"
     # The ready-marker carries this host's dataset digest (section 6a) so the
     # slice can refuse to launch on divergent per-host corpora.

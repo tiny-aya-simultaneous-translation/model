@@ -8,7 +8,7 @@
 #
 # Usage:
 #   N=200000 bash scripts/tpu/stage_sweep_subset.sh
-#   # -> uploads gs://tinyaya-stage2-eu/data/sweep-subset-200000.tar.gz
+#   # -> uploads gs://<your-bucket>/data/sweep-subset-200000.tar.gz
 #   #    (pass that as SWEEP_DATA_GS_URI to launch_sweep_fleet.sh)
 
 set -euo pipefail

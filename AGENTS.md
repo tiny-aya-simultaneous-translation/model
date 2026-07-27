@@ -50,12 +50,12 @@ uv run python -m py_compile $(git ls-files '*.py')  # quick lint
 
 Current long-horizon path: **v6e-16 spot in `europe-west4-a`** (4 hosts × 4 chips = one
 16-chip SPMD mesh, 32 GiB HBM/chip). A v6e-8 (single host) is used for smoke/overfit/eval.
-Checkpoints → **`gs://tinyaya-stage2-eu/`** (europe-west4, co-located with the TPUs).
+Checkpoints → **`gs://<your-bucket>/`** (keep it in the TPUs' region -- a cross-region bucket makes every checkpoint write pay egress).
 
 ```bash
 # v0.3 long-horizon run (r=32 / +MLP / rsLoRA winner, 110,463 steps @ real global batch 32)
 TRC_PROFILE=v6e-16-eu CONFIG_FILE=configs/tpu/stage2_tpu_v6e16_full_v03_mh.yaml \
-SWEEP_DATA_GS_URI=gs://tinyaya-stage2-eu/data/full-corpus-ta-20260708.tar.gz \
+SWEEP_DATA_GS_URI=gs://<your-bucket>/data/<corpus>.tar.gz \
 bash scripts/tpu/launch_spot.sh
 # babysit the QR for the whole run (local tmux):
 #   QR_NAME=... ZONE=europe-west4-a LAUNCH_ENV_FILE=launch.env bash scripts/tpu/qr_watch.sh
@@ -113,7 +113,7 @@ Each TPU config carries: the `loss:` text/audio weights (text+audio since 2026-0
 `text_weight 0.2`, `composite_text_w 0.4` — the corpus ships alignments), the
 `lora:` block (`r`/`alpha`/`use_rslora`/`target_modules`/`lora_exclude_top`/
 `num_full_ft_layers`), and `logging.{val_on_tpu,diag_metrics,save_dir}` (save_dir under
-`gs://tinyaya-stage2-eu/`).
+`gs://<your-bucket>/`).
 
 ## Per-chip memory budget
 

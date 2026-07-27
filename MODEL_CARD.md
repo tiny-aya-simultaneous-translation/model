@@ -142,7 +142,10 @@ Then attach the custom heads (`projection` / `depth_decoder` / `audio_heads` /
 - **Training (W&B)**: https://wandb.ai/cataluna84/tinyaya-stage2-tpu/runs/xzcb60bl
 - **Emergence report (W&B)**: https://wandb.ai/cataluna84/tinyaya-stage2-tpu/reports/TinyAya-v0.3-Emergence-and-Data-Efficiency--VmlldzoxNzU1OTU1NQ==
 - **Blog**: [Adapting Moshi for Low-Resource Speech Translation](https://labscommunity.cohere.com/blog/2026/adapting-moshi-low-resource-speech-translation/)
-- **Checkpoints (GCS)**: `gs://tinyaya-stage2-eu/checkpoints/`
+- **Checkpoints**: the full ~89-point suite is on the Hub — as branch revisions
+  (`@best`, `@step-NNNNN`) and under `main:checkpoints/`. Weights only; the
+  training-time GCS bucket that held optimizer state has been decommissioned, so
+  checkpoints are for inference/analysis, not for resuming training.
 - **Dataset**: https://huggingface.co/datasets/tiny-aya-translate/tr-hi-mimi-encoded
 - **Code**: https://github.com/tiny-aya-simultaneous-translation/model
 

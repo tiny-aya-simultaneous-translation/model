@@ -168,7 +168,8 @@ Mimi decode) lives in the training repo (`src/model/composite.py`).
 - **Training run (W&B)**: https://wandb.ai/cataluna84/tinyaya-stage2-tpu/runs/b7fr72u5
   — full config, loss curves, system/throughput metrics, and the model
   artifact (`tinyaya-stage2-tr-hi-v6e-v2:v0`).
-- **Checkpoints (GCS)**: `gs://tinyaya-stage2-eu/checkpoints/stage2-tpu-v6e-v2/`
+- **Checkpoints**: the training-time GCS bucket was decommissioned after the
+  v0.3 release; published weights live on the Hub.
 - **Dataset**: https://huggingface.co/datasets/tiny-aya-translate/tr-hi-mimi-encoded
 - **Code**: https://github.com/tiny-aya-simultaneous-translation/model
 - **Next version**: https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.2

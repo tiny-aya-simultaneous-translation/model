@@ -324,8 +324,8 @@ exclude_top=0 buys ~0.5 text CE at zero audio cost.
 | B | r64 | 1.566 | 4.958 | 3.601 | [2jtqcnla](https://wandb.ai/cataluna84/tinyaya-stage2-tpu/runs/2jtqcnla) |
 | A | frozen champion | 1.692 | 4.960 | 3.653 | [powp1a50](https://wandb.ai/cataluna84/tinyaya-stage2-tpu/runs/powp1a50) |
 
-All per-arm `best_by_val` checkpoints:
-`gs://tinyaya-stage2-eu/checkpoints/stage2-reval-5k-ta/arm_{A..F}/best_by_val`.
+The per-arm `best_by_val` checkpoints lived in the training-time GCS bucket,
+which was decommissioned after release; the arm results above are the record.
 
 ## Training infrastructure: replicated strategy + XLA architecture changes
 

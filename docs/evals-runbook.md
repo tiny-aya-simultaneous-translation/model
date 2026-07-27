@@ -11,13 +11,15 @@ plateau early-stop @ 65,250 then anneal 65,250→76,250; **best val composite
 results in [`v0.3-eval-report.md`](v0.3-eval-report.md). The repo is **public** with the full suite;
 checkpoint access routes for every command below:
 
-1. **GCS (all ~89 dirs, full optimizer state — LAWA + resume):**
-   `gs://tinyaya-stage2-eu/checkpoints/stage2-v6e16-mh-v03-r2/step_0NNNNN`
-   + `.../best_by_val` (= **step 76,000**)
-2. **Hub revisions (all ~89, weights-only):**
+1. **Hub revisions (all ~89, weights-only):**
    `hub:tiny-aya-translate/tr-hi-s2st-v0.3@best` (=76,000), `@step-76250`,
    `@step-{1000,…,76000}`
-3. **Hub main tree (browsing):** `main:checkpoints/<label>/`
+2. **Hub main tree (browsing):** `main:checkpoints/<label>/`
+
+> The training-time GCS bucket — the only copy that carried **optimizer state**,
+> and therefore the only route that supported *resuming* training — was
+> decommissioned after the release. The Hub copies are weights-only: enough for
+> inference, evaluation, and weight averaging, but not for resume.
 
 Eval targets are the **annealed** best (76,000) + final (76,250) + LAWA
 candidate; the plateau best (62,750) is optional ablation context.
@@ -59,9 +61,9 @@ export WANDB_API_KEY=...                # ... --secret=wandb-api-key
 export GEMINI_API_KEY=...               # Gemini referee + GEMBA judge
 ```
 
-Data: stage the corpus val split + encoded dir (GCS tarball
-`gs://tinyaya-stage2-eu/data/full-corpus-ta-20260708.tar.gz` or the HF
-dataset — see `scripts/tpu/stage_dataset.sh` for both routes). For the FLEURS
+Data: stage the corpus val split + encoded dir from the HF dataset
+`tiny-aya-translate/tr-hi-mimi-encoded` (see `scripts/tpu/stage_dataset.sh`; it
+also supports a pre-staged GCS tarball if you build one). For the FLEURS
 set, download `packed/encoded_pt.tar.gz` + `packed/encoded_alignments.tar.gz`
 + `splits/val.jsonl` from `tiny-aya-translate/fleurs-tr-hi-mimi-encoded`
 (~30 MB total) and extract; pass its `val.jsonl`/`encoded` as
@@ -96,7 +98,7 @@ Full milestone sweep (per checkpoint):
 
 ```bash
 uv run python scripts/eval_release.py \
-    --checkpoint gs://tinyaya-stage2-eu/checkpoints/stage2-v6e16-mh-v03-r2/best_by_val \
+    --checkpoint hub:tiny-aya-translate/tr-hi-s2st-v0.3@best \
     --subset eval/subsets/v03-val-500.jsonl \
     --val_jsonl /data/splits/val.jsonl --encoded_dir /data/encoded \
     --device cuda --gemini_referee 25 \

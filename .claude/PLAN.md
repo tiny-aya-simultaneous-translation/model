@@ -43,33 +43,41 @@ with a full honest eval and a lean, secret-free public repo.
 - [x] **Blog PR #14 MERGED** 2026-07-24 (`d1f07ac`) — published post verified live
       with the v0.3 content (author byline, TRC ack, emergence framing, W&B links).
 
-## Open PRs (awaiting merge)
-- [ ] **PR #11** — card eval-report links `blob/feat/…` → `blob/main`. CI green.
-- [ ] **PR #12** — `.claude` restructure + hook fix. CI green:
-      - deleted `.claude/archive/` (624 KB of session-log archives);
-      - **tracked** `.claude/{PLAN,PROGRESS,VERIFY,memories}.md` so the memory
-        system ships whole, alongside the already-tracked tooling;
-      - still gitignored: `settings.local.json` (per-machine permission grants
-        incl. a destructive `gcloud storage rm *` auto-approval — must not be
-        imposed on collaborators) and `archive/` (stops future re-bloat);
-      - **`_lib.relativize_paths()`** so hook entries log repo-relative paths
-        (`edited \`docs/x.md\``, `~/…` outside the project) instead of leaking
-        `/home/<user>/…` into a public repo on every tool call. Pinned by
-        `tests/test_hook_path_relativization.py`; 193 tests pass.
+## Done — post-release sweep (PRs #11–#14, all merged 2026-07-27)
+- [x] **#11** card eval-report links `blob/feat/…` → `blob/main`.
+- [x] **#13** `example.env` + credentials docs, and the **`.gitignore` hardening**
+      that closed the `launch.env` leak path (`*.env` + `.env.*` + `*.env.*`,
+      `!example.env`, `.envrc`, credential blobs).
+- [x] **#14** repo-wide alignment: invalid `CITATION.cff` + `NOTICE` that claimed
+      Apache-2.0 over the **CC-BY-NC-4.0 weights**; `pyproject` 0.1.0 → 0.3.0 with
+      `[project.urls]`; `onboarding.md` rewritten (717→454, symbol-cited); ~20 dead
+      references cleared; ruff 26 → **0** and enforced in CI; byte-compile widened
+      5 → 87 files; community-health files; TPU cold-boot clone URL fixed.
+- [x] **#12** `.claude` restructure (archive deleted, memory files tracked,
+      `settings.local.json` still excluded) + **`_lib.relativize_paths()`** so hook
+      entries stop leaking `/home/<user>/…` into a public repo. Pinned by
+      `tests/test_hook_path_relativization.py`.
+- [x] **HF card re-uploaded** and live-verified after the merge.
+- [x] **Infrastructure torn down** — QR `tinyaya-v6e16-eu-qr` deleted; verified
+      **zero queued resources and zero TPU VMs** across `europe-west4-a`,
+      `us-east1-d`, `us-central2-b`. No compute cost accruing.
 
-## Next (optional)
+`main` @ `4e906da`, 216 tracked files; both CI gates green, ruff clean, 193 tests.
+
+## Next (optional, nothing blocking)
 - [ ] Dataset cards (alignments note).
-- [ ] Make `data-pipeline` public if its README link should resolve externally
-      (currently private → 404 for outside readers; the link itself is correct).
-- [ ] Delete the SUSPENDED QR `tinyaya-v6e16-eu-qr` (cleanup only — already preempted).
+- [ ] Make `data-pipeline` public if its README link should resolve for outside
+      readers (currently private → 404 anonymously; the link itself is correct).
 - [ ] Cut a fresh tag at `main` if the release should point at the final state
-      rather than the code freeze.
+      rather than the `e89fb26` code freeze.
+- [ ] GCS still holds the ~411 GB checkpoint suite — intentional (it backs the
+      published Pythia-style suite), but it is the one ongoing cost.
 
 ## Definition of Done
-✅ Public HF repo + full checkpoint suite + card with eval numbers; eval report,
-W&B run + emergence report, and blog all telling one consistent CC-BY-NC-4.0
-story; PR #10 merged; `v0.3` release promoted; blog published.
-**Remaining: merge PR #11 + PR #12.**
+✅ **Met.** Public HF repo + full checkpoint suite + card with eval numbers; eval
+report, W&B run + emergence report, and blog all telling one consistent
+CC-BY-NC-4.0 story; PR #10 merged; `v0.3` release promoted; blog published; the
+post-release sweep merged; infrastructure torn down.
 
 ## Ops note (learned the hard way, 2026-07-27)
 Branch-switching can **delete** the `.claude` memory files whenever they are

@@ -15,7 +15,7 @@ Idempotent per branch (re-running re-uploads; existing branches are reused).
 Usage
 -----
   HF_TOKEN=... python scripts/publish_checkpoint_suite.py \\
-      --save-dir gs://tinyaya-stage2-eu/checkpoints/<run> \\
+      --save-dir gs://<your-bucket>/checkpoints/<run> \\
       --repo-id tiny-aya/tinyaya-stage2-v0.3 \\
       [--include-best] [--only-steps 1,2,4,1000,2000] [--dry-run]
 """

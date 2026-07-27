@@ -21,7 +21,7 @@ STAGES (resumable; --stages selects):
 
 Usage (GPU box, full pass):
   uv run python scripts/eval_release.py \
-      --checkpoint gs://tinyaya-stage2-eu/ckpts/<run>/step_110000 \
+      --checkpoint gs://<your-bucket>/ckpts/<run>/step_110000 \
       --subset eval/subsets/v03-val-500.jsonl \
       --val_jsonl /data/splits/val.jsonl --encoded_dir /data/encoded \
       --device cuda --output_dir eval_out/step_110000 \
