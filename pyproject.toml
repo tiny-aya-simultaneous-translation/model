@@ -39,7 +39,7 @@ dependencies = [
     "gcsfs>=2026.6.0",
     # transformers<5 requires huggingface-hub<1.0, so hub stays on its
     # latest 0.x (v1's CLI rename to `hf` does not apply on this line).
-    "huggingface-hub[cli]>=0.34,<1.0",
+    "huggingface-hub[cli]>=0.34,<2.0",
     "pyyaml>=6.0",
     "sacrebleu==2.6.0",
     "tqdm>=4.66",
