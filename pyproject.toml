@@ -13,13 +13,6 @@ authors = [
 # CC-BY-NC-4.0 (inherited from the CC-BY-NC-4.0 base model) -- see NOTICE.
 license = { text = "Apache-2.0" }
 
-[project.urls]
-Repository = "https://github.com/tiny-aya-simultaneous-translation/model"
-Model = "https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3"
-Dataset = "https://huggingface.co/datasets/tiny-aya-translate/tr-hi-mimi-encoded"
-Blog = "https://labscommunity.cohere.com/blog/2026/adapting-moshi-low-resource-speech-translation/"
-"Training run (W&B)" = "https://wandb.ai/cataluna84/tinyaya-stage2-tpu/runs/xzcb60bl"
-
 dependencies = [
     # torch itself is NOT declared here -- it lives in the mutually-exclusive
     # `tpu` (CPU wheels, default) and `cuda` (cu128 wheels, GPU eval box)
@@ -52,6 +45,15 @@ dependencies = [
     "tqdm>=4.66",
     "numpy>=2.0,<3.0",
 ]
+
+# NOTE: a table header ends the [project] key-value block, so this must stay
+# BELOW `dependencies` -- placing it above silently reparents the array.
+[project.urls]
+Repository = "https://github.com/tiny-aya-simultaneous-translation/model"
+Model = "https://huggingface.co/tiny-aya-translate/tr-hi-s2st-v0.3"
+Dataset = "https://huggingface.co/datasets/tiny-aya-translate/tr-hi-mimi-encoded"
+Blog = "https://labscommunity.cohere.com/blog/2026/adapting-moshi-low-resource-speech-translation/"
+"Training run (W&B)" = "https://wandb.ai/cataluna84/tinyaya-stage2-tpu/runs/xzcb60bl"
 
 [project.optional-dependencies]
 # Evals-program deps (docs/v0.3-evals-plan.md) -- GPU-box only; ALL imports in
