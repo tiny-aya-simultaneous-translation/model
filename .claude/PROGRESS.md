@@ -79,6 +79,33 @@ moved to `.claude/archive/PROGRESS-YYYY-Qn.md` by the
 
 ---
 
+## 2026-07-27T04:47:49Z | chore/track-claude-tooling@102f2e3 | done | edit
+created `.claude/PLAN.md`
+
+
+## 2026-07-27T04:45:40Z | chore/track-claude-tooling@102f2e3 | fail | verify
+verify: 11 passed, 1 failed out of 12 on Stop
+
+FAIL [1] # the TPU↔GPU seam holds: torch_xla must NOT leak into shared model/data code
+    src/model/scan_utils.py:479:    from torch_xla.experimental.scan_layers import (
+
+
+## 2026-07-27T04:45:15Z | chore/track-claude-tooling@102f2e3 | done | edit
+edited `~/.claude/projects/-home-cataluna84-Workspace-tinyaya-stage2-scale/memory/v03-release-debloat.md`
+
+
+## 2026-07-27T04:45:03Z | chore/track-claude-tooling@102f2e3 | done | exec
+cd ~/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-27T04:44:30Z | chore/track-claude-tooling@102f2e3 | done | exec
+cd ~/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-27T04:42:31Z | chore/track-claude-tooling@102f2e3 | done | exec
+cd ~/Workspace/tinyaya-stage2-scale
+
+
 ## 2026-07-27T04:41:51Z | chore/track-claude-tooling@5e4fcc4 | done | exec
 cd ~/Workspace/tinyaya-stage2-scale
 
