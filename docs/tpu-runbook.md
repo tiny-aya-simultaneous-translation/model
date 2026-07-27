@@ -64,7 +64,7 @@ uploads a secret-sanitized training log to GCS at end-of-run.
 export PJRT_DEVICE=TPU                     # auto-set when libtpu present
 export XLA_DISABLE_FUNCTIONALIZATION=0     # MUST be 0 (pytorch/xla #8607)
 export XLA_NO_SPECIAL_SCALARS=1            # disables assume-no-NaN rewrites; required for inline val
-export TPU_STRATEGY=fsdpv2_lora            # shards LoRA-bearing layers, replicates frozen ones
+export TPU_STRATEGY=auto                   # resolves to `replicated` below ~500M trainable (v0.3 ≈192M)
 ```
 
 `XLA_USE_BF16`/`XLA_DOWNCAST_BF16` are deprecated (torch_xla ≥2.6, silent no-op) — bf16 is

@@ -19,7 +19,7 @@ once and write the answer down.
 | `.claude/VERIFY.md` | Ordered shell commands that prove "done" | Stable; human-edited |
 | `.claude/memories.md` | Long-term decisions (architecture, trade-offs, domain facts) | Curated |
 
-A per-fact `memory/` directory (one file per fact + `MEMORY.md` index) is the newer,
+A per-fact `memory/` directory (one file per fact + an index) is the newer,
 finer-grained store loaded each session; `memories.md` is the legacy monolith.
 
 ## The lifecycle (autonomous loop)

@@ -17,7 +17,15 @@ and their env vars.
 | `startup_script.sh` | every TPU host at boot | installs uv + Python, fetches code (GCS tarball or clone), syncs `uv.lock`, fetches secrets, stages data, starts training in a `tmux` restart loop with `--resume auto` |
 | `hot_redeploy.sh` / `_remote_redeploy.sh` | workstation | push code to a live QR without recreating it |
 | `ops.sh` | workstation | `status`, `tail-logs`, `attach`, `ssh`, `pull-best`, `delete` |
+| `vm_watcher.sh` | on the VM | durable on-host watchdog — keeps monitoring across workstation disconnects (`docs/tpu-runbook.md` treats this as mandatory for a long run) |
+| `qr_watch.sh` | workstation | queued-resource babysitter: re-submits an identical launch after a spot preemption, replaying the settings from `LAUNCH_ENV_FILE` |
+| `stage_dataset.sh`, `prefetch_backbones.sh` | on the VM | stage the corpus to `/mnt/data` with preflight gates; pre-fetch the gated backbones before the rendezvous barrier |
+| `launch_canary.sh`, `run_hardening_probe.sh` | workstation / VM | short canary + the (retired) pre-launch hardening probes |
+| `probe_strategies.py`, `spmd_*_truth.py` | on the VM | SPMD strategy / batch-semantics probes |
 | `sweep_coordinator.py`, `sweep_agent_primary.sh`, `launch_sweep_*.sh` | VM / workstation | multi-host sweep coordination (see [`sweeps/README.md`](../../sweeps/README.md)) |
+
+`_lib.sh` is sourced (not executed) by the launchers; it provides `load_env_file`
+with the precedence **shell env > `.env` > script defaults**.
 
 ## Configuration
 
@@ -55,4 +63,5 @@ Secret Manager once; VMs fetch them at boot.
 ## What this does NOT do
 
 - Multislice (single slice only) · async checkpointing (synchronous via `xm.save`)
-- Auto-eval after training — run `scripts/eval_checkpoint.py` separately (CPU/GPU)
+- Auto-eval after training — run `scripts/eval_checkpoint.py` (or the full `scripts/eval_release.py`
+harness — see [`docs/evals-runbook.md`](../../docs/evals-runbook.md)) separately (CPU/GPU)
