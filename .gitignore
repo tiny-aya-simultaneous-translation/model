@@ -1,7 +1,17 @@
 # --- secrets / local config ---
-.env
-.env.local
-*.env.local
+# Ignore EVERY dotenv-style file, then re-admit the tracked template. `launch.env`
+# (per-run launcher settings) and any future `*.env` are covered by the glob --
+# the docs tell people to create these, so the default must be "never committed".
+*.env
+.env.*
+*.env.*
+!example.env
+.envrc
+
+# Credential blobs that tooling drops into the repo root.
+service-account*.json
+*-key.json
+credentials.json
 
 # --- python ---
 __pycache__/
@@ -54,11 +64,6 @@ runs/
 # --- audio scratch ---
 *.wav.tmp
 
-# --- factory memory system ---
-.factory/settings.local.json
-.factory/archive/.tmp-*
-.factory/hooks/__pycache__/
-
 # --- claude memory system (reusable tooling ships; live session state + logs do not) ---
 .claude/settings.local.json
 .claude/hooks/__pycache__/
@@ -67,5 +72,6 @@ runs/
 .claude/PLAN.md
 .claude/VERIFY.md
 .claude/archive/
-phase-3-data-generation-pipeline
+
+# Build stamp written by scripts/tpu/hot_redeploy.sh.
 BUILD_SHA

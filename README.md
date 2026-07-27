@@ -91,7 +91,25 @@ runs and CPU-only tests never import it.
 git clone https://github.com/tiny-aya-simultaneous-translation/model.git
 cd model
 uv sync
+
+cp example.env .env      # then fill in your tokens (see below)
 ```
+
+**Credentials.** Secrets go in a gitignored repo-root `.env`; `example.env` is the
+annotated template. Minimum to start a run:
+
+| variable | required? | why |
+|---|---|---|
+| `HF_TOKEN` | **yes** | pulls the gated `CohereLabs/tiny-aya-base` + Moshi/Mimi weights; `scripts/tpu/setup_gcp.sh` aborts without it |
+| `WANDB_API_KEY`, `WANDB_PROJECT`, `WANDB_ENTITY` | recommended | training runs without them, but you get no metrics, checkpoint index, or audio demos |
+| `GEMINI_API_KEY` | evals only | the GEMBA adequacy judge + ASR referee in `scripts/eval_release.py` |
+| `PROJECT_ID`, `REGION`, `BUCKET` | optional | GCP overrides; the defaults reproduce the published v0.3 run |
+
+Precedence is **shell env > `.env` > script defaults**. On TPU, `setup_gcp.sh`
+seeds `HF_TOKEN`/`WANDB_API_KEY` into GCP Secret Manager and the workers fetch
+them at boot, so keys never land in a VM image. Per-run settings (slice, recipe,
+corpus URIs) are passed to the launcher on the command line, not via `.env` —
+see the training command below and [`docs/tpu-runbook.md`](docs/tpu-runbook.md).
 
 ### Training (TPU v6e-16, SPMD data-parallel — the long-horizon path)
 The v0.3 long-horizon run trains on **v6e-16** (4 hosts × 4 chips) in `europe-west4-a` —
