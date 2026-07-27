@@ -1,0 +1,60 @@
+name: Bug report
+description: Something in the training / evaluation code does not work
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. **Do not paste tokens or credentials** — redact
+        `HF_TOKEN`, `WANDB_API_KEY`, and `GEMINI_API_KEY` from any log you
+        attach. For a security problem, use
+        [private reporting](https://github.com/tiny-aya-simultaneous-translation/model/security/advisories/new)
+        instead of this form.
+
+  - type: dropdown
+    id: backend
+    attributes:
+      label: Backend
+      description: The repo is dual-backend; which path did you hit this on?
+      options:
+        - TPU (torch_xla / SPMD)
+        - GPU (CUDA)
+        - CPU only (tests, config parsing, docs tooling)
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you expected, and what you got instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reproduction
+      description: The exact command, plus the config file you passed.
+      placeholder: |
+        uv run python scripts/train_hierarchical.py --config configs/tpu/...
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant output
+      description: Traceback or log tail. Redact secrets.
+      render: shell
+
+  - type: textarea
+    id: env
+    attributes:
+      label: Environment
+      description: Python, torch / torch_xla versions, accelerator, and commit.
+      placeholder: |
+        python 3.12.x, torch 2.9.0, torch_xla 2.9, v6e-8, commit abc1234
+    validations:
+      required: true

@@ -14,8 +14,12 @@ export USER="${USER:-$(id -un)}"
 echo "=== [$(date -Is)] startup_script.sh begin on $(hostname) ==="
 
 # ----- repo / branch knobs (override via VM metadata if needed) -----
-REPO_URL="${REPO_URL:-https://github.com/tiny-aya-simulatenous-translation/tinyaya-stage2-scale.git}"
-REPO_BRANCH="${REPO_BRANCH:-feat/tpu-support}"
+# Canonical org spelling + current repo name. The previous default pointed at
+# the misspelled org AND the old repo name, and only resolved via GitHub's
+# rename redirect -- on the cold-boot clone path, which is the worst place to
+# depend on one.
+REPO_URL="${REPO_URL:-https://github.com/tiny-aya-simultaneous-translation/model.git}"
+REPO_BRANCH="${REPO_BRANCH:-main}"
 REPO_DIR="${REPO_DIR:-/opt/tinyaya}"
 PYTHON_VERSION="${PYTHON_VERSION:-3.12.13}"
 # v0.3: the SYNTHETIC FLORES/OPUS/conversational corpus (1.24M Mimi-encoded

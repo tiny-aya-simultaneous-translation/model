@@ -1,0 +1,30 @@
+name: Question / reproduction help
+description: Ask about the model, the recipe, or reproducing the v0.3 results
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before asking, these may already answer it:
+
+        - **Results + methodology:** [`docs/v0.3-eval-report.md`](../blob/main/docs/v0.3-eval-report.md)
+        - **Model card:** [`MODEL_CARD.md`](../blob/main/MODEL_CARD.md)
+        - **Reproducing training:** [`docs/tpu-runbook.md`](../blob/main/docs/tpu-runbook.md)
+        - **Reproducing evals:** [`docs/evals-runbook.md`](../blob/main/docs/evals-runbook.md)
+        - **Codebase tour:** [`docs/onboarding.md`](../blob/main/docs/onboarding.md)
+
+        Note the released weights are **CC-BY-NC-4.0** (non-commercial,
+        inherited from the base model) while the code is Apache-2.0.
+
+  - type: textarea
+    id: question
+    attributes:
+      label: Question
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: What you've tried
+      description: Commands run, docs already checked.
