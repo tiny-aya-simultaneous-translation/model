@@ -79,6 +79,69 @@ moved to `.claude/archive/PROGRESS-YYYY-Qn.md` by the
 
 ---
 
+## 2026-07-27T04:54:37Z | chore/track-claude-tooling@2ff4b3b | done | exec
+cd ~/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-27T04:53:58Z | chore/track-claude-tooling@2ff4b3b | done | exec
+cd ~/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-27T04:53:28Z | chore/track-claude-tooling@2ff4b3b | done | edit
+edited `README.md`
+
+
+## 2026-07-27T04:53:25Z | chore/track-claude-tooling@2ff4b3b | done | edit
+edited `CONTRIBUTING.md`
+
+
+## 2026-07-27T04:53:21Z | chore/track-claude-tooling@2ff4b3b | done | edit
+edited `example.env`
+
+
+## 2026-07-27T04:52:52Z | chore/track-claude-tooling@2ff4b3b | done | exec
+cd ~/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-27T04:52:28Z | chore/track-claude-tooling@2ff4b3b | done | exec
+cd ~/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-27T04:51:57Z | chore/track-claude-tooling@2ff4b3b | done | edit
+edited `README.md`
+
+
+## 2026-07-27T04:51:43Z | chore/track-claude-tooling@2ff4b3b | done | edit
+edited `CONTRIBUTING.md`
+
+
+## 2026-07-27T04:51:18Z | chore/track-claude-tooling@2ff4b3b | done | edit
+created `example.env`
+
+
+## 2026-07-27T04:50:13Z | chore/track-claude-tooling@2ff4b3b | done | exec
+cd ~/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-27T04:49:59Z | chore/track-claude-tooling@2ff4b3b | done | exec
+cd ~/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-27T04:49:43Z | chore/track-claude-tooling@2ff4b3b | done | exec
+cd ~/Workspace/tinyaya-stage2-scale
+
+
+## 2026-07-27T04:48:52Z | chore/track-claude-tooling@2ff4b3b | fail | verify
+verify: 11 passed, 1 failed out of 12 on Stop
+
+FAIL [1] # the TPU↔GPU seam holds: torch_xla must NOT leak into shared model/data code
+    src/model/scan_utils.py:479:    from torch_xla.experimental.scan_layers import (
+
+
+## 2026-07-27T04:48:20Z | chore/track-claude-tooling@2ff4b3b | done | exec
+cd ~/Workspace/tinyaya-stage2-scale
+
+
 ## 2026-07-27T04:47:49Z | chore/track-claude-tooling@102f2e3 | done | edit
 created `.claude/PLAN.md`
 
