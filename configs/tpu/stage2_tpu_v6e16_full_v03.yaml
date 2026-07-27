@@ -1,27 +1,31 @@
-# TPU v6e-16 PRODUCTION run v0.3: text+audio, reval winner (arm D), 3 epochs.
+# TPU v6e-16 SINGLE-HOST v0.3 config: text+audio, reval winner (arm D).
+#
+# SUPERSEDED -- this is NOT the config that produced the released checkpoint.
+# The v0.3 long-horizon run used the multi-host
+# `stage2_tpu_v6e16_full_v03_mh.yaml` (W&B run xzcb60bl): 76,250 steps /
+# 2.07 epochs, WSD + anneal, best val composite 2.8199 @ step 76,000. Kept as
+# the single-host variant and as the default CONFIG_FILE for the launchers.
 #
 # RECIPE PROVENANCE (2026-07-09): the v03-5k-reval-ta sweep (6 arms x 5,000
-# full-corpus text+audio steps) re-picked the
-# recipe. Winner = arm D: the r=32/lr=1.716e-4/+MLP/rsLoRA base with
-# lora_exclude_top: 0 (adapters on ALL 36 layers) -- gates-clean at every
-# composite weighting; the old frozen champion (exclude_top=2) finished LAST.
-# Pipeline validated by the 32-sample memorization gate + TF/AR examination
-# (PR #10 gate report) before this config is allowed to launch.
+# full-corpus text+audio steps) re-picked the recipe. Winner = arm D: the
+# r=32/lr=1.716e-4/+MLP/rsLoRA base with lora_exclude_top: 0 (adapters on ALL
+# 36 layers) -- gates-clean at every composite weighting; the old frozen
+# champion (exclude_top=2) finished LAST. Pipeline was validated by the
+# 32-sample memorization gate + TF/AR examination (PR #10 gate report).
 #
 # WHY THIS EXISTS
 # ---------------
 # The Stage-1/2 capacity sweep only ever trained on the 200K GCS SUBSET for
-# 1,500 steps -- 0.31 epochs of the real 1.24M corpus. Before committing to
-# a full 3-epoch (14,532-step) production run on the winning recipe
-# (lr_lora=1.716e-4, lora_r=32, +MLP structure), this smoke test re-validates
-# it on the FULL corpus for ~5,000 steps (~1.04 epochs), in parallel with two
-# other Stage-2 candidates (r=8 and r=64) on separate TPU v6e-16 slices
-# across two TRC zones (europe-west4-a + us-east1-d).
+# 1,500 steps -- 0.31 epochs of the real 1.24M corpus. This config re-validated
+# the winning recipe (lr_lora=1.716e-4, lora_r=32, +MLP structure) on the FULL
+# corpus for ~5,000 steps (~1.04 epochs), in parallel with two other Stage-2
+# candidates (r=8 and r=64) on separate TPU v6e-16 slices across two TRC zones
+# (europe-west4-a + us-east1-d).
 #
-# If this arm still wins on real full-corpus data diversity, it gets
-# EXTENDED IN PLACE: bump train.max_steps from 5000 to 14532 and re-run
-# --resume auto on the SAME slice/save_dir/W&B run -- no new config, no
-# restart. This file IS the production config once that happens.
+# The original plan was to extend this arm in place to a 3-epoch horizon. That
+# is NOT what happened: the long-horizon run moved to the multi-host `_mh`
+# config with a 110,463-step ceiling and stopped at 76,250 (WSD early-stop at
+# 65,250 + an 11k-step linear anneal leg).
 #
 # data.* paths are populated by scripts/tpu/startup_script.sh's plain
 # (non-sweep) branch -- MUST clear /mnt/data/encoded + /mnt/data/splits and
@@ -44,7 +48,11 @@ train:
   num_codebooks: 8
   batch_size: 4                   # per-chip (validated safe); 4 x 4 x 16 = global 256
   grad_accum: 4
-  max_steps: 14532                # 3 epochs (1,240,000/256 ~= 4844 steps/epoch x 3)
+  # Retired 3-epoch horizon computed against the old nominal global batch
+  # (batch-semantics audit: real optimizer batch = batch_size x grad_accum).
+  # The shipped run used the _mh config's 110,463-step ceiling and stopped at
+  # 76,250.
+  max_steps: 14532
   warmup_steps: 150               # ~1% of max_steps
   min_lr_ratio: 0.0
   early_stop_patience: 6          # 6 val cycles (1500 steps) no-improvement -> stop; safety net past the validated 0.31-epoch regime
@@ -71,7 +79,7 @@ loss:
   # -- 840,426 .src + .tgt alignments.json ship at the data root (100%
   # coverage); the old check used legacy filenames. Loader fixed in
   # src/data/dataset.py. Winner hyperparameters from the v03-5k-reval-ta sweep
-  # land here before the production launch (sweep plan Phase 3).
+  # land here before the long-horizon launch (sweep plan Phase 3).
   text_weight: 0.2
   audio_weight: 1.0
   text_weight_curriculum_frac: 0.0

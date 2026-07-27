@@ -13,7 +13,7 @@
 #    a DIFFERENT trial, so the 4 hosts would run different hyperparams and the
 #    mesh corrupts. Each trial must run as ONE 16-chip job with IDENTICAL args on
 #    all 4 hosts. Drive the sweep from a single coordinator that broadcasts each
-#    trial's args to all hosts (see scripts/tpu sweep launcher / runbook). The
+#    trial's args to all hosts (scripts/tpu/launch_sweep_coordinated.sh). The
 #    `command:` below is the per-trial program invocation that the coordinator
 #    fans out; it is NOT meant to be run as 4 independent agents.
 #

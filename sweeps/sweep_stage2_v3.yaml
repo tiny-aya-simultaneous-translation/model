@@ -14,12 +14,12 @@
 #
 # PREREQUISITE: run AFTER the data loader is repointed to the synthetic corpus
 # `tiny-aya-translate/tr-hi-mimi-encoded` (the v0.2/FLEURS blend would search the
-# wrong distribution). See the data-repoint step in docs/v0.3-implementation-plan.md.
+# wrong distribution).
 #
 # HOW TO RUN (see sweeps/README.md):
 #   wandb sweep sweeps/sweep_stage2_v3.yaml
 #   wandb agent <entity>/<project>/<sweep_id>    # on the TPU VM, TPU env exported
-# Then promote the winner into the production config:
+# Then promote the winner into the long-horizon config:
 #   python scripts/promote_sweep_winner.py --sweep <entity>/<project>/<id> \
 #       --config configs/tpu/stage2_tpu_v6e_v3.yaml --metric val/composite
 
@@ -47,7 +47,7 @@ parameters:
   lora_alpha_mult: { value: 2 }
   # NB: the proxy HORIZON (max_steps / val_every / warmup / save_every) lives in
   # the proxy config below, NOT in this grid -- so promote_sweep_winner only ever
-  # carries the *recipe* knobs into the production config.
+  # carries the *recipe* knobs into the long-horizon config.
 
 # wandb agent appends each swept param as a CLI arg (--lr_lora <v> --lora_r <v>
 # --lora_dropout <v> ...); train_hierarchical.py maps them onto the cfg sections

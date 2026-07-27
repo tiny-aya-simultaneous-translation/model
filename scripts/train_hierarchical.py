@@ -33,9 +33,9 @@ YAML (``--config``) provides the defaults; CLI flags override; the
 Two new keys plumb the scan_layers / grad-checkpoint feature flags:
 
 * ``train.use_scan_layers`` (bool) -- swap layer stacks for the
-  ``scan_utils`` proxy. See PLAN.md Phase 1.
+  ``scan_utils`` proxy. See .claude/PLAN.md Phase 1.
 * ``train.xla_grad_checkpoint`` (bool) -- per-layer
-  ``torch.utils.checkpoint``. See PLAN.md Phase 2.
+  ``torch.utils.checkpoint``. See .claude/PLAN.md Phase 2.
 * ``train.compile_warmup_steps`` (int) -- run zero-LR TPU macro-steps
   before visible step 1 so the counted loss curve starts after compile.
 """
@@ -1964,7 +1964,7 @@ def main():
     # os.path.exists(os.path.join("gs://...", "optimizer.pt")) check was ALWAYS
     # False for GCS resume, so every spot-preemption resume silently restarted
     # Adam moments from zero. Missing state is now a hard error: a long
-    # production run must never quietly continue on a fresh optimizer
+    # long-horizon run must never quietly continue on a fresh optimizer
     # (train.allow_fresh_optimizer=true is the deliberate escape hatch).
     if start_step > 0 and resume_dir:
         opt_p = fetch_checkpoint_file(resume_dir, "optimizer.pt")
