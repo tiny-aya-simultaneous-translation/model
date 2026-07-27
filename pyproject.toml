@@ -98,8 +98,8 @@ tpu = [
     # whenever runtime.is_spmd()). Without jax the first scanned backward dies
     # with ModuleNotFoundError. CPU wheels suffice -- jax only traces to
     # StableHLO here, it never touches the TPU. Pins match torch_xla 2.9.0's
-    # own `pallas` extra (jax==0.7.1/jaxlib==0.7.1).
-    "jax==0.7.1",
+    # own `pallas` extra (jax==0.11.0/jaxlib==0.7.1).
+    "jax==0.11.0",
     "jaxlib==0.7.1",
     # xb.call_jax also hard-requires torchax (xla_builder.py: `if jax is None
     # or tx is None: raise AssertionError('Jax is required...')`) -- the jax
