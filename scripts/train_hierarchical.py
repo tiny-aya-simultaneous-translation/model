@@ -1148,7 +1148,9 @@ def run_validation(
             if n == 0 and val_debug:
                 if is_tpu:
                     torch_xla.sync()
-                fin = lambda t: bool(torch.isfinite(t).all().item())
+                def fin(t):
+                    return bool(torch.isfinite(t).all().item())
+
                 print(
                     "  [val-debug] finite: "
                     f"hidden={fin(hidden)} "
@@ -3054,7 +3056,7 @@ def main():
         # absolute tolerance so genuine drift (a mis-zeroed LR/WD group) still
         # trips it while bf16 read-noise does not.
         _drift = max(
-            (abs(a - b) for a, b in zip(sentinel_after, sentinel_before)),
+            (abs(a - b) for a, b in zip(sentinel_after, sentinel_before, strict=False)),
             default=0.0,
         )
         if _drift > 1e-2:
@@ -3155,7 +3157,7 @@ def main():
             _dnames = macro.get("diag_names") or []
             if _dvals is not None and len(_dnames) > 0:
                 _flat = _dvals.cpu().tolist()  # single host transfer for all groups
-                gd = dict(zip(_dnames, _flat))
+                gd = dict(zip(_dnames, _flat, strict=False))
                 _lr_by = {g["name"]: g["lr"] for g in optimizer.param_groups if "name" in g}
                 for gname in sorted({k.split("/", 1)[1] for k in gd}):
                     gn = gd.get(f"grad_norm/{gname}", 0.0)

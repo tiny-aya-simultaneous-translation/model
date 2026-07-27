@@ -27,8 +27,6 @@ pure arithmetic, so the math is unit-tested without a TPU/GPU.
 
 from __future__ import annotations
 
-import math
-
 
 def composite_val_loss(
     text_loss: float,

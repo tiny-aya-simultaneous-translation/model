@@ -5,16 +5,16 @@
 from __future__ import annotations
 
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
 from _lib import (  # noqa: E402
-    PROGRESS_FILE,
-    PLAN_FILE,
-    VERIFY_FILE,
     MEMORIES_FILE,
+    PLAN_FILE,
+    PROGRESS_FILE,
+    VERIFY_FILE,
     emit,
     git_branch,
     git_rev,
@@ -22,7 +22,6 @@ from _lib import (  # noqa: E402
     read_input,
     scrub,
 )
-
 
 TRIGGERS = {
     "#progress": ("progress", PROGRESS_FILE),
@@ -59,7 +58,7 @@ def main() -> None:
         line = f"- [ ] {body}  <!-- captured {now_iso()} -->\n"
         _append_under_section(mem_file, "## Tasks", line)
     elif kind == "decision":
-        ymd = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        ymd = datetime.now(UTC).strftime("%Y-%m-%d")
         block = (
             f"\n### {ymd}: {body[:80]}\n"
             f"**Decision:** {body}\n"

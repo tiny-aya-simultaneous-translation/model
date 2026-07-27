@@ -1,14 +1,20 @@
 """Generate audio with parallel two-stream Moshi architecture + codebook delay."""
-import sys, torch
+import sys
+
+import torch
+
 sys.path.insert(0, ".")
 
-from src.data.dataset import StreamingTranslationDataset, undo_codebook_delay, SILENCE_TOKEN
+import os
+
+import soundfile as sf
+from transformers import AutoTokenizer
+
+from src.data.dataset import SILENCE_TOKEN, StreamingTranslationDataset
+from src.data.mimi_encoder import MimiEncoder
 from src.model.composite import TinyAyaMoshiComposite
 from src.model.lora_setup import apply_lora
 from src.training.checkpointing import load_checkpoint
-from src.data.mimi_encoder import MimiEncoder
-from transformers import AutoTokenizer
-import soundfile as sf, os
 
 CKPT = "checkpoints/overfit_parallel/step_000300"
 SPLIT = "data/splits/small/train_20.jsonl"     # <- point at your split
@@ -163,5 +169,5 @@ print(f"CB0 unique tokens: {len(set(gen_target[0].cpu().tolist()))}", flush=True
 # Clamp SILENCE_TOKEN to valid Mimi range
 gen_clean = gen_target.cpu().clamp(max=2047)
 sf.write(f"{OUT_DIR}/moshi_style/generated.wav", mimi.decode(gen_clean.to(device)).numpy(), 24000)
-print(f"Saved moshi_style/", flush=True)
+print("Saved moshi_style/", flush=True)
 print("Done!", flush=True)

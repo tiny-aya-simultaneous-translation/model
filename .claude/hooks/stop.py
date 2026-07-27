@@ -15,14 +15,13 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from _lib import (  # noqa: E402
+    PLAN_FILE,
     PROJECT_DIR,
     VERIFY_FILE,
-    PLAN_FILE,
     append_progress,
     emit,
     read_input,
 )
-
 
 CODE_FENCE = re.compile(r"```bash\s*\n(.*?)```", re.DOTALL)
 

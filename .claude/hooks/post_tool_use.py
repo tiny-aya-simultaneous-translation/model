@@ -17,7 +17,6 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from _lib import append_progress, emit, read_input  # noqa: E402
 
-
 # Bash commands that are pure observation -- do not log to PROGRESS.
 NOISY_EXECUTE_PATTERNS = (
     "git status",
