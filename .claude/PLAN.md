@@ -64,46 +64,44 @@ with a full honest eval and a lean, secret-free public repo.
 
 `main` @ `0d9460f`, 216 tracked files; both CI gates green, ruff clean, 193 tests.
 
-## Next — dataset cards (audited 2026-07-27; this is the real remaining work)
+## Done — HuggingFace org brought to release standard (2026-07-27)
 
-Nine public datasets under `tiny-aya-translate`. The audit found more than the
-"alignments note" this item used to say — the main corpus card is **actively
-wrong**, and wrong in the exact way that cost two releases.
+Admin access landed, so the whole org was audited and fixed: **26 repos → 20
+public (7 models + 13 datasets) + 6 private, 0 missing metadata, 85/85 card URLs
+resolving.**
 
-**P0 — `tr-hi-mimi-encoded` (263 downloads; THE training corpus).** Its card
-documents an API that does not match the data:
-- **`.pt` gold-text keys**: card says `source_text` / `target_text`; the real
-  keys are **`src_text` / `tgt_text`**. A consumer following the card gets a
-  `KeyError`.
-- **Alignment paths**: card shows `encoded/<stem>_src.json` (legacy names, under
-  `encoded/`); the real files are **`{stem}.src.alignments.json` at the data
-  root**. This is precisely the mismatch behind the "corpus has no text
-  alignments" misdiagnosis — the old check looked for the names the card
-  documents, found none, and v0.1/v0.2 trained audio-only as a result. The card
-  is still propagating the bug to the next consumer.
-- Missing: the post-filter row counts (**1,178,302 train / 62,036 val**, ~5% of
-  rows dropped for missing `.pt`), the **840,426 × 2 alignment pairs at 100%
-  coverage**, and any pointer to the v0.3 model / eval report.
+- [x] **LEGAL — `tr-hi-s2st-v0.1`, `v0.2` and the private `…-tr-hi-pt` were
+      published as `apache-2.0`.** All three are LoRA derivatives of
+      `CohereLabs/tiny-aya-base` (`cc-by-nc-4.0`), so the non-commercial term is
+      inherited and Apache was never ours to grant. Corrected on the Hub **and**
+      in the repo sources (`docs/hf-model-card-tr-hi-s2st-v0.{1,2}.md` still said
+      Apache too, so it would have regressed on the next upload).
+- [x] **Dataset licences.** Every dataset previously declared *none*.
+      FLORES-derived corpora → `cc-by-sa-4.0` (share-alike propagates); eval sets
+      → `other` + upstream note, rather than inventing a licence.
+- [x] **The `tr-hi-mimi-encoded` P0.** Its card documented `.pt` keys as
+      `source_text`/`target_text` (real: `src_text`/`tgt_text`) and alignment
+      paths as `encoded/<stem>_src.json` (real: `{stem}.src.alignments.json` at
+      the data root) — the very mismatch that made v0.1/v0.2 train audio-only.
+      Corrected, with the resolution order spelled out.
+- [x] **13 new cards**, incl. `fleurs-tr-hi-parallel-speech` (11,383 files,
+      previously undocumented) and the 2 stray trainer `push_to_hub` artifacts,
+      now labelled superseded → v0.3.
+- [x] **GitHub ↔ HF cross-links on every card.** Verified mapping, not guessed:
+      `codec-finetuning` is what the whole phase-3 cluster exists for, and
+      `hindi-tts-probe` benchmarks directly on `lahaja-eval` — the study that
+      chose the Hindi ASR judge used in the v0.3 eval. The three **private**
+      GitHub repos are deliberately never linked as browsable.
+- [x] **Shared lineage footer** everywhere: `parallel-text → parallel-speech →
+      mimi-encoded → v0.3`, plus eval report, W&B run + emergence report, blog,
+      TRC acknowledgement, and the honest framing (text translates ~25 chrF++;
+      intelligible audio synthesis is the frontier).
+- [x] **Housekeeping.** 4 empty models + 1 empty dataset → private (reversible,
+      nothing deleted); `turkish-{cv,openslr}-24k-phase3` stay public with
+      placeholder cards.
 
-**P1 — three datasets have NO card at all:** `tts-worker-bundle`,
-`turkish-cv-24k-phase3`, `turkish-openslr-24k-phase3`.
-
-**P1b — two of those are effectively EMPTY** (only `.gitattributes`):
-`turkish-cv-24k-phase3`, `turkish-openslr-24k-phase3`. Decide per repo —
-populate, or make private / delete. A public dataset with no content and no card
-is worse than absent.
-
-**P2 — thin cards, ordered by actual traffic:**
-`tr-hi-parallel-speech-v2` (759 chars, **361 dl** — the most-downloaded of all),
-`tr-subset-v0.1` (321 chars, **332 dl**), `tr-hi-parallel-text` (419 chars,
-125 dl), `tr-hi-parallel-speech-v3` (652 chars, 28 dl).
-
-**P2b — licence check.** These derive from FLORES (**CC BY-SA 4.0**, share-alike),
-OPUS-100 (per-subcorpus) and TTS-model outputs. Verify each card's licence field
-matches `THIRD_PARTY_NOTICES.md`; share-alike in particular has to propagate.
-
-*(Verified fine: `fleurs-tr-hi-mimi-encoded` exists and is public, so the
-evals-runbook download instructions resolve.)*
+Tooling: `~/Workspace/v0.3-work/hf_release_cards.py` — idempotent and
+re-runnable, preserving every auto-generated `dataset_info` block.
 
 ## Next (other, optional)
 - [ ] Make `data-pipeline` public if its README link should resolve for outside
