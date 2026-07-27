@@ -59,13 +59,14 @@ runs/
 .factory/archive/.tmp-*
 .factory/hooks/__pycache__/
 
-# --- claude memory system (reusable tooling ships; live session state + logs do not) ---
+# --- claude memory system ---
+# The tooling AND the memory files (PLAN/PROGRESS/VERIFY/memories) are tracked.
+# Still excluded:
+#   settings.local.json - per-machine permission grants (incl. destructive-command
+#                         auto-approvals); must not be imposed on collaborators
+#   archive/            - bulk session-log archives (600 KB+, no public value)
 .claude/settings.local.json
 .claude/hooks/__pycache__/
-.claude/PROGRESS.md
-.claude/memories.md
-.claude/PLAN.md
-.claude/VERIFY.md
 .claude/archive/
 phase-3-data-generation-pipeline
 BUILD_SHA
