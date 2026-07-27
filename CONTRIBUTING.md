@@ -42,8 +42,9 @@ process environment, so export first (`set -a; . ./.env; set +a`).
 
 Two rules, both non-negotiable:
 
-- **Never commit real values.** `.env` is gitignored; only `example.env`
-  (placeholders) is tracked. On TPU, `setup_gcp.sh` pushes `HF_TOKEN` /
+- **Never commit real values.** Every `*.env` is gitignored (plus `.envrc` and
+  `*-key.json` / `service-account*.json` / `credentials.json`); `example.env` is
+  the one tracked exception. On TPU, `setup_gcp.sh` pushes `HF_TOKEN` /
   `WANDB_API_KEY` into GCP Secret Manager and the workers fetch them at boot —
   keys never land in a VM image, a config, or a log.
 - **Keep secrets out of logs.** If you add a code path that echoes environment
