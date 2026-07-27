@@ -62,16 +62,57 @@ with a full honest eval and a lean, secret-free public repo.
       **zero queued resources and zero TPU VMs** across `europe-west4-a`,
       `us-east1-d`, `us-central2-b`. No compute cost accruing.
 
-`main` @ `4e906da`, 216 tracked files; both CI gates green, ruff clean, 193 tests.
+`main` @ `0d9460f`, 216 tracked files; both CI gates green, ruff clean, 193 tests.
 
-## Next (optional, nothing blocking)
-- [ ] Dataset cards (alignments note).
+## Next — dataset cards (audited 2026-07-27; this is the real remaining work)
+
+Nine public datasets under `tiny-aya-translate`. The audit found more than the
+"alignments note" this item used to say — the main corpus card is **actively
+wrong**, and wrong in the exact way that cost two releases.
+
+**P0 — `tr-hi-mimi-encoded` (263 downloads; THE training corpus).** Its card
+documents an API that does not match the data:
+- **`.pt` gold-text keys**: card says `source_text` / `target_text`; the real
+  keys are **`src_text` / `tgt_text`**. A consumer following the card gets a
+  `KeyError`.
+- **Alignment paths**: card shows `encoded/<stem>_src.json` (legacy names, under
+  `encoded/`); the real files are **`{stem}.src.alignments.json` at the data
+  root**. This is precisely the mismatch behind the "corpus has no text
+  alignments" misdiagnosis — the old check looked for the names the card
+  documents, found none, and v0.1/v0.2 trained audio-only as a result. The card
+  is still propagating the bug to the next consumer.
+- Missing: the post-filter row counts (**1,178,302 train / 62,036 val**, ~5% of
+  rows dropped for missing `.pt`), the **840,426 × 2 alignment pairs at 100%
+  coverage**, and any pointer to the v0.3 model / eval report.
+
+**P1 — three datasets have NO card at all:** `tts-worker-bundle`,
+`turkish-cv-24k-phase3`, `turkish-openslr-24k-phase3`.
+
+**P1b — two of those are effectively EMPTY** (only `.gitattributes`):
+`turkish-cv-24k-phase3`, `turkish-openslr-24k-phase3`. Decide per repo —
+populate, or make private / delete. A public dataset with no content and no card
+is worse than absent.
+
+**P2 — thin cards, ordered by actual traffic:**
+`tr-hi-parallel-speech-v2` (759 chars, **361 dl** — the most-downloaded of all),
+`tr-subset-v0.1` (321 chars, **332 dl**), `tr-hi-parallel-text` (419 chars,
+125 dl), `tr-hi-parallel-speech-v3` (652 chars, 28 dl).
+
+**P2b — licence check.** These derive from FLORES (**CC BY-SA 4.0**, share-alike),
+OPUS-100 (per-subcorpus) and TTS-model outputs. Verify each card's licence field
+matches `THIRD_PARTY_NOTICES.md`; share-alike in particular has to propagate.
+
+*(Verified fine: `fleurs-tr-hi-mimi-encoded` exists and is public, so the
+evals-runbook download instructions resolve.)*
+
+## Next (other, optional)
 - [ ] Make `data-pipeline` public if its README link should resolve for outside
       readers (currently private → 404 anonymously; the link itself is correct).
 - [ ] Cut a fresh tag at `main` if the release should point at the final state
       rather than the `e89fb26` code freeze.
-- [ ] GCS still holds the ~411 GB checkpoint suite — intentional (it backs the
-      published Pythia-style suite), but it is the one ongoing cost.
+- [x] ~~GCS checkpoint suite cost~~ — bucket deleted 2026-07-27; zero cloud cost.
+      Note the trade: it held the only optimizer state, so the published
+      checkpoints support inference/eval/averaging but **not** resume.
 
 ## Definition of Done
 ✅ **Met.** Public HF repo + full checkpoint suite + card with eval numbers; eval
