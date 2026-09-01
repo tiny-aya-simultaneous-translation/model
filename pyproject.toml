@@ -33,7 +33,7 @@ dependencies = [
     "peft>=0.19,<1.0",
     "accelerate>=1.14,<2.0",
     "soundfile==0.14.0",
-    "scipy==1.18.0",
+    "scipy==1.18.1",
     "librosa==0.11.0",
     "wandb>=0.27,<1.0",
     "gcsfs>=2026.6.0",
