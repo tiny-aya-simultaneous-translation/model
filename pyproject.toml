@@ -34,7 +34,7 @@ dependencies = [
     "accelerate>=1.14,<2.0",
     "soundfile==0.14.0",
     "scipy==1.18.0",
-    "librosa==0.11.0",
+    "librosa==1.0.0",
     "wandb>=0.27,<1.0",
     "gcsfs>=2026.6.0",
     # transformers<5 requires huggingface-hub<1.0, so hub stays on its
